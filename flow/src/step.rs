@@ -87,3 +87,172 @@ impl Step {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::context::Context;
+    use serde_json::json;
+
+    #[test]
+    fn test_step_from_json_basic() {
+        let json_step = json!({
+            "label": "test_step",
+            "return": {"result": "success"}
+        });
+        
+        let step = Step::from_json(0, 0, &json_step).unwrap();
+        
+        assert_eq!(step.id, "p0_s0");
+        assert_eq!(step.label, Some("test_step".to_string()));
+        assert_eq!(step.return_val, Some(json!({"result": "success"})));
+        assert!(step.condition.is_none());
+        assert!(step.then_pipeline.is_none());
+        assert!(step.else_pipeline.is_none());
+        assert!(step.to_step.is_none());
+    }
+
+    #[test]
+    fn test_step_from_json_with_condition() {
+        let json_step = json!({
+            "condition": {
+                "left": "params.value",
+                "operator": "greater_than",
+                "right": 10
+            },
+            "then": {
+                "pipeline_id": 1
+            },
+            "else": {
+                "pipeline_id": 2
+            }
+        });
+        
+        let step = Step::from_json(0, 0, &json_step).unwrap();
+        
+        assert!(step.condition.is_some());
+        assert_eq!(step.then_pipeline, Some(1));
+        assert_eq!(step.else_pipeline, Some(2));
+    }
+
+    #[test]
+    fn test_step_from_json_with_to_step() {
+        let json_step = json!({
+            "to": {
+                "pipeline": 1,
+                "step": 2
+            }
+        });
+        
+        let step = Step::from_json(0, 0, &json_step).unwrap();
+        
+        assert_eq!(step.to_step, Some((1, 2)));
+    }
+
+    #[tokio::test]
+    async fn test_step_execute_return() {
+        let ctx = Context::new();
+        let step = Step {
+            id: "test".to_string(),
+            label: None,
+            condition: None,
+            return_val: Some(json!({"result": "immediate"})),
+            then_pipeline: None,
+            else_pipeline: None,
+            to_step: None,
+        };
+        
+        let output = step.execute(&ctx).await.unwrap();
+        
+        assert_eq!(output.next_step, NextStep::Stop);
+        assert_eq!(output.output, Some(json!({"result": "immediate"})));
+    }
+
+    #[tokio::test]
+    async fn test_step_execute_to_step() {
+        let ctx = Context::new();
+        let step = Step {
+            id: "test".to_string(),
+            label: None,
+            condition: None,
+            return_val: None,
+            then_pipeline: None,
+            else_pipeline: None,
+            to_step: Some((1, 2)),
+        };
+        
+        let output = step.execute(&ctx).await.unwrap();
+        
+        assert_eq!(output.next_step, NextStep::Step { pipeline: 1, step: 2 });
+        assert!(output.output.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_step_execute_condition_true() {
+        let ctx = Context::from_main(json!({"value": 15}));
+        let condition = Condition::from_json(&json!({
+            "left": "params.value",
+            "operator": "greater_than",
+            "right": 10
+        })).unwrap();
+        
+        let step = Step {
+            id: "test".to_string(),
+            label: None,
+            condition: Some(condition),
+            return_val: None,
+            then_pipeline: Some(1),
+            else_pipeline: Some(2),
+            to_step: None,
+        };
+        
+        let output = step.execute(&ctx).await.unwrap();
+        
+        assert_eq!(output.next_step, NextStep::Pipeline(1));
+        assert!(output.output.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_step_execute_condition_false() {
+        let ctx = Context::from_main(json!({"value": 5}));
+        let condition = Condition::from_json(&json!({
+            "left": "params.value",
+            "operator": "greater_than",
+            "right": 10
+        })).unwrap();
+        
+        let step = Step {
+            id: "test".to_string(),
+            label: None,
+            condition: Some(condition),
+            return_val: None,
+            then_pipeline: Some(1),
+            else_pipeline: Some(2),
+            to_step: None,
+        };
+        
+        let output = step.execute(&ctx).await.unwrap();
+        
+        assert_eq!(output.next_step, NextStep::Pipeline(2));
+        assert!(output.output.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_step_execute_default_next() {
+        let ctx = Context::new();
+        let step = Step {
+            id: "test".to_string(),
+            label: None,
+            condition: None,
+            return_val: None,
+            then_pipeline: None,
+            else_pipeline: None,
+            to_step: None,
+        };
+        
+        let output = step.execute(&ctx).await.unwrap();
+        
+        assert_eq!(output.next_step, NextStep::Next);
+        assert!(output.output.is_none());
+    }
+}

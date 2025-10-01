@@ -67,6 +67,7 @@ mod tests {
     use crate::context::Context;
     use serde_json::json;
 
+    // 基本表达式测试
     #[test]
     fn test_basic_expressions() {
         let ctx = Context::from_main(json!({ 
@@ -76,10 +77,22 @@ mod tests {
             "name": "Alice"
         }));
         
-        // 测试基本比较
+        // 数值比较
         assert!(evaluate_expression("params_age >= 18", &ctx).unwrap());
         assert!(evaluate_expression("params_income > 5000", &ctx).unwrap());
+        assert!(evaluate_expression("params_age < 30", &ctx).unwrap());
+        assert!(evaluate_expression("params_age <= 25", &ctx).unwrap());
+        assert!(evaluate_expression("params_age == 25", &ctx).unwrap());
+        assert!(evaluate_expression("params_age != 30", &ctx).unwrap());
+        
+        // 布尔运算
         assert!(evaluate_expression("!params_is_student", &ctx).unwrap());
+        assert!(evaluate_expression("params_age > 20 && !params_is_student", &ctx).unwrap());
+        assert!(evaluate_expression("params_age < 30 || params_income > 1000", &ctx).unwrap());
+        
+        // 字符串比较
+        assert!(evaluate_expression("params_name == \"Alice\"", &ctx).unwrap());
+        assert!(evaluate_expression("params_name != \"Bob\"", &ctx).unwrap());
     }
 
     #[test]
@@ -87,22 +100,91 @@ mod tests {
         let ctx = Context::from_main(json!({ 
             "age": 25, 
             "income": 6000.0, 
-            "is_student": false
+            "is_student": false,
+            "has_job": true
         }));
         
-        // 测试复杂表达式
-        assert!(evaluate_expression("params_age >= 18 && params_income > 5000", &ctx).unwrap());
-        assert!(evaluate_expression("params_age < 30 || params_is_student", &ctx).unwrap());
+        // 复杂逻辑表达式 - 这些应该都为 true
+        assert!(evaluate_expression(
+            "params_age >= 18 && params_income > 5000 && params_has_job && !params_is_student", 
+            &ctx
+        ).unwrap());
+        
+        // 这个表达式应该为 false，因为所有条件都不满足
+        // age < 18: false, is_student: false, income < 1000: false
+        assert!(!evaluate_expression(
+            "params_age < 18 || params_is_student || params_income < 1000", 
+            &ctx
+        ).unwrap());
     }
 
     #[test]
-    fn test_string_comparison() {
+    fn test_expression_errors() {
+        let ctx = Context::from_main(json!({ "value": 10 }));
+        
+        // 语法错误
+        assert!(evaluate_expression("invalid syntax", &ctx).is_err());
+        
+        // 未定义变量
+        assert!(evaluate_expression("undefined_var > 5", &ctx).is_err());
+    }
+
+    #[test]
+    fn test_edge_cases() {
         let ctx = Context::from_main(json!({ 
-            "name": "Alice"
+            "zero": 0,
+            "negative": -5,
+            "empty_string": "",
+            "non_empty_string": "hello",
+            "bool_true": true,
+            "bool_false": false
         }));
         
-        // 测试字符串比较
-        assert!(evaluate_expression("params_name == \"Alice\"", &ctx).unwrap());
-        assert!(evaluate_expression("params_name != \"Bob\"", &ctx).unwrap());
+        // 边界值测试 - 使用明确的布尔表达式
+        assert!(!evaluate_expression("params_zero == 0", &ctx).unwrap()); // 0 == 0 为 true
+        assert!(evaluate_expression("params_negative < 0", &ctx).unwrap()); // -5 < 0 为 true
+        assert!(!evaluate_expression("params_empty_string == \"\"", &ctx).unwrap()); // 空字符串比较为 true
+        assert!(evaluate_expression("params_non_empty_string == \"hello\"", &ctx).unwrap()); // 字符串比较为 true
+        assert!(evaluate_expression("params_bool_true", &ctx).unwrap());
+        assert!(!evaluate_expression("params_bool_false", &ctx).unwrap());
+        
+        // 测试数值到布尔值的转换
+        assert!(!evaluate_expression("params_zero", &ctx).unwrap()); // 0 转换为 false
+        assert!(evaluate_expression("params_negative", &ctx).unwrap()); // -5 转换为 true
+    }
+
+    #[test]
+    fn test_with_payload_variables() {
+        let mut ctx = Context::from_main(json!({ "initial": 10 }));
+        ctx.set_payload(json!({
+            "processed": true,
+            "count": 5,
+            "message": "done"
+        }));
+        
+        assert!(evaluate_expression("payload_processed", &ctx).unwrap());
+        assert!(evaluate_expression("payload_count == 5", &ctx).unwrap());
+        assert!(evaluate_expression("payload_message == \"done\"", &ctx).unwrap());
+        assert!(evaluate_expression("params_initial == 10 && payload_processed", &ctx).unwrap());
+    }
+
+    #[test]
+    fn test_numeric_conversions() {
+        let ctx = Context::from_main(json!({ 
+            "int_zero": 0,
+            "int_positive": 42,
+            "int_negative": -1,
+            "float_zero": 0.0,
+            "float_positive": 3.14,
+            "float_negative": -2.5
+        }));
+        
+        // 测试数值到布尔的隐式转换
+        assert!(!evaluate_expression("params_int_zero", &ctx).unwrap());
+        assert!(evaluate_expression("params_int_positive", &ctx).unwrap());
+        assert!(evaluate_expression("params_int_negative", &ctx).unwrap());
+        assert!(!evaluate_expression("params_float_zero", &ctx).unwrap());
+        assert!(evaluate_expression("params_float_positive", &ctx).unwrap());
+        assert!(evaluate_expression("params_float_negative", &ctx).unwrap());
     }
 }

@@ -56,3 +56,161 @@ impl Flow {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::context::Context;
+    use serde_json::json;
+
+    fn create_test_flow_json() -> JsonValue {
+        json!({
+            "steps": [
+                {
+                    "label": "step1",
+                    "condition": {
+                        "left": "params.value",
+                        "operator": "greater_than",
+                        "right": 10
+                    },
+                    "then": {
+                        "steps": [
+                            {
+                                "label": "then_step",
+                                "return": {"result": "then_branch"}
+                            }
+                        ]
+                    },
+                    "else": {
+                        "steps": [
+                            {
+                                "label": "else_step", 
+                                "return": {"result": "else_branch"}
+                            }
+                        ]
+                    }
+                }
+            ]
+        })
+    }
+
+    #[test]
+    fn test_flow_from_json() {
+        let flow_json = create_test_flow_json();
+        let flow = Flow::from_json(&flow_json).unwrap();
+        
+        assert_eq!(flow.main_pipeline_id, 0);
+        assert!(flow.pipelines.contains_key(&0));
+        // 应该创建了3个pipeline：main(0), then(1), else(2)
+        assert!(flow.pipelines.contains_key(&1));
+        assert!(flow.pipelines.contains_key(&2));
+    }
+
+    #[test]
+    fn test_flow_from_json_empty() {
+        let empty_json = json!({});
+        assert!(Flow::from_json(&empty_json).is_err());
+        
+        let no_steps_json = json!({"steps": []});
+        assert!(Flow::from_json(&no_steps_json).is_err());
+    }
+
+    #[tokio::test]
+    async fn test_flow_execute_simple() {
+        let flow_json = json!({
+            "steps": [
+                {
+                    "return": {"result": "success"}
+                }
+            ]
+        });
+        
+        let flow = Flow::from_json(&flow_json).unwrap();
+        let mut ctx = Context::new();
+        
+        let result = flow.execute(&mut ctx).await.unwrap();
+        
+        assert_eq!(result, Some(json!({"result": "success"})));
+    }
+
+    #[tokio::test]
+    async fn test_flow_execute_conditional_then() {
+        let flow_json = create_test_flow_json();
+        let flow = Flow::from_json(&flow_json).unwrap();
+        let mut ctx = Context::from_main(json!({"value": 15})); // value > 10
+        
+        let result = flow.execute(&mut ctx).await.unwrap();
+        
+        assert_eq!(result, Some(json!({"result": "then_branch"})));
+    }
+
+    #[tokio::test]
+    async fn test_flow_execute_conditional_else() {
+        let flow_json = create_test_flow_json();
+        let flow = Flow::from_json(&flow_json).unwrap();
+        let mut ctx = Context::from_main(json!({"value": 5})); // value <= 10
+        
+        let result = flow.execute(&mut ctx).await.unwrap();
+        
+        assert_eq!(result, Some(json!({"result": "else_branch"})));
+    }
+
+    #[tokio::test]
+    async fn test_flow_execute_pipeline_not_found() {
+        let flow_json = json!({
+            "steps": [
+                {
+                    "to": {
+                        "pipeline": 999, // 不存在的pipeline
+                        "step": 0
+                    }
+                }
+            ]
+        });
+        
+        let flow = Flow::from_json(&flow_json).unwrap();
+        let mut ctx = Context::new();
+        
+        let result = flow.execute(&mut ctx).await;
+        
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            FlowError::PipelineNotFound(pipeline_id) => {
+                assert_eq!(pipeline_id, 999);
+            }
+            _ => panic!("Expected PipelineNotFound error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_flow_execute_multiple_steps() {
+        let flow_json = json!({
+            "steps": [
+                {
+                    "label": "step1"
+                },
+                {
+                    "label": "step2", 
+                    "return": {"result": "final"}
+                }
+            ]
+        });
+        
+        let flow = Flow::from_json(&flow_json).unwrap();
+        let mut ctx = Context::new();
+        
+        let result = flow.execute(&mut ctx).await.unwrap();
+        
+        assert_eq!(result, Some(json!({"result": "final"})));
+    }
+
+    #[test]
+    fn test_flow_clone() {
+        let flow_json = create_test_flow_json();
+        let flow1 = Flow::from_json(&flow_json).unwrap();
+        let flow2 = flow1.clone();
+        
+        assert_eq!(flow1.main_pipeline_id, flow2.main_pipeline_id);
+        assert_eq!(flow1.pipelines.len(), flow2.pipelines.len());
+    }
+}

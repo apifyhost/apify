@@ -62,3 +62,176 @@ fn process_pipeline(
     pipelines.insert(pipeline_id, Pipeline::new(pipeline_id, steps));
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_json_to_pipelines_basic() {
+        let json_flow = json!({
+            "steps": [
+                {
+                    "label": "step1",
+                    "return": {"result": "step1"}
+                },
+                {
+                    "label": "step2", 
+                    "return": {"result": "step2"}
+                }
+            ]
+        });
+        
+        let pipelines = json_to_pipelines(&json_flow).unwrap();
+        
+        assert!(pipelines.contains_key(&0)); // 主pipeline
+        assert_eq!(pipelines.len(), 1);
+        
+        let main_pipeline = pipelines.get(&0).unwrap();
+        assert_eq!(main_pipeline.steps.len(), 2);
+        assert_eq!(main_pipeline.steps[0].label, Some("step1".to_string()));
+        assert_eq!(main_pipeline.steps[1].label, Some("step2".to_string()));
+    }
+
+    #[test]
+    fn test_json_to_pipelines_with_branches() {
+        let json_flow = json!({
+            "steps": [
+                {
+                    "condition": {
+                        "left": "params.value",
+                        "operator": "greater_than",
+                        "right": 10
+                    },
+                    "then": {
+                        "steps": [
+                            {"label": "then_step1"},
+                            {"label": "then_step2"}
+                        ]
+                    },
+                    "else": {
+                        "steps": [
+                            {"label": "else_step1"},
+                            {"label": "else_step2"},
+                            {"label": "else_step3"}
+                        ]
+                    }
+                }
+            ]
+        });
+        
+        let pipelines = json_to_pipelines(&json_flow).unwrap();
+        
+        // 应该创建3个pipeline：main(0), then(1), else(2)
+        assert_eq!(pipelines.len(), 3);
+        
+        assert!(pipelines.contains_key(&0));
+        assert!(pipelines.contains_key(&1));
+        assert!(pipelines.contains_key(&2));
+        
+        let then_pipeline = pipelines.get(&1).unwrap();
+        let else_pipeline = pipelines.get(&2).unwrap();
+        
+        assert_eq!(then_pipeline.steps.len(), 2);
+        assert_eq!(else_pipeline.steps.len(), 3);
+    }
+
+    #[test]
+    fn test_json_to_pipelines_nested_branches() {
+        let json_flow = json!({
+            "steps": [
+                {
+                    "condition": {
+                        "left": "params.a",
+                        "operator": "greater_than",
+                        "right": 10
+                    },
+                    "then": {
+                        "steps": [
+                            {
+                                "condition": {
+                                    "left": "params.b", 
+                                    "operator": "less_than",
+                                    "right": 5
+                                },
+                                "then": {
+                                    "steps": [
+                                        {"label": "nested_then"}
+                                    ]
+                                },
+                                "else": {
+                                    "steps": [
+                                        {"label": "nested_else"}
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        });
+        
+        let pipelines = json_to_pipelines(&json_flow).unwrap();
+        
+        // 应该创建4个pipeline：main(0), then(1), nested_then(2), nested_else(3)
+        assert_eq!(pipelines.len(), 4);
+    }
+
+    #[test]
+    fn test_json_to_pipelines_errors() {
+        // 缺少steps数组
+        let invalid_json = json!({});
+        assert!(json_to_pipelines(&invalid_json).is_err());
+        
+        // steps不是数组
+        let invalid_json2 = json!({"steps": "not_an_array"});
+        assert!(json_to_pipelines(&invalid_json2).is_err());
+        
+        // then分支缺少steps
+        let invalid_json3 = json!({
+            "steps": [
+                {
+                    "then": {"not_steps": "invalid"}
+                }
+            ]
+        });
+        assert!(json_to_pipelines(&invalid_json3).is_err());
+    }
+
+    #[test]
+    fn test_pipeline_id_assignment() {
+        let json_flow = json!({
+            "steps": [
+                {
+                    "then": {
+                        "steps": [
+                            {
+                                "else": {
+                                    "steps": [
+                                        {"label": "deep"}
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "else": {
+                        "steps": [
+                            {"label": "another"}
+                        ]
+                    }
+                }
+            ]
+        });
+        
+        let pipelines = json_to_pipelines(&json_flow).unwrap();
+        
+        // 应该分配连续的ID：main(0), then(1), else(2), else(3)
+        let expected_ids = vec![0, 1, 2, 3];
+        for id in expected_ids {
+            assert!(pipelines.contains_key(&id), "Missing pipeline with id {}", id);
+        }
+    }
+}
