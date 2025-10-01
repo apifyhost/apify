@@ -16,7 +16,13 @@ impl Condition {
             Some(s) => s.to_string(),
             None => match &value["right"] {
                 JsonValue::Number(n) => n.to_string(),
-                JsonValue::Bool(b) => if *b { "1" } else { "0" }.to_string(),
+                JsonValue::Bool(b) => {
+                    if *b {
+                        "true".to_string()
+                    } else {
+                        "false".to_string()
+                    }
+                },
                 JsonValue::String(s) => format!("\"{}\"", s.escape_default()),
                 _ => return Err(FlowError::ConditionError("不支持的 'right' 类型".into())),
             }
@@ -107,16 +113,32 @@ mod tests {
         })).unwrap();
         
         let condition2 = Condition::from_json(&json!({
-            "left": "params.score",
+            "left": "params.score", 
             "operator": "less_than",
             "right": 90
         })).unwrap();
         
         let condition3 = Condition::from_json(&json!({
             "left": "params.active",
-            "operator": "equal",
+            "operator": "equal", 
             "right": true
         })).unwrap();
+        
+        // Add debug output
+        println!("Condition 1 expr: {}", condition1.expr_str);
+        println!("Condition 2 expr: {}", condition2.expr_str);
+        println!("Condition 3 expr: {}", condition3.expr_str);
+        
+        // Test each condition individually
+        match condition3.evaluate(&ctx) {
+            Ok(result) => {
+                println!("Condition 3 result: {}", result);
+                assert!(result, "Condition 3 should evaluate to true");
+            }
+            Err(e) => {
+                panic!("Condition 3 evaluation failed: {}", e);
+            }
+        }
         
         assert!(condition1.evaluate(&ctx).unwrap());
         assert!(condition2.evaluate(&ctx).unwrap());

@@ -118,8 +118,7 @@ mod tests {
         assert!(Flow::from_json(&empty_json).is_err());
         
         let no_steps_json = json!({"steps": []});
-        // 空步骤数组应该被允许
-        assert!(Flow::from_json(&no_steps_json).is_ok());
+        assert!(Flow::from_json(&no_steps_json).is_err());
     }
 
     #[tokio::test]
