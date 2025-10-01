@@ -77,3 +77,102 @@ impl Context {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_context_creation() {
+        let ctx = Context::new();
+        assert!(ctx.get_main().is_null());
+        assert!(ctx.get_payload().is_none());
+    }
+
+    #[test]
+    fn test_context_from_main() {
+        let main_data = json!({"name": "test", "value": 42});
+        let ctx = Context::from_main(main_data.clone());
+        
+        assert_eq!(ctx.get_main(), &main_data);
+        assert!(ctx.get_payload().is_none());
+    }
+
+    #[test]
+    fn test_set_payload() {
+        let mut ctx = Context::new();
+        let payload = json!({"result": "success"});
+        
+        ctx.set_payload(payload.clone());
+        assert_eq!(ctx.get_payload(), Some(payload));
+    }
+
+    #[test]
+    fn test_step_outputs() {
+        let mut ctx = Context::new();
+        let step_id = "p0_s1".to_string();
+        let output = json!({"data": "processed"});
+        
+        ctx.add_step_output(step_id.clone(), output.clone());
+        assert_eq!(ctx.get_step_output(&step_id), Some(&output));
+        assert!(ctx.get_step_output("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_get_variable_params() {
+        let main_data = json!({
+            "user": {
+                "name": "Alice",
+                "age": 25
+            },
+            "scores": [85, 90, 78]
+        });
+        let ctx = Context::from_main(main_data);
+        
+        assert_eq!(ctx.get_variable("params.user.name"), Some(json!("Alice")));
+        assert_eq!(ctx.get_variable("params.user.age"), Some(json!(25)));
+        assert_eq!(ctx.get_variable("params.scores.0"), Some(json!(85)));
+        assert_eq!(ctx.get_variable("params.nonexistent"), None);
+    }
+
+    #[test]
+    fn test_get_variable_payload() {
+        let mut ctx = Context::new();
+        let payload = json!({
+            "result": {
+                "status": "success",
+                "data": [1, 2, 3]
+            }
+        });
+        ctx.set_payload(payload);
+        
+        assert_eq!(ctx.get_variable("payload.result.status"), Some(json!("success")));
+        assert_eq!(ctx.get_variable("payload.result.data.1"), Some(json!(2)));
+    }
+
+    #[test]
+    fn test_get_variable_steps() {
+        let mut ctx = Context::new();
+        let step_output = json!({"output": "step1_result"});
+        
+        ctx.add_step_output("p0_s0".to_string(), step_output.clone());
+        assert_eq!(ctx.get_variable("steps.p0_s0"), Some(step_output));
+    }
+
+    #[test]
+    fn test_clone_context() {
+        let mut ctx1 = Context::from_main(json!({"data": "original"}));
+        ctx1.set_payload(json!({"result": "test"}));
+        ctx1.add_step_output("step1".to_string(), json!({"output": "data"}));
+        
+        let ctx2 = ctx1.clone();
+        
+        assert_eq!(ctx1.get_main(), ctx2.get_main());
+        assert_eq!(ctx1.get_payload(), ctx2.get_payload());
+        assert_eq!(
+            ctx1.get_step_output("step1"),
+            ctx2.get_step_output("step1")
+        );
+    }
+}
