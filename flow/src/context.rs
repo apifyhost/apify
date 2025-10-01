@@ -3,8 +3,8 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct Context {
-    main: JsonValue,          // 主输入参数
-    payload: Option<JsonValue>, // 中间结果
+    main: JsonValue,                          // 主输入参数
+    payload: Option<JsonValue>,               // 中间结果
     step_outputs: HashMap<String, JsonValue>, // 步骤输出
 }
 
@@ -18,7 +18,10 @@ impl Context {
     }
 
     pub fn from_main(main: JsonValue) -> Self {
-        Self { main, ..Self::new() }
+        Self {
+            main,
+            ..Self::new()
+        }
     }
 
     pub fn get_main(&self) -> &JsonValue {
@@ -54,8 +57,14 @@ impl Context {
 
         match parts[0] {
             "params" => self.get_path(&self.main, &parts[1..]),
-            "payload" => self.payload.as_ref().and_then(|p| self.get_path(p, &parts[1..])),
-            "steps" => parts.get(1).and_then(|id| self.step_outputs.get(*id)).cloned(),
+            "payload" => self
+                .payload
+                .as_ref()
+                .and_then(|p| self.get_path(p, &parts[1..])),
+            "steps" => parts
+                .get(1)
+                .and_then(|id| self.step_outputs.get(*id))
+                .cloned(),
             _ => None,
         }
     }
@@ -67,7 +76,9 @@ impl Context {
         }
 
         match value {
-            JsonValue::Object(map) => map.get(parts[0]).and_then(|v| self.get_path(v, &parts[1..])),
+            JsonValue::Object(map) => map
+                .get(parts[0])
+                .and_then(|v| self.get_path(v, &parts[1..])),
             JsonValue::Array(arr) => parts[0]
                 .parse::<usize>()
                 .ok()
@@ -94,7 +105,7 @@ mod tests {
     fn test_context_from_main() {
         let main_data = json!({"name": "test", "value": 42});
         let ctx = Context::from_main(main_data.clone());
-        
+
         assert_eq!(ctx.get_main(), &main_data);
         assert!(ctx.get_payload().is_none());
     }
@@ -103,7 +114,7 @@ mod tests {
     fn test_set_payload() {
         let mut ctx = Context::new();
         let payload = json!({"result": "success"});
-        
+
         ctx.set_payload(payload.clone());
         assert_eq!(ctx.get_payload(), Some(payload));
     }
@@ -113,7 +124,7 @@ mod tests {
         let mut ctx = Context::new();
         let step_id = "p0_s1".to_string();
         let output = json!({"data": "processed"});
-        
+
         ctx.add_step_output(step_id.clone(), output.clone());
         assert_eq!(ctx.get_step_output(&step_id), Some(&output));
         assert!(ctx.get_step_output("nonexistent").is_none());
@@ -129,7 +140,7 @@ mod tests {
             "scores": [85, 90, 78]
         });
         let ctx = Context::from_main(main_data);
-        
+
         assert_eq!(ctx.get_variable("params.user.name"), Some(json!("Alice")));
         assert_eq!(ctx.get_variable("params.user.age"), Some(json!(25)));
         assert_eq!(ctx.get_variable("params.scores.0"), Some(json!(85)));
@@ -146,8 +157,11 @@ mod tests {
             }
         });
         ctx.set_payload(payload);
-        
-        assert_eq!(ctx.get_variable("payload.result.status"), Some(json!("success")));
+
+        assert_eq!(
+            ctx.get_variable("payload.result.status"),
+            Some(json!("success"))
+        );
         assert_eq!(ctx.get_variable("payload.result.data.1"), Some(json!(2)));
     }
 
@@ -155,7 +169,7 @@ mod tests {
     fn test_get_variable_steps() {
         let mut ctx = Context::new();
         let step_output = json!({"output": "step1_result"});
-        
+
         ctx.add_step_output("p0_s0".to_string(), step_output.clone());
         assert_eq!(ctx.get_variable("steps.p0_s0"), Some(step_output));
     }
@@ -165,14 +179,11 @@ mod tests {
         let mut ctx1 = Context::from_main(json!({"data": "original"}));
         ctx1.set_payload(json!({"result": "test"}));
         ctx1.add_step_output("step1".to_string(), json!({"output": "data"}));
-        
+
         let ctx2 = ctx1.clone();
-        
+
         assert_eq!(ctx1.get_main(), ctx2.get_main());
         assert_eq!(ctx1.get_payload(), ctx2.get_payload());
-        assert_eq!(
-            ctx1.get_step_output("step1"),
-            ctx2.get_step_output("step1")
-        );
+        assert_eq!(ctx1.get_step_output("step1"), ctx2.get_step_output("step1"));
     }
 }

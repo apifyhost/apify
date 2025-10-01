@@ -1,4 +1,7 @@
-use crate::{context::Context, error::FlowError, pipeline::Pipeline, step::NextStep, transform::json_to_pipelines};
+use crate::{
+    context::Context, error::FlowError, pipeline::Pipeline, step::NextStep,
+    transform::json_to_pipelines,
+};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 
@@ -26,7 +29,10 @@ impl Flow {
             return Err(FlowError::TransformError("主流程不能为空".into()));
         }
 
-        Ok(Self { pipelines, main_pipeline_id })
+        Ok(Self {
+            pipelines,
+            main_pipeline_id,
+        })
     }
 
     pub async fn execute(&self, context: &mut Context) -> Result<Option<JsonValue>, FlowError> {
@@ -34,27 +40,32 @@ impl Flow {
         let mut current_step_idx = 0;
 
         loop {
-            let pipeline = self.pipelines.get(&current_pipeline_id)
+            let pipeline = self
+                .pipelines
+                .get(&current_pipeline_id)
                 .ok_or_else(|| FlowError::PipelineNotFound(current_pipeline_id))?;
 
             let step_output = pipeline.execute(context, current_step_idx).await?;
 
             match step_output.next_step {
                 NextStep::Stop => return Ok(step_output.output),
-                
+
                 NextStep::Next => {
                     current_step_idx += 1;
                     if current_step_idx >= pipeline.steps.len() {
                         return Ok(step_output.output);
                     }
                 }
-                
+
                 NextStep::Pipeline(target_id) => {
                     current_pipeline_id = target_id;
                     current_step_idx = 0;
                 }
-                
-                NextStep::Step { pipeline: target_id, step: target_step } => {
+
+                NextStep::Step {
+                    pipeline: target_id,
+                    step: target_step,
+                } => {
                     current_pipeline_id = target_id;
                     current_step_idx = target_step;
                 }
@@ -90,7 +101,7 @@ mod tests {
                     "else": {
                         "steps": [
                             {
-                                "label": "else_step", 
+                                "label": "else_step",
                                 "return": {"result": "else_branch"}
                             }
                         ]
@@ -104,7 +115,7 @@ mod tests {
     fn test_flow_from_json() {
         let flow_json = create_test_flow_json();
         let flow = Flow::from_json(&flow_json).unwrap();
-        
+
         assert_eq!(flow.main_pipeline_id, 0);
         assert!(flow.pipelines.contains_key(&0));
         // 应该创建了3个pipeline：main(0), then(1), else(2)
@@ -116,7 +127,7 @@ mod tests {
     fn test_flow_from_json_empty() {
         let empty_json = json!({});
         assert!(Flow::from_json(&empty_json).is_err());
-        
+
         let no_steps_json = json!({"steps": []});
         assert!(Flow::from_json(&no_steps_json).is_err());
     }
@@ -130,12 +141,12 @@ mod tests {
                 }
             ]
         });
-        
+
         let flow = Flow::from_json(&flow_json).unwrap();
         let mut ctx = Context::new();
-        
+
         let result = flow.execute(&mut ctx).await.unwrap();
-        
+
         assert_eq!(result, Some(json!({"result": "success"})));
     }
 
@@ -144,9 +155,9 @@ mod tests {
         let flow_json = create_test_flow_json();
         let flow = Flow::from_json(&flow_json).unwrap();
         let mut ctx = Context::from_main(json!({"value": 15})); // value > 10
-        
+
         let result = flow.execute(&mut ctx).await.unwrap();
-        
+
         assert_eq!(result, Some(json!({"result": "then_branch"})));
     }
 
@@ -155,9 +166,9 @@ mod tests {
         let flow_json = create_test_flow_json();
         let flow = Flow::from_json(&flow_json).unwrap();
         let mut ctx = Context::from_main(json!({"value": 5})); // value <= 10
-        
+
         let result = flow.execute(&mut ctx).await.unwrap();
-        
+
         assert_eq!(result, Some(json!({"result": "else_branch"})));
     }
 
@@ -173,12 +184,12 @@ mod tests {
                 }
             ]
         });
-        
+
         let flow = Flow::from_json(&flow_json).unwrap();
         let mut ctx = Context::new();
-        
+
         let result = flow.execute(&mut ctx).await;
-        
+
         assert!(result.is_err());
         match result.unwrap_err() {
             FlowError::PipelineNotFound(pipeline_id) => {
@@ -196,17 +207,17 @@ mod tests {
                     "label": "step1"
                 },
                 {
-                    "label": "step2", 
+                    "label": "step2",
                     "return": {"result": "final"}
                 }
             ]
         });
-        
+
         let flow = Flow::from_json(&flow_json).unwrap();
         let mut ctx = Context::new();
-        
+
         let result = flow.execute(&mut ctx).await.unwrap();
-        
+
         assert_eq!(result, Some(json!({"result": "final"})));
     }
 
@@ -215,7 +226,7 @@ mod tests {
         let flow_json = create_test_flow_json();
         let flow1 = Flow::from_json(&flow_json).unwrap();
         let flow2 = flow1.clone();
-        
+
         assert_eq!(flow1.main_pipeline_id, flow2.main_pipeline_id);
         assert_eq!(flow1.pipelines.len(), flow2.pipelines.len());
     }

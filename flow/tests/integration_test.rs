@@ -27,7 +27,7 @@ mod integration_tests {
                     "else": {
                         "steps": [
                             {
-                                "label": "minor_processing", 
+                                "label": "minor_processing",
                                 "return": {"status": "minor", "message": "Processing minor user"}
                             }
                         ]
@@ -39,20 +39,26 @@ mod integration_tests {
         let flow = Flow::from_json(&workflow_json).unwrap();
         let mut ctx = Context::from_main(json!({"age": 25}));
         let result = flow.execute(&mut ctx).await.unwrap();
-        
-        assert_eq!(result, Some(json!({
-            "status": "adult",
-            "message": "Processing adult user"
-        })));
+
+        assert_eq!(
+            result,
+            Some(json!({
+                "status": "adult",
+                "message": "Processing adult user"
+            }))
+        );
 
         let flow = Flow::from_json(&workflow_json).unwrap();
         let mut ctx = Context::from_main(json!({"age": 16}));
         let result = flow.execute(&mut ctx).await.unwrap();
-        
-        assert_eq!(result, Some(json!({
-            "status": "minor", 
-            "message": "Processing minor user"
-        })));
+
+        assert_eq!(
+            result,
+            Some(json!({
+                "status": "minor",
+                "message": "Processing minor user"
+            }))
+        );
     }
 
     #[tokio::test]
@@ -76,10 +82,13 @@ mod integration_tests {
         let mut ctx = Context::new();
         let result = flow.execute(&mut ctx).await.unwrap();
 
-        assert_eq!(result, Some(json!({
-            "sequence": "complete",
-            "step": 3
-        })));
+        assert_eq!(
+            result,
+            Some(json!({
+                "sequence": "complete",
+                "step": 3
+            }))
+        );
     }
 
     #[tokio::test]
@@ -115,4 +124,3 @@ mod integration_tests {
         assert!(format!("{}", step_error).contains("步骤未找到"));
     }
 }
-

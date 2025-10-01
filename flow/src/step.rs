@@ -6,10 +6,7 @@ pub enum NextStep {
     Stop,
     Next,
     Pipeline(usize),
-    Step {
-        pipeline: usize,
-        step: usize,
-    },
+    Step { pipeline: usize, step: usize },
 }
 
 #[derive(Debug, Clone)]
@@ -38,14 +35,23 @@ impl Step {
         Ok(Self {
             id: generate_step_id(pipeline_id, step_idx),
             label: value["label"].as_str().map(|s| s.to_string()),
-            condition: value.get("condition").map(Condition::from_json).transpose()?,
+            condition: value
+                .get("condition")
+                .map(Condition::from_json)
+                .transpose()?,
             return_val: value.get("return").cloned(),
             then_pipeline: value["then"]["pipeline_id"].as_u64().map(|x| x as usize),
             else_pipeline: value["else"]["pipeline_id"].as_u64().map(|x| x as usize),
             to_step: if let Some(to) = value.get("to") {
                 Some((
-                    to["pipeline"].as_u64().ok_or_else(|| FlowError::StepError("缺少 'to.pipeline'".into()))? as usize,
-                    to["step"].as_u64().ok_or_else(|| FlowError::StepError("缺少 'to.step'".into()))? as usize,
+                    to["pipeline"]
+                        .as_u64()
+                        .ok_or_else(|| FlowError::StepError("缺少 'to.pipeline'".into()))?
+                        as usize,
+                    to["step"]
+                        .as_u64()
+                        .ok_or_else(|| FlowError::StepError("缺少 'to.step'".into()))?
+                        as usize,
                 ))
             } else {
                 None
@@ -73,11 +79,20 @@ impl Step {
         // 条件判断
         if let Some(condition) = &self.condition {
             let next_step = if condition.evaluate(context)? {
-                self.then_pipeline.clone().map(NextStep::Pipeline).unwrap_or(NextStep::Next)
+                self.then_pipeline
+                    .clone()
+                    .map(NextStep::Pipeline)
+                    .unwrap_or(NextStep::Next)
             } else {
-                self.else_pipeline.clone().map(NextStep::Pipeline).unwrap_or(NextStep::Next)
+                self.else_pipeline
+                    .clone()
+                    .map(NextStep::Pipeline)
+                    .unwrap_or(NextStep::Next)
             };
-            return Ok(StepOutput { next_step, output: None });
+            return Ok(StepOutput {
+                next_step,
+                output: None,
+            });
         }
 
         // 默认下一步
@@ -100,9 +115,9 @@ mod tests {
             "label": "test_step",
             "return": {"result": "success"}
         });
-        
+
         let step = Step::from_json(0, 0, &json_step).unwrap();
-        
+
         assert_eq!(step.id, "p0_s0");
         assert_eq!(step.label, Some("test_step".to_string()));
         assert_eq!(step.return_val, Some(json!({"result": "success"})));
@@ -127,9 +142,9 @@ mod tests {
                 "pipeline_id": 2
             }
         });
-        
+
         let step = Step::from_json(0, 0, &json_step).unwrap();
-        
+
         assert!(step.condition.is_some());
         assert_eq!(step.then_pipeline, Some(1));
         assert_eq!(step.else_pipeline, Some(2));
@@ -143,9 +158,9 @@ mod tests {
                 "step": 2
             }
         });
-        
+
         let step = Step::from_json(0, 0, &json_step).unwrap();
-        
+
         assert_eq!(step.to_step, Some((1, 2)));
     }
 
@@ -161,9 +176,9 @@ mod tests {
             else_pipeline: None,
             to_step: None,
         };
-        
+
         let output = step.execute(&ctx).await.unwrap();
-        
+
         assert_eq!(output.next_step, NextStep::Stop);
         assert_eq!(output.output, Some(json!({"result": "immediate"})));
     }
@@ -180,10 +195,16 @@ mod tests {
             else_pipeline: None,
             to_step: Some((1, 2)),
         };
-        
+
         let output = step.execute(&ctx).await.unwrap();
-        
-        assert_eq!(output.next_step, NextStep::Step { pipeline: 1, step: 2 });
+
+        assert_eq!(
+            output.next_step,
+            NextStep::Step {
+                pipeline: 1,
+                step: 2
+            }
+        );
         assert!(output.output.is_none());
     }
 
@@ -194,8 +215,9 @@ mod tests {
             "left": "params.value",
             "operator": "greater_than",
             "right": 10
-        })).unwrap();
-        
+        }))
+        .unwrap();
+
         let step = Step {
             id: "test".to_string(),
             label: None,
@@ -205,9 +227,9 @@ mod tests {
             else_pipeline: Some(2),
             to_step: None,
         };
-        
+
         let output = step.execute(&ctx).await.unwrap();
-        
+
         assert_eq!(output.next_step, NextStep::Pipeline(1));
         assert!(output.output.is_none());
     }
@@ -219,8 +241,9 @@ mod tests {
             "left": "params.value",
             "operator": "greater_than",
             "right": 10
-        })).unwrap();
-        
+        }))
+        .unwrap();
+
         let step = Step {
             id: "test".to_string(),
             label: None,
@@ -230,9 +253,9 @@ mod tests {
             else_pipeline: Some(2),
             to_step: None,
         };
-        
+
         let output = step.execute(&ctx).await.unwrap();
-        
+
         assert_eq!(output.next_step, NextStep::Pipeline(2));
         assert!(output.output.is_none());
     }
@@ -249,9 +272,9 @@ mod tests {
             else_pipeline: None,
             to_step: None,
         };
-        
+
         let output = step.execute(&ctx).await.unwrap();
-        
+
         assert_eq!(output.next_step, NextStep::Next);
         assert!(output.output.is_none());
     }

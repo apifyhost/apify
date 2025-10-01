@@ -1,14 +1,14 @@
 use crate::{context::Context, error::FlowError};
-use evalexpr::{eval_boolean_with_context, HashMapContext, ContextWithMutableVariables};
+use evalexpr::{eval_boolean_with_context, ContextWithMutableVariables, HashMapContext};
 use serde_json::Value as JsonValue;
 
 /// 解析并执行表达式（使用 evalexpr）
 pub fn evaluate_expression(expr_str: &str, context: &Context) -> Result<bool, FlowError> {
     let mut eval_context = HashMapContext::new();
-    
+
     // 设置变量到上下文中
     set_context_variables(&mut eval_context, context);
-    
+
     eval_boolean_with_context(expr_str, &eval_context)
         .map_err(|e| FlowError::ExpressionError(format!("表达式执行失败: {}", e)))
 }
@@ -20,7 +20,9 @@ fn set_context_variables(eval_context: &mut HashMapContext, context: &Context) {
         for (key, value) in params {
             if let Some(eval_value) = convert_json_value(value.clone()) {
                 // 使用 params_ 前缀来避免命名冲突
-                eval_context.set_value(format!("params_{}", key), eval_value).ok();
+                eval_context
+                    .set_value(format!("params_{}", key), eval_value)
+                    .ok();
             }
         }
     }
@@ -30,7 +32,9 @@ fn set_context_variables(eval_context: &mut HashMapContext, context: &Context) {
         if let JsonValue::Object(payload_obj) = payload {
             for (key, value) in payload_obj {
                 if let Some(eval_value) = convert_json_value(value.clone()) {
-                    eval_context.set_value(format!("payload_{}", key), eval_value).ok();
+                    eval_context
+                        .set_value(format!("payload_{}", key), eval_value)
+                        .ok();
                 }
             }
         }
@@ -70,13 +74,13 @@ mod tests {
     // 基本表达式测试
     #[test]
     fn test_basic_expressions() {
-        let ctx = Context::from_main(json!({ 
-            "age": 25, 
-            "income": 6000.0, 
+        let ctx = Context::from_main(json!({
+            "age": 25,
+            "income": 6000.0,
             "is_student": false,
             "name": "Alice"
         }));
-        
+
         // 数值比较
         assert!(evaluate_expression("params_age >= 18", &ctx).unwrap());
         assert!(evaluate_expression("params_income > 5000", &ctx).unwrap());
@@ -84,12 +88,12 @@ mod tests {
         assert!(evaluate_expression("params_age <= 25", &ctx).unwrap());
         assert!(evaluate_expression("params_age == 25", &ctx).unwrap());
         assert!(evaluate_expression("params_age != 30", &ctx).unwrap());
-        
+
         // 布尔运算
         assert!(evaluate_expression("!params_is_student", &ctx).unwrap());
         assert!(evaluate_expression("params_age > 20 && !params_is_student", &ctx).unwrap());
         assert!(evaluate_expression("params_age < 30 || params_income > 1000", &ctx).unwrap());
-        
+
         // 字符串比较
         assert!(evaluate_expression("params_name == \"Alice\"", &ctx).unwrap());
         assert!(evaluate_expression("params_name != \"Bob\"", &ctx).unwrap());
@@ -97,41 +101,43 @@ mod tests {
 
     #[test]
     fn test_complex_expressions() {
-        let ctx = Context::from_main(json!({ 
-            "age": 25, 
-            "income": 6000.0, 
+        let ctx = Context::from_main(json!({
+            "age": 25,
+            "income": 6000.0,
             "is_student": false,
             "has_job": true
         }));
-        
+
         // 复杂逻辑表达式 - 这些应该都为 true
         assert!(evaluate_expression(
-            "params_age >= 18 && params_income > 5000 && params_has_job && !params_is_student", 
+            "params_age >= 18 && params_income > 5000 && params_has_job && !params_is_student",
             &ctx
-        ).unwrap());
-        
+        )
+        .unwrap());
+
         // 这个表达式应该为 false，因为所有条件都不满足
         // age < 18: false, is_student: false, income < 1000: false
         assert!(!evaluate_expression(
-            "params_age < 18 || params_is_student || params_income < 1000", 
+            "params_age < 18 || params_is_student || params_income < 1000",
             &ctx
-        ).unwrap());
+        )
+        .unwrap());
     }
 
     #[test]
     fn test_expression_errors() {
         let ctx = Context::from_main(json!({ "value": 10 }));
-        
+
         // 语法错误
         assert!(evaluate_expression("invalid syntax", &ctx).is_err());
-        
+
         // 未定义变量
         assert!(evaluate_expression("undefined_var > 5", &ctx).is_err());
     }
 
     #[test]
     fn test_edge_cases() {
-        let ctx = Context::from_main(json!({ 
+        let ctx = Context::from_main(json!({
             "zero": 0,
             "negative": -5,
             "empty_string": "",
@@ -139,7 +145,7 @@ mod tests {
             "bool_true": true,
             "bool_false": false
         }));
-        
+
         // 边界值测试 - 使用明确的布尔表达式
         assert!(evaluate_expression("params_zero == 0", &ctx).unwrap()); // 0 == 0 为 true
         assert!(evaluate_expression("params_negative < 0", &ctx).unwrap()); // -5 < 0 为 true
@@ -157,7 +163,7 @@ mod tests {
             "count": 5,
             "message": "done"
         }));
-        
+
         assert!(evaluate_expression("payload_processed", &ctx).unwrap());
         assert!(evaluate_expression("payload_count == 5", &ctx).unwrap());
         assert!(evaluate_expression("payload_message == \"done\"", &ctx).unwrap());
@@ -166,7 +172,7 @@ mod tests {
 
     #[test]
     fn test_numeric_conversions() {
-        let ctx = Context::from_main(json!({ 
+        let ctx = Context::from_main(json!({
             "int_zero": 0,
             "int_positive": 42,
             "int_negative": -1,
@@ -174,7 +180,7 @@ mod tests {
             "float_positive": 3.14,
             "float_negative": -2.5
         }));
-        
+
         // 测试数值比较，而不是隐式转换
         assert!(evaluate_expression("params_int_zero == 0", &ctx).unwrap());
         assert!(evaluate_expression("params_int_positive == 42", &ctx).unwrap());

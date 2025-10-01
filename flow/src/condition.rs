@@ -22,10 +22,10 @@ impl Condition {
                     } else {
                         "false".to_string()
                     }
-                },
+                }
                 JsonValue::String(s) => format!("\"{}\"", s.escape_default()),
                 _ => return Err(FlowError::ConditionError("不支持的 'right' 类型".into())),
-            }
+            },
         };
 
         let operator = value["operator"]
@@ -44,7 +44,12 @@ impl Condition {
             "less_than_or_equal" => format!("{} <= {}", left, right),
             "and" => format!("{} && {}", left, right),
             "or" => format!("{} || {}", left, right),
-            _ => return Err(FlowError::ConditionError(format!("不支持的运算符: {}", operator))),
+            _ => {
+                return Err(FlowError::ConditionError(format!(
+                    "不支持的运算符: {}",
+                    operator
+                )))
+            }
         };
 
         Ok(Self { expr_str })
@@ -68,7 +73,7 @@ mod tests {
             "operator": "greater_than",
             "right": 18
         });
-        
+
         let condition = Condition::from_json(&json_condition).unwrap();
         assert_eq!(condition.expr_str, "params_age > 18");
     }
@@ -85,14 +90,14 @@ mod tests {
             ("and", "&&"),
             ("or", "||"),
         ];
-        
+
         for (operator, expected_op) in test_cases {
             let json_condition = json!({
                 "left": "params.value",
                 "operator": operator,
                 "right": 10
             });
-            
+
             let condition = Condition::from_json(&json_condition).unwrap();
             assert!(condition.expr_str.contains(expected_op));
         }
@@ -100,35 +105,38 @@ mod tests {
 
     #[test]
     fn test_condition_evaluation() {
-        let ctx = Context::from_main(json!({ 
+        let ctx = Context::from_main(json!({
             "age": 25,
             "score": 85,
             "active": true
         }));
-        
+
         let condition1 = Condition::from_json(&json!({
             "left": "params.age",
             "operator": "greater_than",
             "right": 18
-        })).unwrap();
-        
+        }))
+        .unwrap();
+
         let condition2 = Condition::from_json(&json!({
-            "left": "params.score", 
+            "left": "params.score",
             "operator": "less_than",
             "right": 90
-        })).unwrap();
-        
+        }))
+        .unwrap();
+
         let condition3 = Condition::from_json(&json!({
             "left": "params.active",
-            "operator": "equal", 
+            "operator": "equal",
             "right": true
-        })).unwrap();
-        
+        }))
+        .unwrap();
+
         // Add debug output
         println!("Condition 1 expr: {}", condition1.expr_str);
         println!("Condition 2 expr: {}", condition2.expr_str);
         println!("Condition 3 expr: {}", condition3.expr_str);
-        
+
         // Test each condition individually
         match condition3.evaluate(&ctx) {
             Ok(result) => {
@@ -139,7 +147,7 @@ mod tests {
                 panic!("Condition 3 evaluation failed: {}", e);
             }
         }
-        
+
         assert!(condition1.evaluate(&ctx).unwrap());
         assert!(condition2.evaluate(&ctx).unwrap());
         assert!(condition3.evaluate(&ctx).unwrap());
@@ -150,30 +158,31 @@ mod tests {
         // 缺少必需字段
         assert!(Condition::from_json(&json!({})).is_err());
         assert!(Condition::from_json(&json!({"left": "value"})).is_err());
-        
+
         // 不支持的运算符
         assert!(Condition::from_json(&json!({
             "left": "params.value",
             "operator": "unknown",
             "right": 10
-        })).is_err());
+        }))
+        .is_err());
     }
 
     #[test]
     fn test_condition_with_different_right_types() {
         let test_cases = vec![
-            json!(42),           // 数字
-            json!(true),         // 布尔值
-            json!("string"),     // 字符串
+            json!(42),       // 数字
+            json!(true),     // 布尔值
+            json!("string"), // 字符串
         ];
-        
+
         for right_value in test_cases {
             let json_condition = json!({
                 "left": "params.test",
                 "operator": "equal",
                 "right": right_value
             });
-            
+
             assert!(Condition::from_json(&json_condition).is_ok());
         }
     }

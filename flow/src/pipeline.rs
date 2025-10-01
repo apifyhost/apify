@@ -1,4 +1,8 @@
-use crate::{context::Context, error::FlowError, step::{NextStep, Step, StepOutput}};
+use crate::{
+    context::Context,
+    error::FlowError,
+    step::{NextStep, Step, StepOutput},
+};
 
 #[derive(Debug, Clone)]
 pub struct Pipeline {
@@ -54,7 +58,7 @@ impl Pipeline {
 mod tests {
     use super::*;
     use crate::context::Context;
-    use crate::step::{Step, NextStep};
+    use crate::step::{NextStep, Step};
     use serde_json::json;
 
     fn create_test_step(id: &str, next_step: NextStep) -> Step {
@@ -82,12 +86,12 @@ mod tests {
             create_test_step("step2", NextStep::Next),
             create_test_step("step3", NextStep::Stop),
         ];
-        
+
         let pipeline = Pipeline::new(0, steps);
         let ctx = Context::new();
-        
+
         let output = pipeline.execute(&ctx, 0).await.unwrap();
-        
+
         assert_eq!(output.next_step, NextStep::Stop);
         // 最后一个步骤的输出
         assert_eq!(output.output, Some(json!({"result": "step3"})));
@@ -100,13 +104,13 @@ mod tests {
             create_test_step("step2", NextStep::Next),
             create_test_step("step3", NextStep::Stop),
         ];
-        
+
         let pipeline = Pipeline::new(0, steps);
         let ctx = Context::new();
-        
+
         // 从第二个步骤开始执行
         let output = pipeline.execute(&ctx, 1).await.unwrap();
-        
+
         assert_eq!(output.next_step, NextStep::Stop);
         assert_eq!(output.output, Some(json!({"result": "step3"})));
     }
@@ -114,31 +118,41 @@ mod tests {
     #[tokio::test]
     async fn test_pipeline_execute_with_jump() {
         let steps = vec![
-            create_test_step("step1", NextStep::Step { pipeline: 1, step: 0 }),
+            create_test_step(
+                "step1",
+                NextStep::Step {
+                    pipeline: 1,
+                    step: 0,
+                },
+            ),
             create_test_step("step2", NextStep::Stop), // 这个步骤不会执行
         ];
-        
+
         let pipeline = Pipeline::new(0, steps);
         let ctx = Context::new();
-        
+
         let output = pipeline.execute(&ctx, 0).await.unwrap();
-        
-        assert_eq!(output.next_step, NextStep::Step { pipeline: 1, step: 0 });
+
+        assert_eq!(
+            output.next_step,
+            NextStep::Step {
+                pipeline: 1,
+                step: 0
+            }
+        );
         assert!(output.output.is_none());
     }
 
     #[tokio::test]
     async fn test_pipeline_execute_error_step_not_found() {
-        let steps = vec![
-            create_test_step("step1", NextStep::Next),
-        ];
-        
+        let steps = vec![create_test_step("step1", NextStep::Next)];
+
         let pipeline = Pipeline::new(0, steps);
         let ctx = Context::new();
-        
+
         // 尝试从超出范围的步骤开始执行
         let result = pipeline.execute(&ctx, 5).await;
-        
+
         assert!(result.is_err());
         match result.unwrap_err() {
             FlowError::StepNotFound(step_idx, pipeline_id) => {
@@ -153,11 +167,11 @@ mod tests {
     async fn test_pipeline_execute_empty() {
         let pipeline = Pipeline::new(0, vec![]);
         let ctx = Context::new();
-        
+
         // 空管道应该返回 StepNotFound 错误
         let result = pipeline.execute(&ctx, 0).await;
         assert!(result.is_err());
-        
+
         match result.unwrap_err() {
             FlowError::StepNotFound(step_idx, pipeline_id) => {
                 assert_eq!(step_idx, 0);
@@ -173,9 +187,9 @@ mod tests {
             create_test_step("step1", NextStep::Next),
             create_test_step("step2", NextStep::Stop),
         ];
-        
+
         let pipeline = Pipeline::new(42, steps.clone());
-        
+
         assert_eq!(pipeline.id, 42);
         assert_eq!(pipeline.steps.len(), 2);
         assert_eq!(pipeline.steps[0].id, "step1");
