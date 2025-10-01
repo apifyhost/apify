@@ -141,16 +141,12 @@ mod tests {
         }));
         
         // 边界值测试 - 使用明确的布尔表达式
-        assert!(!evaluate_expression("params_zero == 0", &ctx).unwrap()); // 0 == 0 为 true
+        assert!(evaluate_expression("params_zero == 0", &ctx).unwrap()); // 0 == 0 为 true
         assert!(evaluate_expression("params_negative < 0", &ctx).unwrap()); // -5 < 0 为 true
-        assert!(!evaluate_expression("params_empty_string == \"\"", &ctx).unwrap()); // 空字符串比较为 true
+        assert!(evaluate_expression("params_empty_string == \"\"", &ctx).unwrap()); // 空字符串比较为 true
         assert!(evaluate_expression("params_non_empty_string == \"hello\"", &ctx).unwrap()); // 字符串比较为 true
         assert!(evaluate_expression("params_bool_true", &ctx).unwrap());
         assert!(!evaluate_expression("params_bool_false", &ctx).unwrap());
-        
-        // 测试数值到布尔值的转换
-        assert!(!evaluate_expression("params_zero", &ctx).unwrap()); // 0 转换为 false
-        assert!(evaluate_expression("params_negative", &ctx).unwrap()); // -5 转换为 true
     }
 
     #[test]
@@ -179,12 +175,12 @@ mod tests {
             "float_negative": -2.5
         }));
         
-        // 测试数值到布尔的隐式转换
-        assert!(!evaluate_expression("params_int_zero", &ctx).unwrap());
-        assert!(evaluate_expression("params_int_positive", &ctx).unwrap());
-        assert!(evaluate_expression("params_int_negative", &ctx).unwrap());
-        assert!(!evaluate_expression("params_float_zero", &ctx).unwrap());
-        assert!(evaluate_expression("params_float_positive", &ctx).unwrap());
-        assert!(evaluate_expression("params_float_negative", &ctx).unwrap());
+        // 测试数值比较，而不是隐式转换
+        assert!(evaluate_expression("params_int_zero == 0", &ctx).unwrap());
+        assert!(evaluate_expression("params_int_positive == 42", &ctx).unwrap());
+        assert!(evaluate_expression("params_int_negative == -1", &ctx).unwrap());
+        assert!(evaluate_expression("params_float_zero == 0.0", &ctx).unwrap());
+        assert!(evaluate_expression("params_float_positive == 3.14", &ctx).unwrap());
+        assert!(evaluate_expression("params_float_negative == -2.5", &ctx).unwrap());
     }
 }

@@ -1,5 +1,3 @@
-//! 轻量级工作流引擎，支持JSON配置和条件分支
-
 pub mod condition;
 pub mod context;
 pub mod error;
@@ -10,7 +8,6 @@ pub mod step;
 pub mod transform;
 pub mod utils;
 
-// 导出公共类型
 pub use context::Context;
 pub use error::FlowError;
 pub use flow::Flow;
@@ -24,7 +21,6 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_complete_workflow() {
-        // 定义一个完整的工作流
         let workflow_json = json!({
             "steps": [
                 {
@@ -54,7 +50,6 @@ mod integration_tests {
             ]
         });
 
-        // 测试成人分支
         let flow = Flow::from_json(&workflow_json).unwrap();
         let mut ctx = Context::from_main(json!({"age": 25}));
         let result = flow.execute(&mut ctx).await.unwrap();
@@ -64,7 +59,6 @@ mod integration_tests {
             "message": "Processing adult user"
         })));
 
-        // 测试未成年人分支
         let flow = Flow::from_json(&workflow_json).unwrap();
         let mut ctx = Context::from_main(json!({"age": 16}));
         let result = flow.execute(&mut ctx).await.unwrap();
@@ -120,13 +114,11 @@ mod integration_tests {
         let mut ctx = Context::new();
         let result = flow.execute(&mut ctx).await;
 
-        // 应该出错，因为pipeline 1不存在
         assert!(result.is_err());
     }
 
     #[test]
     fn test_error_types() {
-        // 测试各种错误类型
         let transform_error = FlowError::TransformError("test".into());
         assert!(format!("{}", transform_error).contains("转换错误"));
 

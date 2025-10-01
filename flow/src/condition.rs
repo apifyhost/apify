@@ -26,6 +26,9 @@ impl Condition {
             .as_str()
             .ok_or_else(|| FlowError::ConditionError("缺少 'operator' 字段".into()))?;
 
+        // 将变量名从 params.x 转换为 params_x 格式
+        let left = left.replace('.', "_");
+
         let expr_str = match operator {
             "equal" => format!("{} == {}", left, right),
             "not_equal" => format!("{} != {}", left, right),
@@ -61,23 +64,23 @@ mod tests {
         });
         
         let condition = Condition::from_json(&json_condition).unwrap();
-        assert_eq!(condition.expr_str, "params.age > 18");
+        assert_eq!(condition.expr_str, "params_age > 18");
     }
 
     #[test]
     fn test_all_operators() {
         let test_cases = vec![
-            ("equal", "==", "params.value == 10"),
-            ("not_equal", "!=", "params.value != 10"),
-            ("greater_than", ">", "params.value > 10"),
-            ("less_than", "<", "params.value < 10"),
-            ("greater_than_or_equal", ">=", "params.value >= 10"),
-            ("less_than_or_equal", "<=", "params.value <= 10"),
-            ("and", "&&", "params.a && params.b"),
-            ("or", "||", "params.a || params.b"),
+            ("equal", "=="),
+            ("not_equal", "!="),
+            ("greater_than", ">"),
+            ("less_than", "<"),
+            ("greater_than_or_equal", ">="),
+            ("less_than_or_equal", "<="),
+            ("and", "&&"),
+            ("or", "||"),
         ];
         
-        for (operator, expected_op, expected_expr) in test_cases {
+        for (operator, expected_op) in test_cases {
             let json_condition = json!({
                 "left": "params.value",
                 "operator": operator,

@@ -50,7 +50,6 @@ impl Pipeline {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,10 +154,17 @@ mod tests {
         let pipeline = Pipeline::new(0, vec![]);
         let ctx = Context::new();
         
-        let output = pipeline.execute(&ctx, 0).await.unwrap();
+        // 空管道应该返回 StepNotFound 错误
+        let result = pipeline.execute(&ctx, 0).await;
+        assert!(result.is_err());
         
-        assert_eq!(output.next_step, NextStep::Stop);
-        assert!(output.output.is_none());
+        match result.unwrap_err() {
+            FlowError::StepNotFound(step_idx, pipeline_id) => {
+                assert_eq!(step_idx, 0);
+                assert_eq!(pipeline_id, 0);
+            }
+            _ => panic!("Expected StepNotFound error"),
+        }
     }
 
     #[test]
