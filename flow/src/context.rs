@@ -1,92 +1,79 @@
-use serde_json::{Map, Value as JsonValue};
+use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 
-/// 工作流执行上下文，存储所有执行过程中的数据
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Context {
-    main: Option<JsonValue>,      // 主输入数据
-    payload: Option<JsonValue>,   // 流程执行中的中间结果
-    input: Option<JsonValue>,     // 当前步骤的输入
-    steps: Vec<JsonValue>,        // 所有步骤的输出记录
-    step_outputs: HashMap<String, JsonValue>, // 按步骤ID存储的输出
+    main: JsonValue,          // 主输入参数
+    payload: Option<JsonValue>, // 中间结果
+    step_outputs: HashMap<String, JsonValue>, // 步骤输出
 }
 
 impl Context {
-    /// 创建新的空上下文
     pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// 从主输入数据创建上下文
-    pub fn from_main(main: JsonValue) -> Self {
         Self {
-            main: Some(main),
-            ..Self::default()
+            main: JsonValue::Null,
+            payload: None,
+            step_outputs: HashMap::new(),
         }
     }
 
-    // Getters
-    pub fn get_main(&self) -> Option<&JsonValue> {
-        self.main.as_ref()
+    pub fn from_main(main: JsonValue) -> Self {
+        Self { main, ..Self::new() }
     }
 
-    pub fn get_payload(&self) -> Option<&JsonValue> {
-        self.payload.as_ref()
+    pub fn get_main(&self) -> &JsonValue {
+        &self.main
     }
 
-    pub fn get_input(&self) -> Option<&JsonValue> {
-        self.input.as_ref()
-    }
-
-    pub fn get_steps(&self) -> &Vec<JsonValue> {
-        &self.steps
-    }
-
-    pub fn get_step_output(&self, step_id: &str) -> Option<&JsonValue> {
-        self.step_outputs.get(step_id)
-    }
-
-    // Setters
     pub fn set_main(&mut self, main: JsonValue) {
-        self.main = Some(main);
+        self.main = main;
+    }
+
+    pub fn get_payload(&self) -> Option<JsonValue> {
+        self.payload.clone()
     }
 
     pub fn set_payload(&mut self, payload: JsonValue) {
         self.payload = Some(payload);
     }
 
-    pub fn set_input(&mut self, input: JsonValue) {
-        self.input = Some(input);
+    pub fn add_step_output(&mut self, step_id: String, output: JsonValue) {
+        self.step_outputs.insert(step_id, output);
     }
 
-    /// 添加步骤输出到历史记录
-    pub fn add_step_payload(&mut self, payload: Option<JsonValue>) {
-        if let Some(payload) = payload {
-            self.steps.push(payload.clone());
-            self.payload = Some(payload);
+    pub fn get_step_output(&self, step_id: &str) -> Option<&JsonValue> {
+        self.step_outputs.get(step_id)
+    }
+
+    /// 获取变量值（支持 params.xxx, payload.xxx, steps.xxx）
+    pub fn get_variable(&self, path: &str) -> Option<JsonValue> {
+        let parts: Vec<&str> = path.split('.').collect();
+        if parts.is_empty() {
+            return None;
+        }
+
+        match parts[0] {
+            "params" => self.get_path(&self.main, &parts[1..]),
+            "payload" => self.payload.as_ref().and_then(|p| self.get_path(p, &parts[1..])),
+            "steps" => parts.get(1).and_then(|id| self.step_outputs.get(*id)).cloned(),
+            _ => None,
         }
     }
 
-    /// 按步骤ID记录输出
-    pub fn add_step_id_output(&mut self, step_id: String, payload: JsonValue) {
-        self.step_outputs.insert(step_id, payload.clone());
-        self.payload = Some(payload);
-    }
+    /// 按路径获取JSON值
+    fn get_path(&self, value: &JsonValue, parts: &[&str]) -> Option<JsonValue> {
+        if parts.is_empty() {
+            return Some(value.clone());
+        }
 
-    /// 合并另一个上下文的数据
-    pub fn merge(&mut self, other: &Context) {
-        if self.main.is_none() {
-            self.main = other.main.clone();
-        }
-        
-        if let Some(payload) = &other.payload {
-            self.payload = Some(payload.clone());
-        }
-        
-        self.steps.extend(other.steps.iter().cloned());
-        
-        for (k, v) in &other.step_outputs {
-            self.step_outputs.insert(k.clone(), v.clone());
+        match value {
+            JsonValue::Object(map) => map.get(parts[0]).and_then(|v| self.get_path(v, &parts[1..])),
+            JsonValue::Array(arr) => parts[0]
+                .parse::<usize>()
+                .ok()
+                .and_then(|i| arr.get(i))
+                .and_then(|v| self.get_path(v, &parts[1..])),
+            _ => None,
         }
     }
 }

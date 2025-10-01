@@ -1,45 +1,31 @@
-use std::fmt;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum FlowError {
-    // 解析相关错误
-    ParseError(String),
-    // 表达式相关错误
+    #[error("JSON解析错误: {0}")]
+    JsonParseError(#[from] serde_json::Error),
+
+    #[error("表达式错误: {0}")]
     ExpressionError(String),
-    // 流程相关错误
-    PipelineError(String),
-    // 步骤相关错误
+
+    #[error("条件错误: {0}")]
+    ConditionError(String),
+
+    #[error("步骤错误: {0}")]
     StepError(String),
-    // JSON处理错误
-    JsonError(serde_json::Error),
-    // 执行时错误
-    ExecutionError(String),
-}
 
-impl fmt::Display for FlowError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            FlowError::ParseError(msg) => write!(f, "Parse error: {}", msg),
-            FlowError::ExpressionError(msg) => write!(f, "Expression error: {}", msg),
-            FlowError::PipelineError(msg) => write!(f, "Pipeline error: {}", msg),
-            FlowError::StepError(msg) => write!(f, "Step error: {}", msg),
-            FlowError::JsonError(err) => write!(f, "JSON error: {}", err),
-            FlowError::ExecutionError(msg) => write!(f, "Execution error: {}", msg),
-        }
-    }
-}
+    #[error("流程错误: {0}")]
+    PipelineError(String),
 
-impl std::error::Error for FlowError {}
+    #[error("转换错误: {0}")]
+    TransformError(String),
 
-// 从其他错误类型转换
-impl From<serde_json::Error> for FlowError {
-    fn from(err: serde_json::Error) -> Self {
-        FlowError::JsonError(err)
-    }
-}
+    #[error("上下文错误: {0}")]
+    ContextError(String),
 
-impl From<evalexpr::EvalexprError> for FlowError {
-    fn from(err: evalexpr::EvalexprError) -> Self {
-        FlowError::ExpressionError(err.to_string())
-    }
+    #[error("流程未找到: {0}")]
+    PipelineNotFound(usize),
+
+    #[error("步骤未找到: {0} (流程 {1})")]
+    StepNotFound(usize, usize),
 }

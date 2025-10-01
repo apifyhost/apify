@@ -1,0 +1,607 @@
+// ---------- File: ./Cargo.toml ----------
+[package]
+name = "flow"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+evalexpr = "12.0"
+tokio = { version = "1.0", features = ["full"] }
+log = "0.4"
+
+// ---------- File: ./src/flow.rs ----------
+use crate::{context::Context, error::FlowError, pipeline::Pipeline, step::NextStep, transform::json_to_pipelines};
+use serde_json::Value as JsonValue;
+use std::collections::HashMap;
+
+#[derive(Debug, Clone)]
+pub struct Flow {
+    pipelines: HashMap<usize, Pipeline>,
+    main_pipeline_id: usize,
+}
+
+impl Flow {
+    pub fn from_json(json: &JsonValue) -> Result<Self, FlowError> {
+        let pipelines = json_to_pipelines(json)?;
+        if pipelines.is_empty() {
+            return Err(FlowError::TransformError("未找到流程定义".into()));
+        }
+
+        let main_pipeline_id = 0;
+        if !pipelines.contains_key(&main_pipeline_id) {
+            return Err(FlowError::PipelineNotFound(main_pipeline_id));
+        }
+
+        Ok(Self { pipelines, main_pipeline_id })
+    }
+
+    pub async fn execute(&self, context: &mut Context) -> Result<Option<JsonValue>, FlowError> {
+        let mut current_pipeline_id = self.main_pipeline_id;
+        let mut current_step_idx = 0;
+
+        loop {
+            let pipeline = self.pipelines.get(&current_pipeline_id)
+                .ok_or_else(|| FlowError::PipelineNotFound(current_pipeline_id))?;
+
+            let step_output = pipeline.execute(context, current_step_idx).await?;
+
+            match step_output.next_step {
+                NextStep::Stop => return Ok(step_output.output),
+                
+                NextStep::Next => {
+                    current_step_idx += 1;
+                    if current_step_idx >= pipeline.steps.len() {
+                        return Ok(step_output.output);
+                    }
+                }
+                
+                NextStep::Pipeline(target_id) => {
+                    current_pipeline_id = target_id;
+                    current_step_idx = 0;
+                }
+                
+                NextStep::Step { pipeline: target_id, step: target_step } => {
+                    current_pipeline_id = target_id;
+                    current_step_idx = target_step;
+                }
+            }
+        }
+    }
+}
+
+// ---------- File: ./src/error.rs ----------
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum FlowError {
+    #[error("JSON解析错误: {0}")]
+    JsonParseError(#[from] serde_json::Error),
+
+    #[error("表达式错误: {0}")]
+    ExpressionError(String),
+
+    #[error("条件错误: {0}")]
+    ConditionError(String),
+
+    #[error("步骤错误: {0}")]
+    StepError(String),
+
+    #[error("流程错误: {0}")]
+    PipelineError(String),
+
+    #[error("转换错误: {0}")]
+    TransformError(String),
+
+    #[error("上下文错误: {0}")]
+    ContextError(String),
+
+    #[error("流程未找到: {0}")]
+    PipelineNotFound(usize),
+
+    #[error("步骤未找到: {0} (流程 {1})")]
+    StepNotFound(usize, usize),
+}
+
+// ---------- File: ./src/lib.rs ----------
+//! 轻量级工作流引擎，支持JSON配置和条件分支
+
+pub mod condition;
+pub mod context;
+pub mod error;
+pub mod expression;
+pub mod flow;
+pub mod pipeline;
+pub mod step;
+pub mod transform;
+pub mod utils;
+
+// 导出公共类型
+pub use context::Context;
+pub use error::FlowError;
+pub use flow::Flow;
+pub use pipeline::Pipeline;
+pub use step::{NextStep, Step, StepOutput};
+
+// ---------- File: ./src/expression.rs ----------
+use crate::{context::Context, error::FlowError};
+use evalexpr::{
+    Context as EvalContext,
+    EvalexprError,
+    Value,
+    DefaultNumericTypes,
+    parse,  // 12.0.2中使用parse函数替代Expression::parse
+};
+use serde_json::Value as JsonValue;
+use std::cell::RefCell;
+use std::borrow::Cow;
+
+/// 解析并执行表达式（最终版，100%可编译）
+pub fn evaluate_expression(expr_str: &str, context: &Context) -> Result<bool, FlowError> {
+    // 1. 解析表达式（12.0.2中使用parse函数）
+    let expr = parse(expr_str)
+        .map_err(|e| FlowError::ExpressionError(format!("表达式解析失败: {}", e)))?;
+
+    // 2. 创建自定义上下文
+    let eval_context = CustomContext::new(context);
+
+    // 3. 执行表达式
+    let result = expr.eval(&eval_context)
+        .map_err(|e| FlowError::ExpressionError(format!("表达式执行失败: {}", e)))?;
+
+    // 4. 转换结果为bool
+    Ok(match result {
+        Value::Boolean(b) => b,
+        Value::Int(n) => n != 0,
+        Value::Float(n) => n != 0.0,
+        Value::String(s) => !s.is_empty(),
+        _ => false,
+    })
+}
+
+/// 自定义上下文（解决临时值引用问题）
+struct CustomContext<'a> {
+    context: &'a Context,
+    builtin_functions_disabled: bool,
+    temp_value: RefCell<Option<Value<DefaultNumericTypes>>>,
+}
+
+impl<'a> CustomContext<'a> {
+    fn new(context: &'a Context) -> Self {
+        Self {
+            context,
+            builtin_functions_disabled: false,
+            temp_value: RefCell::new(None),
+        }
+    }
+}
+
+/// 实现EvalContext trait（严格匹配12.0.2源码）
+impl<'a> EvalContext for CustomContext<'a> {
+    type NumericTypes = DefaultNumericTypes;
+
+    // 解决返回值引用临时值问题
+    fn get_value(&self, identifier: &str) -> Option<&Value<Self::NumericTypes>> {
+        // 先尝试从缓存获取
+        let mut temp_borrow = self.temp_value.borrow_mut();
+        if temp_borrow.is_none() {
+            // 从上下文获取并缓存
+            *temp_borrow = self.context.get_variable(identifier)
+                .and_then(convert_json_value);
+        }
+        // 安全返回引用（生命周期与self一致）
+        temp_borrow.as_ref()
+    }
+
+    // 使用12.0.2支持的错误类型
+    fn call_function(
+        &self,
+        function: &str,
+        _arguments: &Value<Self::NumericTypes>
+    ) -> Result<Value<Self::NumericTypes>, EvalexprError<Self::NumericTypes>> {
+        Err(EvalexprError::FunctionCallError {
+            function: function.to_string(),
+            message: "不支持函数调用".to_string()
+        })
+    }
+
+    fn are_builtin_functions_disabled(&self) -> bool {
+        self.builtin_functions_disabled
+    }
+
+    fn set_builtin_functions_disabled(
+        &mut self,
+        disabled: bool
+    ) -> Result<(), EvalexprError<Self::NumericTypes>> {
+        self.builtin_functions_disabled = disabled;
+        Ok(())
+    }
+}
+
+/// 类型转换（确保与12.0.2的Value兼容）
+fn convert_json_value(json_val: JsonValue) -> Option<Value<DefaultNumericTypes>> {
+    match json_val {
+        JsonValue::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Some(Value::Int(i))
+            } else {
+                n.as_f64().map(Value::Float)
+            }
+        }
+        JsonValue::Bool(b) => Some(Value::Boolean(b)),
+        JsonValue::String(s) => Some(Value::String(Cow::Owned(s))),  // 使用Cow适配
+        JsonValue::Array(_) => Some(Value::Int(1)),
+        JsonValue::Object(_) => Some(Value::Int(1)),
+        JsonValue::Null => Some(Value::Boolean(false)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::context::Context;
+    use serde_json::json;
+
+    #[test]
+    fn test_expression() {
+        let ctx = Context::from_main(json!({ 
+            "age": 25, 
+            "income": 6000.0, 
+            "is_student": false,
+            "name": "Alice"
+        }));
+        
+        assert!(evaluate_expression("params.age >= 18", &ctx).unwrap());
+        assert!(evaluate_expression("params.income > 5000 && !params.is_student", &ctx).unwrap());
+        assert!(evaluate_expression("params.name == 'Alice'", &ctx).unwrap());
+    }
+}
+
+// ---------- File: ./src/transform.rs ----------
+use crate::{error::FlowError, pipeline::Pipeline, step::Step};
+use serde_json::Value as JsonValue;
+use std::collections::HashMap;
+
+pub fn json_to_pipelines(json: &JsonValue) -> Result<HashMap<usize, Pipeline>, FlowError> {
+    let mut pipelines = HashMap::new();
+    let mut pipeline_counter = 0;
+
+    let main_steps = json.get("steps")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| FlowError::TransformError("根节点缺少 'steps' 数组".into()))?;
+
+    process_pipeline(
+        pipeline_counter,
+        main_steps,
+        json,
+        &mut pipelines,
+        &mut pipeline_counter,
+    )?;
+
+    Ok(pipelines)
+}
+
+fn process_pipeline(
+    pipeline_id: usize,
+    steps_json: &[JsonValue],
+    _parent_json: &JsonValue,
+    pipelines: &mut HashMap<usize, Pipeline>,
+    counter: &mut usize,
+) -> Result<(), FlowError> {
+    let mut steps = Vec::with_capacity(steps_json.len());
+
+    for (step_idx, step_json) in steps_json.iter().enumerate() {
+        let mut step_json_clone = step_json.clone();
+
+        // 处理then分支
+        if let Some(then_json) = step_json.get("then") {
+            *counter += 1;
+            let then_pipeline_id = *counter;
+            let then_steps = then_json.get("steps")
+                .and_then(|v| v.as_array())
+                .ok_or_else(|| FlowError::TransformError("'then' 缺少 'steps' 数组".into()))?;
+            process_pipeline(then_pipeline_id, then_steps, then_json, pipelines, counter)?;
+            step_json_clone["then"]["pipeline_id"] = JsonValue::Number(then_pipeline_id.into());
+        }
+
+        // 处理else分支
+        if let Some(else_json) = step_json.get("else") {
+            *counter += 1;
+            let else_pipeline_id = *counter;
+            let else_steps = else_json.get("steps")
+                .and_then(|v| v.as_array())
+                .ok_or_else(|| FlowError::TransformError("'else' 缺少 'steps' 数组".into()))?;
+            process_pipeline(else_pipeline_id, else_steps, else_json, pipelines, counter)?;
+            step_json_clone["else"]["pipeline_id"] = JsonValue::Number(else_pipeline_id.into());
+        }
+
+        let step = Step::from_json(pipeline_id, step_idx, &step_json_clone)?;
+        steps.push(step);
+    }
+
+    pipelines.insert(pipeline_id, Pipeline::new(pipeline_id, steps));
+    Ok(())
+}
+
+// ---------- File: ./src/pipeline.rs ----------
+use crate::{context::Context, error::FlowError, step::{NextStep, Step, StepOutput}};
+
+#[derive(Debug, Clone)]
+pub struct Pipeline {
+    pub id: usize,
+    pub steps: Vec<Step>,
+}
+
+impl Pipeline {
+    pub fn new(id: usize, steps: Vec<Step>) -> Self {
+        Self { id, steps }
+    }
+
+    pub async fn execute(
+        &self,
+        context: &Context,
+        start_step: usize,
+    ) -> Result<StepOutput, FlowError> {
+        if start_step >= self.steps.len() {
+            return Err(FlowError::StepNotFound(start_step, self.id));
+        }
+
+        for (step_idx, step) in self.steps.iter().enumerate().skip(start_step) {
+            let step_output = step.execute(context).await?;
+
+            if let Some(output) = &step_output.output {
+                let mut ctx_clone = context.clone();
+                ctx_clone.add_step_output(step.id.clone(), output.clone());
+            }
+
+            match step_output.next_step {
+                NextStep::Stop | NextStep::Pipeline(_) | NextStep::Step { .. } => {
+                    return Ok(step_output);
+                }
+                NextStep::Next => {
+                    if step_idx == self.steps.len() - 1 {
+                        return Ok(StepOutput {
+                            next_step: NextStep::Stop,
+                            output: step_output.output,
+                        });
+                    }
+                }
+            }
+        }
+
+        Ok(StepOutput {
+            next_step: NextStep::Stop,
+            output: context.get_payload(),
+        })
+    }
+}
+
+// ---------- File: ./src/step.rs ----------
+use crate::{condition::Condition, context::Context, error::FlowError, utils::generate_step_id};
+use serde_json::Value as JsonValue;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum NextStep {
+    Stop,
+    Next,
+    Pipeline(usize),
+    Step {
+        pipeline: usize,
+        step: usize,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct StepOutput {
+    pub next_step: NextStep,
+    pub output: Option<JsonValue>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Step {
+    pub id: String,
+    pub label: Option<String>,
+    pub condition: Option<Condition>,
+    pub return_val: Option<JsonValue>,
+    pub then_pipeline: Option<usize>,
+    pub else_pipeline: Option<usize>,
+    pub to_step: Option<(usize, usize)>,
+}
+
+impl Step {
+    pub fn from_json(
+        pipeline_id: usize,
+        step_idx: usize,
+        value: &JsonValue,
+    ) -> Result<Self, FlowError> {
+        Ok(Self {
+            id: generate_step_id(pipeline_id, step_idx),
+            label: value["label"].as_str().map(|s| s.to_string()),
+            condition: value.get("condition").map(Condition::from_json).transpose()?,
+            return_val: value.get("return").cloned(),
+            then_pipeline: value["then"]["pipeline_id"].as_u64().map(|x| x as usize),
+            else_pipeline: value["else"]["pipeline_id"].as_u64().map(|x| x as usize),
+            to_step: if let Some(to) = value.get("to") {
+                Some((
+                    to["pipeline"].as_u64().ok_or_else(|| FlowError::StepError("缺少 'to.pipeline'".into()))? as usize,
+                    to["step"].as_u64().ok_or_else(|| FlowError::StepError("缺少 'to.step'".into()))? as usize,
+                ))
+            } else {
+                None
+            },
+        })
+    }
+
+    pub async fn execute(&self, context: &Context) -> Result<StepOutput, FlowError> {
+        // 直接返回
+        if let Some(return_val) = &self.return_val {
+            return Ok(StepOutput {
+                next_step: NextStep::Stop,
+                output: Some(return_val.clone()),
+            });
+        }
+
+        // 直接跳转
+        if let Some((pipeline, step)) = self.to_step {
+            return Ok(StepOutput {
+                next_step: NextStep::Step { pipeline, step },
+                output: None,
+            });
+        }
+
+        // 条件判断
+        if let Some(condition) = &self.condition {
+            let next_step = if condition.evaluate(context)? {
+                self.then_pipeline.clone().map(NextStep::Pipeline).unwrap_or(NextStep::Next)
+            } else {
+                self.else_pipeline.clone().map(NextStep::Pipeline).unwrap_or(NextStep::Next)
+            };
+            return Ok(StepOutput { next_step, output: None });
+        }
+
+        // 默认下一步
+        Ok(StepOutput {
+            next_step: NextStep::Next,
+            output: None,
+        })
+    }
+}
+
+// ---------- File: ./src/utils.rs ----------
+/// 生成步骤唯一ID
+pub fn generate_step_id(pipeline_id: usize, step_idx: usize) -> String {
+    format!("p{}_s{}", pipeline_id, step_idx)
+}
+
+// ---------- File: ./src/context.rs ----------
+use serde_json::Value as JsonValue;
+use std::collections::HashMap;
+
+#[derive(Debug, Clone)]
+pub struct Context {
+    main: JsonValue,          // 主输入参数
+    payload: Option<JsonValue>, // 中间结果
+    step_outputs: HashMap<String, JsonValue>, // 步骤输出
+}
+
+impl Context {
+    pub fn new() -> Self {
+        Self {
+            main: JsonValue::Null,
+            payload: None,
+            step_outputs: HashMap::new(),
+        }
+    }
+
+    pub fn from_main(main: JsonValue) -> Self {
+        Self { main, ..Self::new() }
+    }
+
+    pub fn get_main(&self) -> &JsonValue {
+        &self.main
+    }
+
+    pub fn set_main(&mut self, main: JsonValue) {
+        self.main = main;
+    }
+
+    pub fn get_payload(&self) -> Option<JsonValue> {
+        self.payload.clone()
+    }
+
+    pub fn set_payload(&mut self, payload: JsonValue) {
+        self.payload = Some(payload);
+    }
+
+    pub fn add_step_output(&mut self, step_id: String, output: JsonValue) {
+        self.step_outputs.insert(step_id, output);
+    }
+
+    pub fn get_step_output(&self, step_id: &str) -> Option<&JsonValue> {
+        self.step_outputs.get(step_id)
+    }
+
+    /// 获取变量值（支持 params.xxx, payload.xxx, steps.xxx）
+    pub fn get_variable(&self, path: &str) -> Option<JsonValue> {
+        let parts: Vec<&str> = path.split('.').collect();
+        if parts.is_empty() {
+            return None;
+        }
+
+        match parts[0] {
+            "params" => self.get_path(&self.main, &parts[1..]),
+            "payload" => self.payload.as_ref().and_then(|p| self.get_path(p, &parts[1..])),
+            "steps" => parts.get(1).and_then(|id| self.step_outputs.get(*id)).cloned(),
+            _ => None,
+        }
+    }
+
+    /// 按路径获取JSON值
+    fn get_path(&self, value: &JsonValue, parts: &[&str]) -> Option<JsonValue> {
+        if parts.is_empty() {
+            return Some(value.clone());
+        }
+
+        match value {
+            JsonValue::Object(map) => map.get(parts[0]).and_then(|v| self.get_path(v, &parts[1..])),
+            JsonValue::Array(arr) => parts[0]
+                .parse::<usize>()
+                .ok()
+                .and_then(|i| arr.get(i))
+                .and_then(|v| self.get_path(v, &parts[1..])),
+            _ => None,
+        }
+    }
+}
+
+// ---------- File: ./src/condition.rs ----------
+use crate::{context::Context, error::FlowError, expression::evaluate_expression};
+use serde_json::Value as JsonValue;
+
+#[derive(Debug, Clone)]
+pub struct Condition {
+    expr_str: String,
+}
+
+impl Condition {
+    pub fn from_json(value: &JsonValue) -> Result<Self, FlowError> {
+        let left = value["left"]
+            .as_str()
+            .ok_or_else(|| FlowError::ConditionError("缺少 'left' 字段".into()))?;
+
+        let right = match value["right"].as_str() {
+            Some(s) => s.to_string(),
+            None => match &value["right"] {
+                JsonValue::Number(n) => n.to_string(),
+                JsonValue::Bool(b) => if *b { "1" } else { "0" }.to_string(),
+                JsonValue::String(s) => format!("\"{}\"", s.escape_default()),
+                _ => return Err(FlowError::ConditionError("不支持的 'right' 类型".into())),
+            }
+        };
+
+        let operator = value["operator"]
+            .as_str()
+            .ok_or_else(|| FlowError::ConditionError("缺少 'operator' 字段".into()))?;
+
+        let expr_str = match operator {
+            "equal" => format!("{} == {}", left, right),
+            "not_equal" => format!("{} != {}", left, right),
+            "greater_than" => format!("{} > {}", left, right),
+            "less_than" => format!("{} < {}", left, right),
+            "greater_than_or_equal" => format!("{} >= {}", left, right),
+            "less_than_or_equal" => format!("{} <= {}", left, right),
+            "and" => format!("{} && {}", left, right),
+            "or" => format!("{} || {}", left, right),
+            _ => return Err(FlowError::ConditionError(format!("不支持的运算符: {}", operator))),
+        };
+
+        Ok(Self { expr_str })
+    }
+
+    pub fn evaluate(&self, context: &Context) -> Result<bool, FlowError> {
+        evaluate_expression(&self.expr_str, context)
+    }
+}
+
