@@ -2,7 +2,7 @@ use crate::{context::Context, error::FlowError};
 use evalexpr::{eval_boolean_with_context, HashMapContext, ContextWithMutableVariables};
 use serde_json::Value as JsonValue;
 
-/// 解析并执行表达式（使用 evalexpr 12.0.2）
+/// 解析并执行表达式（使用 evalexpr）
 pub fn evaluate_expression(expr_str: &str, context: &Context) -> Result<bool, FlowError> {
     let mut eval_context = HashMapContext::new();
     
@@ -19,7 +19,8 @@ fn set_context_variables(eval_context: &mut HashMapContext, context: &Context) {
     if let JsonValue::Object(params) = context.get_main() {
         for (key, value) in params {
             if let Some(eval_value) = convert_json_value(value.clone()) {
-                eval_context.set_value(format!("params.{}", key), eval_value).ok();
+                // 使用 params_ 前缀来避免命名冲突
+                eval_context.set_value(format!("params_{}", key), eval_value).ok();
             }
         }
     }
@@ -29,7 +30,7 @@ fn set_context_variables(eval_context: &mut HashMapContext, context: &Context) {
         if let JsonValue::Object(payload_obj) = payload {
             for (key, value) in payload_obj {
                 if let Some(eval_value) = convert_json_value(value.clone()) {
-                    eval_context.set_value(format!("payload.{}", key), eval_value).ok();
+                    eval_context.set_value(format!("payload_{}", key), eval_value).ok();
                 }
             }
         }
@@ -57,5 +58,51 @@ fn convert_json_value(json_val: JsonValue) -> Option<evalexpr::Value> {
         }
         JsonValue::Object(_) => Some(evalexpr::Value::Boolean(true)),
         JsonValue::Null => Some(evalexpr::Value::Boolean(false)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::context::Context;
+    use serde_json::json;
+
+    #[test]
+    fn test_basic_expressions() {
+        let ctx = Context::from_main(json!({ 
+            "age": 25, 
+            "income": 6000.0, 
+            "is_student": false,
+            "name": "Alice"
+        }));
+        
+        // 测试基本比较
+        assert!(evaluate_expression("params_age >= 18", &ctx).unwrap());
+        assert!(evaluate_expression("params_income > 5000", &ctx).unwrap());
+        assert!(evaluate_expression("!params_is_student", &ctx).unwrap());
+    }
+
+    #[test]
+    fn test_complex_expressions() {
+        let ctx = Context::from_main(json!({ 
+            "age": 25, 
+            "income": 6000.0, 
+            "is_student": false
+        }));
+        
+        // 测试复杂表达式
+        assert!(evaluate_expression("params_age >= 18 && params_income > 5000", &ctx).unwrap());
+        assert!(evaluate_expression("params_age < 30 || params_is_student", &ctx).unwrap());
+    }
+
+    #[test]
+    fn test_string_comparison() {
+        let ctx = Context::from_main(json!({ 
+            "name": "Alice"
+        }));
+        
+        // 测试字符串比较
+        assert!(evaluate_expression("params_name == \"Alice\"", &ctx).unwrap());
+        assert!(evaluate_expression("params_name != \"Bob\"", &ctx).unwrap());
     }
 }
