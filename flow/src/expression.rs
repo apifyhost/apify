@@ -10,7 +10,7 @@ pub fn evaluate_expression(expr_str: &str, context: &Context) -> Result<bool, Fl
     set_context_variables(&mut eval_context, context);
 
     eval_boolean_with_context(expr_str, &eval_context)
-        .map_err(|e| FlowError::ExpressionError(format!("表达式执行失败: {}", e)))
+        .map_err(|e| FlowError::ExpressionError(format!("表达式执行失败: {e}")))
 }
 
 /// 将自定义上下文中的变量设置到 evalexpr 上下文中
@@ -21,7 +21,7 @@ fn set_context_variables(eval_context: &mut HashMapContext, context: &Context) {
             if let Some(eval_value) = convert_json_value(value.clone()) {
                 // 使用 params_ 前缀来避免命名冲突
                 eval_context
-                    .set_value(format!("params_{}", key), eval_value)
+                    .set_value(format!("params_{key}"), eval_value)
                     .ok();
             }
         }
@@ -33,7 +33,7 @@ fn set_context_variables(eval_context: &mut HashMapContext, context: &Context) {
             for (key, value) in payload_obj {
                 if let Some(eval_value) = convert_json_value(value.clone()) {
                     eval_context
-                        .set_value(format!("payload_{}", key), eval_value)
+                        .set_value(format!("payload_{key}"), eval_value)
                         .ok();
                 }
             }

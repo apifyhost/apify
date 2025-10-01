@@ -43,7 +43,7 @@ impl Flow {
             let pipeline = self
                 .pipelines
                 .get(&current_pipeline_id)
-                .ok_or_else(|| FlowError::PipelineNotFound(current_pipeline_id))?;
+                .ok_or(FlowError::PipelineNotFound(current_pipeline_id))?;
 
             let step_output = pipeline.execute(context, current_step_idx).await?;
 

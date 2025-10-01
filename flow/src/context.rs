@@ -8,6 +8,12 @@ pub struct Context {
     step_outputs: HashMap<String, JsonValue>, // 步骤输出
 }
 
+impl Default for Context {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Context {
     pub fn new() -> Self {
         Self {

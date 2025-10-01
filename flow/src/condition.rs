@@ -36,18 +36,17 @@ impl Condition {
         let left = left.replace('.', "_");
 
         let expr_str = match operator {
-            "equal" => format!("{} == {}", left, right),
-            "not_equal" => format!("{} != {}", left, right),
-            "greater_than" => format!("{} > {}", left, right),
-            "less_than" => format!("{} < {}", left, right),
-            "greater_than_or_equal" => format!("{} >= {}", left, right),
-            "less_than_or_equal" => format!("{} <= {}", left, right),
-            "and" => format!("{} && {}", left, right),
-            "or" => format!("{} || {}", left, right),
+            "equal" => format!("{left} == {right}"),
+            "not_equal" => format!("{left} != {right}"),
+            "greater_than" => format!("{left} > {right}"),
+            "less_than" => format!("{left} < {right}"),
+            "greater_than_or_equal" => format!("{left} >= {right}"),
+            "less_than_or_equal" => format!("{left} <= {right}"),
+            "and" => format!("{left} && {right}"),
+            "or" => format!("{left} || {right}"),
             _ => {
                 return Err(FlowError::ConditionError(format!(
-                    "不支持的运算符: {}",
-                    operator
+                    "不支持的运算符: {operator}"
                 )))
             }
         };

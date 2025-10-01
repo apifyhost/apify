@@ -80,12 +80,10 @@ impl Step {
         if let Some(condition) = &self.condition {
             let next_step = if condition.evaluate(context)? {
                 self.then_pipeline
-                    .clone()
                     .map(NextStep::Pipeline)
                     .unwrap_or(NextStep::Next)
             } else {
                 self.else_pipeline
-                    .clone()
                     .map(NextStep::Pipeline)
                     .unwrap_or(NextStep::Next)
             };
