@@ -28,14 +28,12 @@ fn set_context_variables(eval_context: &mut HashMapContext, context: &Context) {
     }
 
     // 设置 payload 相关的变量
-    if let Some(payload) = context.get_payload() {
-        if let JsonValue::Object(payload_obj) = payload {
-            for (key, value) in payload_obj {
-                if let Some(eval_value) = convert_json_value(value.clone()) {
-                    eval_context
-                        .set_value(format!("payload_{key}"), eval_value)
-                        .ok();
-                }
+    if let Some(JsonValue::Object(payload_obj)) = context.get_payload() {
+        for (key, value) in payload_obj {
+            if let Some(eval_value) = convert_json_value(value.clone()) {
+                eval_context
+                    .set_value(format!("payload_{key}"), eval_value)
+                    .ok();
             }
         }
     }

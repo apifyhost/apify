@@ -62,11 +62,11 @@ impl Context {
         }
 
         match parts[0] {
-            "params" => self.get_path(&self.main, &parts[1..]),
+            "params" => Self::get_path(&self.main, &parts[1..]),
             "payload" => self
                 .payload
                 .as_ref()
-                .and_then(|p| self.get_path(p, &parts[1..])),
+                .and_then(|p| Self::get_path(p, &parts[1..])),
             "steps" => parts
                 .get(1)
                 .and_then(|id| self.step_outputs.get(*id))
@@ -76,7 +76,7 @@ impl Context {
     }
 
     /// 按路径获取JSON值
-    fn get_path(&self, value: &JsonValue, parts: &[&str]) -> Option<JsonValue> {
+    fn get_path(value: &JsonValue, parts: &[&str]) -> Option<JsonValue> {
         if parts.is_empty() {
             return Some(value.clone());
         }
@@ -84,12 +84,12 @@ impl Context {
         match value {
             JsonValue::Object(map) => map
                 .get(parts[0])
-                .and_then(|v| self.get_path(v, &parts[1..])),
+                .and_then(|v| Self::get_path(v, &parts[1..])),
             JsonValue::Array(arr) => parts[0]
                 .parse::<usize>()
                 .ok()
                 .and_then(|i| arr.get(i))
-                .and_then(|v| self.get_path(v, &parts[1..])),
+                .and_then(|v| Self::get_path(v, &parts[1..])),
             _ => None,
         }
     }
