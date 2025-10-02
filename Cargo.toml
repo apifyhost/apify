@@ -1,7 +1,40 @@
 [workspace]
-members = ["flow"]
-default-members = ["flow"]
-resolver = "3"
+members = [
+    "flow",
+    "sdk"
+]
+resolver = "2"
 
 [workspace.package]
-rust-version = "0.1"
+version = "0.1.0"
+edition = "2024"
+license = "Apache License 2.0"
+repository = "https://github.com/apifyhost/apify"
+
+[workspace.dependencies]
+flow = { path = "flow", version = "0" }
+sdk = { path = "sdk", version = "0" }
+
+crossbeam = { version = "0.8" }
+evalexpr = { version = "12.0" }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tokio = { version = "1", features = ["full", "tracing"] }
+valu3 = { version = "0.8" }
+once_cell = { version = "1" }
+
+env_logger = { version = "0" }
+log = { version = "0.4" }
+opentelemetry = { version="0.31" }
+opentelemetry_sdk = { version = "0" }
+opentelemetry-semantic-conventions = { version = "0", features = [
+    "semconv_experimental",
+] }
+opentelemetry-stdout = { version="0" }
+opentelemetry-otlp = { version = "0", features = ["grpc-tonic"] }
+tracing = { version = "0" }
+tracing-core = { version="0" }
+tracing-log = { version = "0" }
+tracing-opentelemetry = { version = "0" }
+tracing-subscriber = { version = "0" }
