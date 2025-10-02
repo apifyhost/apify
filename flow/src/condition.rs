@@ -139,11 +139,11 @@ mod tests {
         // Test each condition individually
         match condition3.evaluate(&ctx) {
             Ok(result) => {
-                println!("Condition 3 result: {}", result);
+                println!("Condition 3 result: {result}");
                 assert!(result, "Condition 3 should evaluate to true");
             }
             Err(e) => {
-                panic!("Condition 3 evaluation failed: {}", e);
+                panic!("Condition 3 evaluation failed: {e}");
             }
         }
 

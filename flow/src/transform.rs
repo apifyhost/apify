@@ -236,8 +236,7 @@ mod tests {
         for id in expected_ids {
             assert!(
                 pipelines.contains_key(&id),
-                "Missing pipeline with id {}",
-                id
+                "Missing pipeline with id {id}"
             );
         }
     }

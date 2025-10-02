@@ -115,12 +115,12 @@ mod integration_tests {
     #[test]
     fn test_error_types() {
         let transform_error = FlowError::TransformError("test".into());
-        assert!(format!("{}", transform_error).contains("转换错误"));
+        assert!(format!("{transform_error}").contains("转换错误"));
 
         let pipeline_error = FlowError::PipelineNotFound(42);
-        assert!(format!("{}", pipeline_error).contains("流程未找到"));
+        assert!(format!("{pipeline_error}").contains("流程未找到"));
 
         let step_error = FlowError::StepNotFound(1, 2);
-        assert!(format!("{}", step_error).contains("步骤未找到"));
+        assert!(format!("{step_error}").contains("步骤未找到"));
     }
 }

@@ -175,7 +175,7 @@ mod tests {
             "int_positive": 42,
             "int_negative": -1,
             "float_zero": 0.0,
-            "float_positive": 3.14,
+            "float_positive": 3.22,
             "float_negative": -2.5
         }));
 
@@ -184,7 +184,7 @@ mod tests {
         assert!(evaluate_expression("params_int_positive == 42", &ctx).unwrap());
         assert!(evaluate_expression("params_int_negative == -1", &ctx).unwrap());
         assert!(evaluate_expression("params_float_zero == 0.0", &ctx).unwrap());
-        assert!(evaluate_expression("params_float_positive == 3.14", &ctx).unwrap());
+        assert!(evaluate_expression("params_float_positive == 3.22", &ctx).unwrap());
         assert!(evaluate_expression("params_float_negative == -2.5", &ctx).unwrap());
     }
 }
