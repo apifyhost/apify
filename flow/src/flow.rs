@@ -15,7 +15,7 @@ impl Flow {
     pub fn from_json(json: &JsonValue) -> Result<Self, FlowError> {
         let pipelines = json_to_pipelines(json)?;
         if pipelines.is_empty() {
-            return Err(FlowError::TransformError("未找到流程定义".into()));
+            return Err(FlowError::TransformError("pipeline not found".into()));
         }
 
         let main_pipeline_id = 0;
@@ -23,10 +23,9 @@ impl Flow {
             return Err(FlowError::PipelineNotFound(main_pipeline_id));
         }
 
-        // 检查主流程是否有步骤
         let main_pipeline = pipelines.get(&main_pipeline_id).unwrap();
         if main_pipeline.steps.is_empty() {
-            return Err(FlowError::TransformError("主流程不能为空".into()));
+            return Err(FlowError::TransformError("main pipeline is empty".into()));
         }
 
         Ok(Self {
@@ -118,7 +117,6 @@ mod tests {
 
         assert_eq!(flow.main_pipeline_id, 0);
         assert!(flow.pipelines.contains_key(&0));
-        // 应该创建了3个pipeline：main(0), then(1), else(2)
         assert!(flow.pipelines.contains_key(&1));
         assert!(flow.pipelines.contains_key(&2));
     }
@@ -154,7 +152,7 @@ mod tests {
     async fn test_flow_execute_conditional_then() {
         let flow_json = create_test_flow_json();
         let flow = Flow::from_json(&flow_json).unwrap();
-        let mut ctx = Context::from_main(json!({"value": 15})); // value > 10
+        let mut ctx = Context::from_main(json!({"value": 15}));
 
         let result = flow.execute(&mut ctx).await.unwrap();
 
@@ -165,7 +163,7 @@ mod tests {
     async fn test_flow_execute_conditional_else() {
         let flow_json = create_test_flow_json();
         let flow = Flow::from_json(&flow_json).unwrap();
-        let mut ctx = Context::from_main(json!({"value": 5})); // value <= 10
+        let mut ctx = Context::from_main(json!({"value": 5}));
 
         let result = flow.execute(&mut ctx).await.unwrap();
 
@@ -178,7 +176,7 @@ mod tests {
             "steps": [
                 {
                     "to": {
-                        "pipeline": 999, // 不存在的pipeline
+                        "pipeline": 999,
                         "step": 0
                     }
                 }

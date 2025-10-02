@@ -10,7 +10,7 @@ impl Condition {
     pub fn from_json(value: &JsonValue) -> Result<Self, FlowError> {
         let left = value["left"]
             .as_str()
-            .ok_or_else(|| FlowError::ConditionError("缺少 'left' 字段".into()))?;
+            .ok_or_else(|| FlowError::ConditionError("missing 'left' field".into()))?;
 
         let right = match value["right"].as_str() {
             Some(s) => s.to_string(),
@@ -24,15 +24,14 @@ impl Condition {
                     }
                 }
                 JsonValue::String(s) => format!("\"{}\"", s.escape_default()),
-                _ => return Err(FlowError::ConditionError("不支持的 'right' 类型".into())),
+                _ => return Err(FlowError::ConditionError("unsupported 'right' type".into())),
             },
         };
 
         let operator = value["operator"]
             .as_str()
-            .ok_or_else(|| FlowError::ConditionError("缺少 'operator' 字段".into()))?;
+            .ok_or_else(|| FlowError::ConditionError("missing 'operator' field".into()))?;
 
-        // 将变量名从 params.x 转换为 params_x 格式
         let left = left.replace('.', "_");
 
         let expr_str = match operator {
@@ -46,7 +45,7 @@ impl Condition {
             "or" => format!("{left} || {right}"),
             _ => {
                 return Err(FlowError::ConditionError(format!(
-                    "不支持的运算符: {operator}"
+                    "operator not supported: {operator}"
                 )))
             }
         };
@@ -154,11 +153,9 @@ mod tests {
 
     #[test]
     fn test_condition_errors() {
-        // 缺少必需字段
         assert!(Condition::from_json(&json!({})).is_err());
         assert!(Condition::from_json(&json!({"left": "value"})).is_err());
 
-        // 不支持的运算符
         assert!(Condition::from_json(&json!({
             "left": "params.value",
             "operator": "unknown",
@@ -170,9 +167,9 @@ mod tests {
     #[test]
     fn test_condition_with_different_right_types() {
         let test_cases = vec![
-            json!(42),       // 数字
-            json!(true),     // 布尔值
-            json!("string"), // 字符串
+            json!(42),
+            json!(true),
+            json!("string"),
         ];
 
         for right_value in test_cases {

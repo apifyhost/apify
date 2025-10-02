@@ -93,7 +93,6 @@ mod tests {
         let output = pipeline.execute(&ctx, 0).await.unwrap();
 
         assert_eq!(output.next_step, NextStep::Stop);
-        // 最后一个步骤的输出
         assert_eq!(output.output, Some(json!({"result": "step3"})));
     }
 
@@ -108,7 +107,6 @@ mod tests {
         let pipeline = Pipeline::new(0, steps);
         let ctx = Context::new();
 
-        // 从第二个步骤开始执行
         let output = pipeline.execute(&ctx, 1).await.unwrap();
 
         assert_eq!(output.next_step, NextStep::Stop);
@@ -125,7 +123,7 @@ mod tests {
                     step: 0,
                 },
             ),
-            create_test_step("step2", NextStep::Stop), // 这个步骤不会执行
+            create_test_step("step2", NextStep::Stop),
         ];
 
         let pipeline = Pipeline::new(0, steps);
@@ -150,7 +148,6 @@ mod tests {
         let pipeline = Pipeline::new(0, steps);
         let ctx = Context::new();
 
-        // 尝试从超出范围的步骤开始执行
         let result = pipeline.execute(&ctx, 5).await;
 
         assert!(result.is_err());
@@ -168,7 +165,6 @@ mod tests {
         let pipeline = Pipeline::new(0, vec![]);
         let ctx = Context::new();
 
-        // 空管道应该返回 StepNotFound 错误
         let result = pipeline.execute(&ctx, 0).await;
         assert!(result.is_err());
 

@@ -3,9 +3,9 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct Context {
-    main: JsonValue,                          // 主输入参数
-    payload: Option<JsonValue>,               // 中间结果
-    step_outputs: HashMap<String, JsonValue>, // 步骤输出
+    main: JsonValue,                          // main input parameters
+    payload: Option<JsonValue>,               // payload data from previous step
+    step_outputs: HashMap<String, JsonValue>, // step outputs
 }
 
 impl Default for Context {
@@ -54,7 +54,7 @@ impl Context {
         self.step_outputs.get(step_id)
     }
 
-    /// 获取变量值（支持 params.xxx, payload.xxx, steps.xxx）
+    /// get var value for params.xxx, payload.xxx, steps.xxx
     pub fn get_variable(&self, path: &str) -> Option<JsonValue> {
         let parts: Vec<&str> = path.split('.').collect();
         if parts.is_empty() {
@@ -75,7 +75,6 @@ impl Context {
         }
     }
 
-    /// 按路径获取JSON值
     fn get_path(value: &JsonValue, parts: &[&str]) -> Option<JsonValue> {
         if parts.is_empty() {
             return Some(value.clone());

@@ -46,11 +46,11 @@ impl Step {
                 Some((
                     to["pipeline"]
                         .as_u64()
-                        .ok_or_else(|| FlowError::StepError("缺少 'to.pipeline'".into()))?
+                        .ok_or_else(|| FlowError::StepError("missing 'to.pipeline'".into()))?
                         as usize,
                     to["step"]
                         .as_u64()
-                        .ok_or_else(|| FlowError::StepError("缺少 'to.step'".into()))?
+                        .ok_or_else(|| FlowError::StepError("missing 'to.step'".into()))?
                         as usize,
                 ))
             } else {
@@ -60,7 +60,6 @@ impl Step {
     }
 
     pub async fn execute(&self, context: &Context) -> Result<StepOutput, FlowError> {
-        // 直接返回
         if let Some(return_val) = &self.return_val {
             return Ok(StepOutput {
                 next_step: NextStep::Stop,
@@ -68,7 +67,6 @@ impl Step {
             });
         }
 
-        // 直接跳转
         if let Some((pipeline, step)) = self.to_step {
             return Ok(StepOutput {
                 next_step: NextStep::Step { pipeline, step },
@@ -76,7 +74,6 @@ impl Step {
             });
         }
 
-        // 条件判断
         if let Some(condition) = &self.condition {
             let next_step = if condition.evaluate(context)? {
                 self.then_pipeline
@@ -93,7 +90,6 @@ impl Step {
             });
         }
 
-        // 默认下一步
         Ok(StepOutput {
             next_step: NextStep::Next,
             output: None,

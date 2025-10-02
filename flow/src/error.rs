@@ -2,30 +2,30 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum FlowError {
-    #[error("JSON解析错误: {0}")]
+    #[error("JSON parse error: {0}")]
     JsonParseError(#[from] serde_json::Error),
 
-    #[error("表达式错误: {0}")]
+    #[error("Expression error: {0}")]
     ExpressionError(String),
 
-    #[error("条件错误: {0}")]
+    #[error("Condition error: {0}")]
     ConditionError(String),
 
-    #[error("步骤错误: {0}")]
+    #[error("Step error: {0}")]
     StepError(String),
 
-    #[error("流程错误: {0}")]
+    #[error("Pipeline error: {0}")]
     PipelineError(String),
 
-    #[error("转换错误: {0}")]
+    #[error("Transform error: {0}")]
     TransformError(String),
 
-    #[error("上下文错误: {0}")]
+    #[error("Context error: {0}")]
     ContextError(String),
 
-    #[error("流程未找到: {0}")]
+    #[error("Pipeline not found: {0}")]
     PipelineNotFound(usize),
 
-    #[error("步骤未找到: {0} (流程 {1})")]
+    #[error("Step not found: {0} (Pipeline {1})")]
     StepNotFound(usize, usize),
 }

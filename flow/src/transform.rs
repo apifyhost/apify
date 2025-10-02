@@ -9,7 +9,7 @@ pub fn json_to_pipelines(json: &JsonValue) -> Result<HashMap<usize, Pipeline>, F
     let main_steps = json
         .get("steps")
         .and_then(|v| v.as_array())
-        .ok_or_else(|| FlowError::TransformError("根节点缺少 'steps' 数组".into()))?;
+        .ok_or_else(|| FlowError::TransformError("missing 'steps' array".into()))?;
 
     process_pipeline(
         pipeline_counter,
@@ -34,26 +34,24 @@ fn process_pipeline(
     for (step_idx, step_json) in steps_json.iter().enumerate() {
         let mut step_json_clone = step_json.clone();
 
-        // 处理then分支
         if let Some(then_json) = step_json.get("then") {
             *counter += 1;
             let then_pipeline_id = *counter;
             let then_steps = then_json
                 .get("steps")
                 .and_then(|v| v.as_array())
-                .ok_or_else(|| FlowError::TransformError("'then' 缺少 'steps' 数组".into()))?;
+                .ok_or_else(|| FlowError::TransformError("missing 'steps' array in 'then'".into()))?;
             process_pipeline(then_pipeline_id, then_steps, then_json, pipelines, counter)?;
             step_json_clone["then"]["pipeline_id"] = JsonValue::Number(then_pipeline_id.into());
         }
 
-        // 处理else分支
         if let Some(else_json) = step_json.get("else") {
             *counter += 1;
             let else_pipeline_id = *counter;
             let else_steps = else_json
                 .get("steps")
                 .and_then(|v| v.as_array())
-                .ok_or_else(|| FlowError::TransformError("'else' 缺少 'steps' 数组".into()))?;
+                .ok_or_else(|| FlowError::TransformError("missing 'steps' array in 'else'".into()))?;
             process_pipeline(else_pipeline_id, else_steps, else_json, pipelines, counter)?;
             step_json_clone["else"]["pipeline_id"] = JsonValue::Number(else_pipeline_id.into());
         }
@@ -88,7 +86,7 @@ mod tests {
 
         let pipelines = json_to_pipelines(&json_flow).unwrap();
 
-        assert!(pipelines.contains_key(&0)); // 主pipeline
+        assert!(pipelines.contains_key(&0));
         assert_eq!(pipelines.len(), 1);
 
         let main_pipeline = pipelines.get(&0).unwrap();
@@ -126,7 +124,6 @@ mod tests {
 
         let pipelines = json_to_pipelines(&json_flow).unwrap();
 
-        // 应该创建3个pipeline：main(0), then(1), else(2)
         assert_eq!(pipelines.len(), 3);
 
         assert!(pipelines.contains_key(&0));
@@ -177,21 +174,17 @@ mod tests {
 
         let pipelines = json_to_pipelines(&json_flow).unwrap();
 
-        // 应该创建4个pipeline：main(0), then(1), nested_then(2), nested_else(3)
         assert_eq!(pipelines.len(), 4);
     }
 
     #[test]
     fn test_json_to_pipelines_errors() {
-        // 缺少steps数组
         let invalid_json = json!({});
         assert!(json_to_pipelines(&invalid_json).is_err());
 
-        // steps不是数组
         let invalid_json2 = json!({"steps": "not_an_array"});
         assert!(json_to_pipelines(&invalid_json2).is_err());
 
-        // then分支缺少steps
         let invalid_json3 = json!({
             "steps": [
                 {
@@ -231,7 +224,6 @@ mod tests {
 
         let pipelines = json_to_pipelines(&json_flow).unwrap();
 
-        // 应该分配连续的ID：main(0), then(1), else(2), else(3)
         let expected_ids = vec![0, 1, 2, 3];
         for id in expected_ids {
             assert!(
