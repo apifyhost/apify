@@ -88,6 +88,6 @@ impl Context {
     }
 
     pub fn get_step_output(&self, id: &ID) -> Option<&Value> {
-        self.steps.get(&id)
+        self.steps.get(id)
     }
 }

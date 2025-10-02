@@ -21,14 +21,14 @@ pub struct Repositories {
 }
 
 pub fn resolve_function_name(name: &str) -> String {
-    format!("__module_{}", name)
+    format!("__module_{name}")
 }
 
 pub fn args_to_abstration(name: String, args: &Vec<String>) -> String {
     let args = args.join(", ");
     let target = resolve_function_name(&name);
 
-    format!("{}({}){{{}([{}])}}", name, args, target, args)
+    format!("{name}({args}){{{target}([{args}])}}")
 }
 
 pub fn wrap_async_fn<F, Fut>(name: String, func: F, args: Vec<String>) -> RepositoryFunction
@@ -52,9 +52,9 @@ pub enum Error {
 impl std::fmt::Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::VersionNotFound(module) => write!(f, "Version not found for module: {}", module),
-            Error::ModuleLoaderError(err) => write!(f, "Module loader error: {}", err),
-            Error::ModuleNotFound(name) => write!(f, "Module not found: {}", name),
+            Error::VersionNotFound(module) => write!(f, "Version not found for module: {module}"),
+            Error::ModuleLoaderError(err) => write!(f, "Module loader error: {err}"),
+            Error::ModuleNotFound(name) => write!(f, "Module not found: {name}"),
         }
     }
 }
@@ -62,9 +62,9 @@ impl std::fmt::Debug for Error {
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::VersionNotFound(module) => write!(f, "Version not found for module: {}", module),
-            Error::ModuleLoaderError(err) => write!(f, "Module loader error: {}", err),
-            Error::ModuleNotFound(name) => write!(f, "Module not found: {}", name),
+            Error::VersionNotFound(module) => write!(f, "Version not found for module: {module}"),
+            Error::ModuleLoaderError(err) => write!(f, "Module loader error: {err}"),
+            Error::ModuleNotFound(name) => write!(f, "Module not found: {name}"),
         }
     }
 }
@@ -153,7 +153,7 @@ impl TryFrom<Value> for ModuleData {
             let prefix = &padded[0..2];
             let middle = &padded[2..4];
 
-            let repository = format!("{}/{}/{}", prefix, middle, module);
+            let repository = format!("{prefix}/{middle}/{module}");
             Some(repository)
         } else {
             None
@@ -213,9 +213,9 @@ pub enum ModulesError {
 impl Display for ModulesError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ModulesError::ModuleNotFound(name) => write!(f, "Module not found: {}", name),
-            ModulesError::ModuleNotLoaded(name) => write!(f, "Module not loaded: {}", name),
-            ModulesError::ModuleError(err) => write!(f, "Module error: {}", err),
+            ModulesError::ModuleNotFound(name) => write!(f, "Module not found: {name}"),
+            ModulesError::ModuleNotLoaded(name) => write!(f, "Module not loaded: {name}"),
+            ModulesError::ModuleError(err) => write!(f, "Module error: {err}"),
         }
     }
 }
@@ -226,11 +226,11 @@ pub struct ModuleResponse {
     pub data: Value,
 }
 
-impl Into<ModuleResponse> for Value {
-    fn into(self) -> ModuleResponse {
+impl From<Value> for ModuleResponse {
+    fn from(val: Value) -> Self {
         ModuleResponse {
             error: None,
-            data: self,
+            data: val,
         }
     }
 }
@@ -362,7 +362,7 @@ impl Modules {
                     ));
 
                     if let Some(error) = result.error {
-                        Value::from(format!("Error: {}", error))
+                        Value::from(format!("Error: {error}"))
                     } else {
                         result.data
                     }

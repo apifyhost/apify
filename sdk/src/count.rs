@@ -2,6 +2,12 @@ pub struct Count {
     count: u64,
 }
 
+impl Default for Count {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Count {
     pub fn new() -> Self {
         Count { count: 0 }

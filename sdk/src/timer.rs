@@ -6,7 +6,7 @@ pub struct Timer<'a> {
 impl<'a> Timer<'a> {
     pub fn start(name: &'a str) -> Self {
         let timer = std::time::Instant::now();
-        println!("Timer {} started", name);
+        println!("Timer {name} started");
         Self { name, timer }
     }
 
