@@ -24,7 +24,7 @@ pub fn resolve_function_name(name: &str) -> String {
     format!("__module_{name}")
 }
 
-pub fn args_to_abstration(name: String, args: &Vec<String>) -> String {
+pub fn args_to_abstration(name: String, args: &[String]) -> String {
     let args = args.join(", ");
     let target = resolve_function_name(&name);
 

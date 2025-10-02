@@ -150,9 +150,7 @@ pub fn get_otel_active() -> bool {
 
 pub fn init_tracing_subscriber(app_data: ApplicationData) -> OtelGuard {
     // Initialize the log-tracing bridge to capture log! macros
-    LogTracer::init().unwrap_or({
-        // Bridge already initialized, ignore
-    });
+    LogTracer::init().unwrap_or(());
 
     if !get_otel_active() {
         let subscriber = Registry::default()
