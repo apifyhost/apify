@@ -1,0 +1,27 @@
+[package]
+name = "sdk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "SDK for apify, a fast, modular runtime for building backends with YAML spec, Rust modules, and native OpenTelemetry observability."
+keywords = ["workflow", "module", "sdk"]
+
+[dependencies]
+valu3 = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+crossbeam = { workspace = true }
+opentelemetry = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+opentelemetry-semantic-conventions = { workspace = true }
+opentelemetry-stdout = { workspace = true }
+tracing-core = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing = { workspace = true }
+tracing-log = { workspace = true }
+once_cell = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
