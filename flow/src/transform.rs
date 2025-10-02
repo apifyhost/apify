@@ -40,7 +40,9 @@ fn process_pipeline(
             let then_steps = then_json
                 .get("steps")
                 .and_then(|v| v.as_array())
-                .ok_or_else(|| FlowError::TransformError("missing 'steps' array in 'then'".into()))?;
+                .ok_or_else(|| {
+                    FlowError::TransformError("missing 'steps' array in 'then'".into())
+                })?;
             process_pipeline(then_pipeline_id, then_steps, then_json, pipelines, counter)?;
             step_json_clone["then"]["pipeline_id"] = JsonValue::Number(then_pipeline_id.into());
         }
@@ -51,7 +53,9 @@ fn process_pipeline(
             let else_steps = else_json
                 .get("steps")
                 .and_then(|v| v.as_array())
-                .ok_or_else(|| FlowError::TransformError("missing 'steps' array in 'else'".into()))?;
+                .ok_or_else(|| {
+                    FlowError::TransformError("missing 'steps' array in 'else'".into())
+                })?;
             process_pipeline(else_pipeline_id, else_steps, else_json, pipelines, counter)?;
             step_json_clone["else"]["pipeline_id"] = JsonValue::Number(else_pipeline_id.into());
         }
@@ -226,10 +230,7 @@ mod tests {
 
         let expected_ids = vec![0, 1, 2, 3];
         for id in expected_ids {
-            assert!(
-                pipelines.contains_key(&id),
-                "Missing pipeline with id {id}"
-            );
+            assert!(pipelines.contains_key(&id), "Missing pipeline with id {id}");
         }
     }
 }

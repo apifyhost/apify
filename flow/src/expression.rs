@@ -1,5 +1,5 @@
 use crate::{context::Context, error::FlowError};
-use evalexpr::{eval_boolean_with_context, ContextWithMutableVariables, HashMapContext};
+use evalexpr::{ContextWithMutableVariables, HashMapContext, eval_boolean_with_context};
 use serde_json::Value as JsonValue;
 
 pub fn evaluate_expression(expr_str: &str, context: &Context) -> Result<bool, FlowError> {
@@ -95,17 +95,21 @@ mod tests {
             "has_job": true
         }));
 
-        assert!(evaluate_expression(
-            "params_age >= 18 && params_income > 5000 && params_has_job && !params_is_student",
-            &ctx
-        )
-        .unwrap());
+        assert!(
+            evaluate_expression(
+                "params_age >= 18 && params_income > 5000 && params_has_job && !params_is_student",
+                &ctx
+            )
+            .unwrap()
+        );
 
-        assert!(!evaluate_expression(
-            "params_age < 18 || params_is_student || params_income < 1000",
-            &ctx
-        )
-        .unwrap());
+        assert!(
+            !evaluate_expression(
+                "params_age < 18 || params_is_student || params_income < 1000",
+                &ctx
+            )
+            .unwrap()
+        );
     }
 
     #[test]

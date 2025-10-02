@@ -46,7 +46,7 @@ impl Condition {
             _ => {
                 return Err(FlowError::ConditionError(format!(
                     "operator not supported: {operator}"
-                )))
+                )));
             }
         };
 
@@ -156,21 +156,19 @@ mod tests {
         assert!(Condition::from_json(&json!({})).is_err());
         assert!(Condition::from_json(&json!({"left": "value"})).is_err());
 
-        assert!(Condition::from_json(&json!({
-            "left": "params.value",
-            "operator": "unknown",
-            "right": 10
-        }))
-        .is_err());
+        assert!(
+            Condition::from_json(&json!({
+                "left": "params.value",
+                "operator": "unknown",
+                "right": 10
+            }))
+            .is_err()
+        );
     }
 
     #[test]
     fn test_condition_with_different_right_types() {
-        let test_cases = vec![
-            json!(42),
-            json!(true),
-            json!("string"),
-        ];
+        let test_cases = vec![json!(42), json!(true), json!("string")];
 
         for right_value in test_cases {
             let json_condition = json!({
