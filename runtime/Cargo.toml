@@ -13,6 +13,7 @@ serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 tokio ={ workspace = true }
 crossbeam = { workspace = true }
+libc = { workspace = true }
 libloading = { workspace = true }
 reqwest = { workspace = true }
 flate2 = { workspace = true }
