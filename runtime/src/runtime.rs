@@ -21,6 +21,7 @@ use std::thread;
 use tokio::sync::oneshot;
 
 #[derive(Debug)]
+#[allow(clippy::enum_variant_names)]
 pub enum RuntimeError {
     ModuleWithError(ScriptError),
     ModuleRegisterError,

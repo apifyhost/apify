@@ -12,6 +12,7 @@ impl Display for ModuleError {
     }
 }
 
+#[allow(clippy::enum_variant_names)]
 pub enum Error {
     VersionNotFound(ModuleError),
     ModuleLoaderError(String),

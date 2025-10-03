@@ -287,27 +287,22 @@ pub fn load_external_module_info(module: &str) -> Value {
             .map_err(Error::LoaderErrorScript)
             .unwrap();
 
-        if let Some(input) = value.get("input") {
-            if let serde_yaml::Value::Mapping(input) = input {
-                if let Some(serde_yaml::Value::String(input_type)) = input.get("type") {
-                    if input_type == "object" {
-                        if let Some(serde_yaml::Value::Mapping(properties)) =
-                            input.get(serde_yaml::Value::String("properties".to_string()))
-                        {
-                            for (key, _) in properties {
-                                if let serde_yaml::Value::String(key) = key {
-                                    input_order.push(key.clone());
-                                }
+        if let Some(serde_yaml::Value::Mapping(input)) = value.get("input") {
+            if let Some(serde_yaml::Value::String(input_type)) = input.get("type") {
+                if input_type == "object" {
+                    if let Some(serde_yaml::Value::Mapping(properties)) = input.get("properties") {
+                        for (key, _) in properties {
+                            if let serde_yaml::Value::String(key) = key {
+                                input_order.push(key.clone());
                             }
                         }
                     }
                 }
+
+                drop(value)
             }
         }
-
-        drop(value)
     }
-
     let mut value: Value = serde_yaml::from_str::<Value>(&file)
         .map_err(Error::LoaderErrorScript)
         .unwrap();
@@ -338,24 +333,19 @@ pub fn load_local_module_info(local_path: &str) -> Value {
             .map_err(Error::LoaderErrorScript)
             .unwrap();
 
-        if let Some(input) = value.get("input") {
-            if let serde_yaml::Value::Mapping(input) = input {
-                if let Some(serde_yaml::Value::String(input_type)) = input.get("type") {
-                    if input_type == "object" {
-                        if let Some(serde_yaml::Value::Mapping(properties)) =
-                            input.get(serde_yaml::Value::String("properties".to_string()))
-                        {
-                            for (key, _) in properties {
-                                if let serde_yaml::Value::String(key) = key {
-                                    input_order.push(key.clone());
-                                }
+        if let Some(serde_yaml::Value::Mapping(input)) = value.get("input") {
+            if let Some(serde_yaml::Value::String(input_type)) = input.get("type") {
+                if input_type == "object" {
+                    if let Some(serde_yaml::Value::Mapping(properties)) = input.get("properties") {
+                        for (key, _) in properties {
+                            if let serde_yaml::Value::String(key) = key {
+                                input_order.push(key.clone());
                             }
                         }
                     }
                 }
             }
         }
-
         drop(value)
     }
 
@@ -368,14 +358,14 @@ pub fn load_local_module_info(local_path: &str) -> Value {
     value
 }
 
-fn find_default_file(base: &PathBuf) -> Option<String> {
+fn find_default_file(base: &Path) -> Option<String> {
     if base.is_file() {
         return Some(base.to_str().unwrap_or_default().to_string());
     }
 
     if base.is_dir() {
         {
-            let mut base_path = base.clone();
+            let mut base_path = base.to_path_buf();
             base_path.set_extension("phlow");
 
             if base_path.exists() {

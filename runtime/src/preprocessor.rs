@@ -131,7 +131,7 @@ fn preprocessor_eval(flow: &str) -> String {
             };
             let indent = " ".repeat(pos);
 
-            if after_eval.starts_with("```") {
+            if let Some(stripped) = after_eval.strip_prefix("```") {
                 // Bloco markdown-style
                 let mut block_lines = vec![];
 
@@ -142,7 +142,7 @@ fn preprocessor_eval(flow: &str) -> String {
                         }
                         block_lines.push(next_line.trim().to_string());
                     }
-                } else if let Some(end_pos) = after_eval[3..].find("```") {
+                } else if let Some(end_pos) = stripped.find("```") {
                     let inner_code = &after_eval[3..3 + end_pos];
                     block_lines.push(inner_code.trim().to_string());
                 }
@@ -395,8 +395,8 @@ fn preprocessor_modules(flow: &str) -> Result<String, Vec<String>> {
                         .and_then(|v| v.as_str())
                     {
                         // Extrai o nome do módulo de paths locais (./modules/cognito -> cognito)
-                        let clean_name = if module_name.starts_with("./modules/") {
-                            &module_name[10..] // Remove "./modules/"
+                        let clean_name = if let Some(stripped) = module_name.strip_prefix("./modules/") {
+                            stripped // Remove "./modules/"
                         } else if module_name.contains('/') {
                             // Para outros paths, pega apenas o último segmento
                             module_name.split('/').next_back().unwrap_or(module_name)

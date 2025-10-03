@@ -1,4 +1,5 @@
 pub mod error;
+#[allow(clippy::module_inception)]
 pub mod loader;
 use crate::MODULE_EXTENSION;
 use crate::RUNTIME_ARCH;
@@ -186,6 +187,7 @@ impl Loader {
 
         let mut downloads = Vec::new();
 
+        let repo_regex = regex::Regex::new(r"^(https?://|\.git|.*@.*)").unwrap();
         for module in &self.modules {
             // Skip local path modules - they don't need to be downloaded
             if module.local_path.is_some() {
@@ -209,8 +211,7 @@ impl Loader {
                 Some(repo) => repo.clone(),
                 None => format!(
                     "{}/refs/heads/main/packages/{}",
-                    if regex::Regex::new(r"^(https?://|\.git|.*@.*)")
-                        .unwrap()
+                    if repo_regex
                         .is_match(default_package_repository_url)
                     {
                         default_package_repository_url.to_string()
