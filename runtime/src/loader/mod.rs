@@ -211,9 +211,7 @@ impl Loader {
                 Some(repo) => repo.clone(),
                 None => format!(
                     "{}/refs/heads/main/packages/{}",
-                    if repo_regex
-                        .is_match(default_package_repository_url)
-                    {
+                    if repo_regex.is_match(default_package_repository_url) {
                         default_package_repository_url.to_string()
                     } else {
                         format!(

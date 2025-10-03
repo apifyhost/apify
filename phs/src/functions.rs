@@ -1042,12 +1042,14 @@ mod tests {
             assert!(map.contains_key("age"));
             // Verifica os valores
             if let Some(name) = map.get("name")
-                && let Some(name_str) = name.clone().try_cast::<String>() {
-                    assert_eq!(name_str, "João");
+                && let Some(name_str) = name.clone().try_cast::<String>()
+            {
+                assert_eq!(name_str, "João");
             }
             if let Some(age) = map.get("age")
-                && let Ok(age_val) = age.as_int() {
-                    assert_eq!(age_val, 30);
+                && let Ok(age_val) = age.as_int()
+            {
+                assert_eq!(age_val, 30);
             }
         } else {
             panic!("Esperado um Map, mas recebeu: {:?}", result.type_name());
@@ -1116,9 +1118,10 @@ mod tests {
 
             // Testa acesso ao objeto aninhado
             if let Some(user) = map.get("user")
-                && let Some(user_map) = user.clone().try_cast::<rhai::Map>() {
-                    assert!(user_map.contains_key("name"));
-                    assert!(user_map.contains_key("age"));
+                && let Some(user_map) = user.clone().try_cast::<rhai::Map>()
+            {
+                assert!(user_map.contains_key("name"));
+                assert!(user_map.contains_key("age"));
             }
         } else {
             panic!("Esperado um Map para objeto aninhado");
@@ -1134,9 +1137,10 @@ mod tests {
 
             // Verifica o primeiro objeto do array
             if let Some(first_obj) = array.first()
-                && let Some(obj_map) = first_obj.clone().try_cast::<rhai::Map>() {
-                    assert!(obj_map.contains_key("id"));
-                    assert!(obj_map.contains_key("name"));
+                && let Some(obj_map) = first_obj.clone().try_cast::<rhai::Map>()
+            {
+                assert!(obj_map.contains_key("id"));
+                assert!(obj_map.contains_key("name"));
             }
         } else {
             panic!("Esperado um Array de objetos");

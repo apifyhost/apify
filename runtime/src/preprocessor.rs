@@ -384,28 +384,27 @@ fn preprocessor_modules(flow: &str) -> Result<String, Vec<String>> {
     let mut available_modules = std::collections::HashSet::new();
 
     // Extrai módulos da seção "modules"
-    if let Some(modules) = parsed.get("modules") {
-        if let Some(modules_array) = modules.as_sequence() {
-            for module in modules_array {
-                if let Some(module_map) = module.as_mapping() {
+    if let Some(modules) = parsed.get("modules")
+        && let Some(modules_array) = modules.as_sequence()
+    {
+        for module in modules_array {
+            if let Some(module_map) = module.as_mapping()
                     // Verifica se existe "module" ou "name"
-                    if let Some(module_name) = module_map
+                    && let Some(module_name) = module_map
                         .get("module")
                         .or_else(|| module_map.get("name"))
                         .and_then(|v| v.as_str())
-                    {
-                        // Extrai o nome do módulo de paths locais (./modules/cognito -> cognito)
-                        let clean_name = if let Some(stripped) = module_name.strip_prefix("./modules/") {
-                            stripped // Remove "./modules/"
-                        } else if module_name.contains('/') {
-                            // Para outros paths, pega apenas o último segmento
-                            module_name.split('/').next_back().unwrap_or(module_name)
-                        } else {
-                            module_name
-                        };
-                        available_modules.insert(clean_name.to_string());
-                    }
-                }
+            {
+                // Extrai o nome do módulo de paths locais (./modules/cognito -> cognito)
+                let clean_name = if let Some(stripped) = module_name.strip_prefix("./modules/") {
+                    stripped // Remove "./modules/"
+                } else if module_name.contains('/') {
+                    // Para outros paths, pega apenas o último segmento
+                    module_name.split('/').next_back().unwrap_or(module_name)
+                } else {
+                    module_name
+                };
+                available_modules.insert(clean_name.to_string());
             }
         }
     }

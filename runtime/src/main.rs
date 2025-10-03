@@ -85,14 +85,13 @@ async fn main() {
 
     let dispatch = guard.dispatch.clone();
     let fut = async {
-        if settings.download {
-            if let Err(err) = loader
+        if settings.download
+            && let Err(err) = loader
                 .download(&settings.default_package_repository_url)
                 .await
-            {
-                log::error!("Download failed: {err:?}");
-                return;
-            }
+        {
+            log::error!("Download failed: {err:?}");
+            return;
         }
 
         loader.update_info();

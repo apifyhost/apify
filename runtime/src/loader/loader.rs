@@ -161,11 +161,12 @@ async fn download_file(url: &str, inner_folder: Option<&str>) -> Result<String, 
     if Archive::new(GzDecoder::new(Cursor::new(bytes.clone())))
         .unpack(&remote_path)
         .is_err()
-      && let Ok(mut archive) = ZipArchive::new(Cursor::new(bytes.clone())) {
-            archive
-                .extract(&remote_path)
-                .map_err(Error::ZipErrorError)?;
-    }
+        && let Ok(mut archive) = ZipArchive::new(Cursor::new(bytes.clone()))
+    {
+        archive
+            .extract(&remote_path)
+            .map_err(Error::ZipErrorError)?;
+    };
 
     let effective_path = if let Some(inner_folder) = inner_folder {
         remote_path.join(inner_folder)
@@ -240,8 +241,9 @@ fn resolve_script(file: &str, main_file_path: String, print_yaml: bool) -> Resul
         })?;
 
         if let Ok(yaml_show) = std::env::var("PHLOW_SCRIPT_SHOW")
-            && yaml_show == "true" {
-                println!("YAML: {script}");
+            && yaml_show == "true"
+        {
+            println!("YAML: {script}");
         }
 
         serde_yaml::from_str(&script).map_err(Error::LoaderErrorScript)?
@@ -284,22 +286,22 @@ pub fn load_external_module_info(module: &str) -> Value {
             .map_err(Error::LoaderErrorScript)
             .unwrap();
 
-        if let Some(serde_yaml::Value::Mapping(input)) = value.get("input") {
-            if let Some(serde_yaml::Value::String(input_type)) = input.get("type") {
-                if input_type == "object" {
-                    if let Some(serde_yaml::Value::Mapping(properties)) = input.get("properties") {
-                        for (key, _) in properties {
-                            if let serde_yaml::Value::String(key) = key {
-                                input_order.push(key.clone());
-                            }
-                        }
+        if let Some(serde_yaml::Value::Mapping(input)) = value.get("input")
+            && let Some(serde_yaml::Value::String(input_type)) = input.get("type")
+        {
+            if input_type == "object"
+                && let Some(serde_yaml::Value::Mapping(properties)) = input.get("properties")
+            {
+                for (key, _) in properties {
+                    if let serde_yaml::Value::String(key) = key {
+                        input_order.push(key.clone());
                     }
                 }
-
-                drop(value)
             }
+            drop(value)
         }
     }
+
     let mut value: Value = serde_yaml::from_str::<Value>(&file)
         .map_err(Error::LoaderErrorScript)
         .unwrap();
@@ -330,15 +332,15 @@ pub fn load_local_module_info(local_path: &str) -> Value {
             .map_err(Error::LoaderErrorScript)
             .unwrap();
 
-        if let Some(serde_yaml::Value::Mapping(input)) = value.get("input") {
-            if let Some(serde_yaml::Value::String(input_type)) = input.get("type") {
-                if input_type == "object" {
-                    if let Some(serde_yaml::Value::Mapping(properties)) = input.get("properties") {
-                        for (key, _) in properties {
-                            if let serde_yaml::Value::String(key) = key {
-                                input_order.push(key.clone());
-                            }
-                        }
+        if let Some(serde_yaml::Value::Mapping(input)) = value.get("input")
+            && let Some(serde_yaml::Value::String(input_type)) = input.get("type")
+        {
+            if input_type == "object"
+                && let Some(serde_yaml::Value::Mapping(properties)) = input.get("properties")
+            {
+                for (key, _) in properties {
+                    if let serde_yaml::Value::String(key) = key {
+                        input_order.push(key.clone());
                     }
                 }
             }
