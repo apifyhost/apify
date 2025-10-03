@@ -161,13 +161,11 @@ async fn download_file(url: &str, inner_folder: Option<&str>) -> Result<String, 
     if Archive::new(GzDecoder::new(Cursor::new(bytes.clone())))
         .unpack(&remote_path)
         .is_err()
-    {
-        if let Ok(mut archive) = ZipArchive::new(Cursor::new(bytes.clone())) {
+      && let Ok(mut archive) = ZipArchive::new(Cursor::new(bytes.clone())) {
             archive
                 .extract(&remote_path)
                 .map_err(Error::ZipErrorError)?;
-        }
-    };
+    }
 
     let effective_path = if let Some(inner_folder) = inner_folder {
         remote_path.join(inner_folder)
@@ -241,10 +239,9 @@ fn resolve_script(file: &str, main_file_path: String, print_yaml: bool) -> Resul
             ))
         })?;
 
-        if let Ok(yaml_show) = std::env::var("PHLOW_SCRIPT_SHOW") {
-            if yaml_show == "true" {
+        if let Ok(yaml_show) = std::env::var("PHLOW_SCRIPT_SHOW")
+            && yaml_show == "true" {
                 println!("YAML: {script}");
-            }
         }
 
         serde_yaml::from_str(&script).map_err(Error::LoaderErrorScript)?
