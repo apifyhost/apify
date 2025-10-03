@@ -13,7 +13,7 @@ type Context = HashMap<String, Value>;
 #[derive(Debug)]
 pub enum ScriptError {
     EvalError(Box<EvalAltResult>),
-    InvalidType(Value),
+    InvalidType(Box<Value>),
     CompileError(String, ParseError),
 }
 

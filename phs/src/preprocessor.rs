@@ -252,9 +252,8 @@ impl SpreadPreprocessor {
         let mut escape_next = false;
         let mut content = String::new();
 
-        for i in start..chars.len() {
+        for (i, _) in chars.iter().enumerate().skip(start) {
             let ch = chars[i];
-
             if escape_next {
                 content.push(ch);
                 escape_next = false;
@@ -297,9 +296,8 @@ impl SpreadPreprocessor {
         let mut spread_items = Vec::new();
 
         for part in parts {
-            if part.starts_with("...") {
-                // É um spread
-                let var_name = part[3..].trim();
+            if let Some(stripped) = part.strip_prefix("...") {
+                let var_name = stripped.trim();
                 spread_items.push(var_name.to_string());
             } else {
                 // É um par chave-valor normal
@@ -316,9 +314,8 @@ impl SpreadPreprocessor {
         let mut spread_items = Vec::new();
 
         for part in parts {
-            if part.starts_with("...") {
-                // É um spread
-                let var_name = part[3..].trim();
+            if let Some(stripped) = part.strip_prefix("...") {
+                let var_name = stripped.trim();
                 spread_items.push(var_name.to_string());
             } else {
                 // É um elemento normal

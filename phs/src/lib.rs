@@ -9,20 +9,17 @@ pub use script::{Script, ScriptError};
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
+use std::pin::Pin;
 use valu3::prelude::*;
 use sdk::structs::{Repositories};
-
 
 pub fn build_engine(repositories: Option<Repositories>) -> Arc<Engine> {
     let mut engine = build_functions();
 
     if let Some(repositories) = repositories {
         for (key, repo) in repositories.repositories {
-            let call: Arc<
-                dyn Fn(Value) -> std::pin::Pin<Box<dyn Future<Output = Value> + Send>>
-                    + Send
-                    + Sync,
-            > = repo.function.clone();
+            type Function = Arc<dyn Fn(Value) -> Pin<Box<dyn Future<Output = Value> + Send>> + Send + Sync>;
+            let call: Function = repo.function.clone();
 
             let arg_types: Vec<std::any::TypeId> =
                 vec![std::any::TypeId::of::<Dynamic>(); repo.args.len()];
@@ -56,7 +53,6 @@ pub fn build_engine(repositories: Option<Repositories>) -> Arc<Engine> {
 
 
 #[cfg(test)]
-
 mod tests {
     use super::*;
     use std::collections::HashMap;

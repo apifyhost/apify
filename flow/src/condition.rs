@@ -215,7 +215,7 @@ impl Condition {
         match result {
             Value::Boolean(result) => Ok(result),
             _ => Err(ConditionError::ScriptError(phs::ScriptError::InvalidType(
-                result,
+                Box::new(result),
             ))),
         }
     }

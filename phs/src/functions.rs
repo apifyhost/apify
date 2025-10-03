@@ -289,10 +289,7 @@ pub fn build_functions() -> Engine {
 
         match general_purpose::STANDARD.decode(&padded_input) {
             Ok(bytes) => {
-                match String::from_utf8(bytes) {
-                    Ok(decoded) => decoded,
-                    Err(_) => String::new(), // Retorna string vazia se não for UTF-8 válido
-                }
+                String::from_utf8(bytes).unwrap_or_default()
             }
             Err(_) => String::new(), // Retorna string vazia se não for Base64 válido
         }
@@ -338,10 +335,7 @@ pub fn build_functions() -> Engine {
         }
 
         // Converte bytes para string UTF-8
-        match String::from_utf8(result) {
-            Ok(decoded) => decoded,
-            Err(_) => String::new(), // Retorna string vazia se não for UTF-8 válido
-        }
+        String::from_utf8(result).unwrap_or_default()
     });
 
     engine.register_fn("parse", |s: &str| -> rhai::Dynamic {
@@ -1091,8 +1085,8 @@ mod tests {
         assert_eq!(result, 42);
 
         // Teste com float JSON
-        let result: f64 = engine.eval(r#""3.14".parse()"#).unwrap();
-        assert_eq!(result, 3.14);
+        let result: f64 = engine.eval(r#""3.24".parse()"#).unwrap();
+        assert_eq!(result, 3.24);
 
         // Teste com boolean JSON true
         let result: bool = engine.eval(r#""true".parse()"#).unwrap();
@@ -1185,8 +1179,8 @@ mod tests {
         assert_eq!(result, "42");
 
         // Teste com número float
-        let result: String = engine.eval(r#"3.14.to_json()"#).unwrap();
-        assert_eq!(result, "3.14");
+        let result: String = engine.eval(r#"3.24.to_json()"#).unwrap();
+        assert_eq!(result, "3.24");
 
         // Teste com boolean true
         let result: String = engine.eval(r#"true.to_json()"#).unwrap();
