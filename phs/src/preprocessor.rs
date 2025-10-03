@@ -2,6 +2,12 @@ use regex::Regex;
 
 pub struct SpreadPreprocessor;
 
+impl Default for SpreadPreprocessor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SpreadPreprocessor {
     pub fn new() -> Self {
         Self
@@ -10,12 +16,12 @@ impl SpreadPreprocessor {
     /// Processa o código para transformar spread syntax em chamadas de função
     pub fn process(&self, code: &str) -> String {
         // Primeiro, converte objetos simples para a sintaxe Rhai com #
-        let code = self.process_object_literals(&code);
+        let code = self.process_object_literals(code);
         // Depois processa arrays com spread
         let code = self.process_arrays_simple(&code);
         // Por último, processa objetos com spread
-        let code = self.process_objects_simple(&code);
-        code
+        
+        self.process_objects_simple(&code)
     }
 
     /// Converte objetos literais {key: value} para #{key: value} para compatibilidade com Rhai
@@ -216,7 +222,7 @@ impl SpreadPreprocessor {
                         result.push_str(&transformed);
                     } else {
                         // Não tem spread, mantém original
-                        result.push_str(&format!("#{{{}}}", content));
+                        result.push_str(&format!("#{{{content}}}"));
                     }
                     i = end_pos + 1;
                 } else {
@@ -297,7 +303,7 @@ impl SpreadPreprocessor {
                 spread_items.push(var_name.to_string());
             } else {
                 // É um par chave-valor normal
-                spread_items.push(format!("#{{{}}}", part));
+                spread_items.push(format!("#{{{part}}}"));
             }
         }
 
@@ -316,7 +322,7 @@ impl SpreadPreprocessor {
                 spread_items.push(var_name.to_string());
             } else {
                 // É um elemento normal
-                spread_items.push(format!("[{}]", part));
+                spread_items.push(format!("[{part}]"));
             }
         }
 
@@ -331,9 +337,9 @@ impl SpreadPreprocessor {
         let mut bracket_count = 0;
         let mut in_string = false;
         let mut escape_next = false;
-        let mut chars = content.chars().peekable();
+        let chars = content.chars().peekable();
 
-        while let Some(ch) = chars.next() {
+        for ch in chars {
             if escape_next {
                 current_part.push(ch);
                 escape_next = false;
@@ -640,8 +646,8 @@ mod tests {
       }"#;
 
         let result = preprocessor.process(code);
-        println!("Input: {}", code);
-        println!("Output: {}", result);
+        println!("Input: {code}");
+        println!("Output: {result}");
 
         // O bloco principal não deve ser convertido (contém múltiplas declarações let)
         assert!(!result.starts_with("#{"));

@@ -12,7 +12,7 @@ pub enum PipelineError {
 impl Display for PipelineError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PipelineError::StepWorkerError(err) => write!(f, "Step worker error: {}", err),
+            PipelineError::StepWorkerError(err) => write!(f, "Step worker error: {err}"),
         }
     }
 }
@@ -42,7 +42,7 @@ impl Pipeline {
         skip: usize,
     ) -> Result<Option<StepOutput>, PipelineError> {
         for (step_index, step) in self.steps.iter().enumerate().skip(skip) {
-            match step.execute(&context).await {
+            match step.execute(context).await {
                 Ok(step_output) => {
                     context.add_step_payload(step_output.output.clone());
 

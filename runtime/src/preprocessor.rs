@@ -24,13 +24,13 @@ pub fn preprocessor(
     let flow = preprocessor_modules(&flow)?;
 
     if print_flow {
-        println!("");
+        println!();
         println!("#####################################################################");
         println!("# FLOW TRANSFORMED");
         println!("#####################################################################");
-        println!("{}", flow);
+        println!("{flow}");
         println!("#####################################################################");
-        println!("");
+        println!();
     }
 
     Ok(flow)
@@ -51,7 +51,7 @@ fn preprocessor_directives(flow: &str, base_path: &Path) -> (String, Vec<String>
         Err(_) => return (flow.to_string(), errors),
     };
 
-    let with_block_includes = include_block_regex.replace_all(&flow, |caps: &regex::Captures| {
+    let with_block_includes = include_block_regex.replace_all(flow, |caps: &regex::Captures| {
         let indent = &caps[1];
         let rel_path = &caps[2];
         let args_str = caps.get(3).map(|m| m.as_str()).unwrap_or("").trim();
@@ -60,12 +60,12 @@ fn preprocessor_directives(flow: &str, base_path: &Path) -> (String, Vec<String>
         match process_include_file(&full_path, &args) {
             Ok(json_str) => json_str
                 .lines()
-                .map(|line| format!("{}{}", indent, line))
+                .map(|line| format!("{indent}{line}"))
                 .collect::<Vec<_>>()
                 .join("\n"),
             Err(e) => {
-                errors.push(format!("Error including file {}: {}", rel_path, e));
-                format!("{}<!-- Error including file: {} -->", indent, rel_path)
+                errors.push(format!("Error including file {rel_path}: {e}"));
+                format!("{indent}<!-- Error including file: {rel_path} -->")
             }
         }
     });
@@ -79,8 +79,8 @@ fn preprocessor_directives(flow: &str, base_path: &Path) -> (String, Vec<String>
             match process_include_file(&full_path, &args) {
                 Ok(json_str) => json_str,
                 Err(e) => {
-                    errors.push(format!("Error including file {}: {}", rel_path, e));
-                    format!("<!-- Error including file: {} -->", rel_path)
+                    errors.push(format!("Error including file {rel_path}: {e}"));
+                    format!("<!-- Error including file: {rel_path} -->")
                 }
             }
         });
@@ -105,14 +105,14 @@ fn preprocessor_directives(flow: &str, base_path: &Path) -> (String, Vec<String>
                         .replace('"', "\\\"");
 
                     if extension == "phs" || extension == "rhai" {
-                        format!(r#""{{{{ {} }}}}""#, one_line)
+                        format!(r#""{{{{ {one_line} }}}}""#)
                     } else {
-                        format!(r#""{}""#, one_line)
+                        format!(r#""{one_line}""#)
                     }
                 }
                 Err(_) => {
-                    errors.push(format!("Error importing file {}: file not found", rel_path));
-                    format!("<!-- Error importing file: {} -->", rel_path)
+                    errors.push(format!("Error importing file {rel_path}: file not found"));
+                    format!("<!-- Error importing file: {rel_path} -->")
                 }
             }
         })
@@ -140,7 +140,7 @@ fn preprocessor_eval(flow: &str) -> String {
                 let mut block_lines = vec![];
 
                 if after_eval == "```" {
-                    while let Some(next_line) = lines.next() {
+                    for next_line in lines.by_ref() {
                         if next_line.trim() == "```" {
                             break;
                         }
@@ -155,9 +155,9 @@ fn preprocessor_eval(flow: &str) -> String {
                 let escaped = single_line.replace('"', "\\\"");
 
                 if before_eval.trim().is_empty() {
-                    result.push_str(&format!("{}\"{{{{ {} }}}}\"\n", indent, escaped));
+                    result.push_str(&format!("{indent}\"{{{{ {escaped} }}}}\"\n"));
                 } else {
-                    result.push_str(&format!("{}\"{{{{ {} }}}}\"\n", before_eval, escaped));
+                    result.push_str(&format!("{before_eval}\"{{{{ {escaped} }}}}\"\n"));
                 }
             } else if after_eval.starts_with("{") {
                 // Bloco de código delimitado por {}
@@ -216,18 +216,18 @@ fn preprocessor_eval(flow: &str) -> String {
                 let escaped = single_line.replace('"', "\\\"");
 
                 if before_eval.trim().is_empty() {
-                    result.push_str(&format!("{}\"{{{{ {} }}}}\"\n", indent, escaped));
+                    result.push_str(&format!("{indent}\"{{{{ {escaped} }}}}\"\n"));
                 } else {
-                    result.push_str(&format!("{}\"{{{{ {} }}}}\"\n", before_eval, escaped));
+                    result.push_str(&format!("{before_eval}\"{{{{ {escaped} }}}}\"\n"));
                 }
             } else if after_eval.starts_with('`') && after_eval.ends_with('`') {
                 // Template string com crases - converte para sintaxe de template string
                 let inner_content = &after_eval[1..after_eval.len() - 1];
                 let escaped = inner_content.replace('"', "\\\"");
-                result.push_str(&format!("{}\"{{{{ `{}` }}}}\"\n", before_eval, escaped));
+                result.push_str(&format!("{before_eval}\"{{{{ `{escaped}` }}}}\"\n"));
             } else if !after_eval.is_empty() {
                 let escaped = after_eval.replace('"', "\\\"");
-                result.push_str(&format!("{}\"{{{{ {} }}}}\"\n", before_eval, escaped));
+                result.push_str(&format!("{before_eval}\"{{{{ {escaped} }}}}\"\n"));
             } else {
                 // Bloco indentado
                 let mut block_lines = vec![];
@@ -258,13 +258,13 @@ fn preprocessor_eval(flow: &str) -> String {
                 // Só adiciona se houver conteúdo válido
                 if !escaped.trim().is_empty() {
                     if before_eval.trim().is_empty() {
-                        result.push_str(&format!("{}\"{{{{ {} }}}}\"\n", indent, escaped));
+                        result.push_str(&format!("{indent}\"{{{{ {escaped} }}}}\"\n"));
                     } else {
-                        result.push_str(&format!("{}\"{{{{ {} }}}}\"\n", before_eval, escaped));
+                        result.push_str(&format!("{before_eval}\"{{{{ {escaped} }}}}\"\n"));
                     }
                 } else {
                     // Se não há conteúdo válido, apenas preserva a linha original sem processamento
-                    result.push_str(&format!("{}\n", line));
+                    result.push_str(&format!("{line}\n"));
                 }
             }
         } else {
@@ -317,8 +317,8 @@ fn process_args_in_content(content: &str, args: &HashMap<String, String>) -> (St
             match args.get(arg_name) {
                 Some(value) => value.clone(),
                 None => {
-                    errors.push(format!("Missing required argument: '{}'", arg_name));
-                    format!("<!-- Error: argument '{}' not found -->", arg_name)
+                    errors.push(format!("Missing required argument: '{arg_name}'"));
+                    format!("<!-- Error: argument '{arg_name}' not found -->")
                 }
             }
         })
@@ -403,7 +403,7 @@ fn preprocessor_modules(flow: &str) -> Result<String, Vec<String>> {
                             &module_name[10..] // Remove "./modules/"
                         } else if module_name.contains('/') {
                             // Para outros paths, pega apenas o último segmento
-                            module_name.split('/').last().unwrap_or(module_name)
+                            module_name.split('/').next_back().unwrap_or(module_name)
                         } else {
                             module_name
                         };
@@ -514,15 +514,15 @@ fn escape_yaml_exclamation_values(yaml: &str) -> String {
         Err(_) => return yaml.to_string(),
     };
 
-    let result = regex
+    
+
+    regex
         .replace_all(yaml, |caps: &regex::Captures| {
             let prefix = &caps[1];
             let exclamation_value = &caps[2];
-            format!(r#"{} "__APIFY_ESCAPE__{}""#, prefix, exclamation_value)
+            format!(r#"{prefix} "__APIFY_ESCAPE__{exclamation_value}""#)
         })
-        .to_string();
-
-    result
+        .to_string()
 }
 
 // Função para desfazer o escape dos valores com !
@@ -532,12 +532,12 @@ fn unescape_yaml_exclamation_values(yaml: &str) -> String {
         Err(_) => return yaml.to_string(),
     };
 
-    let result = regex
+    
+
+    regex
         .replace_all(yaml, |caps: &regex::Captures| {
             let exclamation_value = &caps[1];
             exclamation_value.to_string()
         })
-        .to_string();
-
-    result
+        .to_string()
 }

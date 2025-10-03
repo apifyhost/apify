@@ -11,7 +11,7 @@ use sdk::{otel, prelude::*};
 use crate::loader::Loader;
 
 pub fn run_script(path: &str, setup: ModuleSetup, settings: &Settings) {
-    debug!("Running script at path: {}", path);
+    debug!("Running script at path: {path}");
     let dispatch = setup.dispatch.clone();
 
     tracing::dispatcher::with_default(&dispatch, || {
@@ -20,7 +20,7 @@ pub fn run_script(path: &str, setup: ModuleSetup, settings: &Settings) {
 
         if let Ok(rt) = tokio::runtime::Runtime::new() {
             rt.block_on(async move {
-                let loader = Loader::load(&path, settings.print_yaml).await.unwrap();
+                let loader = Loader::load(path, settings.print_yaml).await.unwrap();
                 let (tx_main_package, rx_main_package) = channel::unbounded::<Package>();
                 let app_data = loader.app_data.clone();
                 let dispatch = setup.dispatch.clone();
@@ -48,7 +48,7 @@ pub fn run_script(path: &str, setup: ModuleSetup, settings: &Settings) {
                 debug!("Script module loaded, starting main loop");
 
                 for package in rx {
-                    debug!("Received package: {:?}", package);
+                    debug!("Received package: {package:?}");
 
                     let span = tracing::span!(
                         tracing::Level::INFO,
@@ -67,10 +67,10 @@ pub fn run_script(path: &str, setup: ModuleSetup, settings: &Settings) {
                         dispatch: Some(dispatch.clone()),
                     };
 
-                    debug!("Sending package to main loop: {:?}", runtime_package);
+                    debug!("Sending package to main loop: {runtime_package:?}");
 
                     if let Err(err) = tx_main_package.send(runtime_package) {
-                        error!("Failed to send package: {:?}", err);
+                        error!("Failed to send package: {err:?}");
                         continue;
                     }
 
@@ -81,11 +81,11 @@ pub fn run_script(path: &str, setup: ModuleSetup, settings: &Settings) {
                             package.payload().unwrap_or(Value::Undefined),
                         ),
                         Ok(result) => ModuleResponse::from_success(result),
-                        Err(err) => ModuleResponse::from_error(format!("Runtime error: {}", err)),
+                        Err(err) => ModuleResponse::from_error(format!("Runtime error: {err}")),
                     };
 
                     if let Err(err) = package.sender.send(response) {
-                        error!("Failed to send response back to module: {:?}", err);
+                        error!("Failed to send response back to module: {err:?}");
                     }
 
                     debug!("Response sent back to module");
@@ -96,17 +96,16 @@ pub fn run_script(path: &str, setup: ModuleSetup, settings: &Settings) {
                 runtime_handle
                     .await
                     .unwrap_or_else(|err| {
-                        error!("Runtime task error: {:?}", err);
+                        error!("Runtime task error: {err:?}");
                         std::process::exit(1);
                     })
                     .unwrap_or_else(|err| {
-                        error!("Runtime error: {:?}", err);
+                        error!("Runtime error: {err:?}");
                         std::process::exit(1);
                     });
             });
         } else {
             tracing::error!("Error creating runtime");
-            return;
         }
     });
 }

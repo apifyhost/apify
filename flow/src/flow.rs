@@ -19,8 +19,8 @@ pub enum FlowError {
 impl Display for FlowError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FlowError::TransformError(err) => write!(f, "Transform error: {}", err),
-            FlowError::PipelineError(err) => write!(f, "Pipeline error: {}", err),
+            FlowError::TransformError(err) => write!(f, "Transform error: {err}"),
+            FlowError::PipelineError(err) => write!(f, "Pipeline error: {err}"),
             FlowError::PipelineNotFound => write!(f, "Pipeline not found"),
             FlowError::ParentError => write!(f, "Parent error"),
         }
@@ -80,9 +80,7 @@ impl Flow {
 
         loop {
             log::debug!(
-                "Executing pipeline {} step {}",
-                current_pipeline,
-                current_step
+                "Executing pipeline {current_pipeline} step {current_step}"
             );
             let pipeline = self
                 .pipelines
@@ -117,12 +115,12 @@ impl Flow {
                                 }
                             }
                             NextStep::Pipeline(id) => {
-                                log::debug!("NextStep::Pipeline({}) - jumping to pipeline", id);
+                                log::debug!("NextStep::Pipeline({id}) - jumping to pipeline");
                                 current_pipeline = id;
                                 current_step = 0;
                             }
                             NextStep::GoToStep(to) => {
-                                log::debug!("NextStep::GoToStep({:?}) - jumping to step", to);
+                                log::debug!("NextStep::GoToStep({to:?}) - jumping to step");
                                 current_pipeline = to.pipeline;
                                 current_step = to.step;
                             }
@@ -133,7 +131,7 @@ impl Flow {
                     }
                 },
                 Err(err) => {
-                    error!("Error executing step: {:?}", err);
+                    error!("Error executing step: {err:?}");
                     return Err(FlowError::PipelineError(err));
                 }
             }

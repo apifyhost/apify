@@ -29,8 +29,7 @@ pub async fn load_script(script_target: &str, print_yaml: bool) -> Result<Script
 
     let script = resolve_script(&file, script_file_path.clone(), print_yaml).map_err(|err| {
         Error::ModuleLoaderError(format!(
-            "Failed to resolve script: {}. Error: {}",
-            script_file_path, err
+            "Failed to resolve script: {script_file_path}. Error: {err}"
         ))
     })?;
 
@@ -46,12 +45,12 @@ fn get_remote_path() -> Result<PathBuf, Error> {
     if remote_path.exists() {
         // remove
         fs::remove_dir_all(&remote_path).map_err(|e| {
-            Error::ModuleLoaderError(format!("Failed to remove remote path: {}", e))
+            Error::ModuleLoaderError(format!("Failed to remove remote path: {e}"))
         })?;
     }
 
     fs::create_dir_all(&remote_path)
-        .map_err(|e| Error::ModuleLoaderError(format!("Failed to create remote dir: {}", e)))?;
+        .map_err(|e| Error::ModuleLoaderError(format!("Failed to create remote dir: {e}")))?;
 
     Ok(remote_path)
 }
@@ -71,18 +70,17 @@ fn clone_git_repo(url: &str, branch: Option<&str>) -> Result<String, Error> {
     });
 
     if url.contains("@") {
-        debug!("Using SSH authentication for Git: {}", url);
+        debug!("Using SSH authentication for Git: {url}");
         if let Some(ssh_user) = url.split('@').next() {
             let id_rsa_path: String = std::env::var("PHLOW_REMOTE_ID_RSA_PATH")
                 .unwrap_or_else(|_| format!("{}/.ssh/id_rsa", std::env::var("HOME").unwrap()));
 
-            debug!("Using SSH user: {}", ssh_user);
-            debug!("Using SSH key path: {}", id_rsa_path);
+            debug!("Using SSH user: {ssh_user}");
+            debug!("Using SSH key path: {id_rsa_path}");
 
             if !Path::new(&id_rsa_path).exists() {
                 return Err(Error::ModuleLoaderError(format!(
-                    "SSH key not found at path: {}",
-                    id_rsa_path
+                    "SSH key not found at path: {id_rsa_path}"
                 )));
             }
 
@@ -111,11 +109,11 @@ fn clone_git_repo(url: &str, branch: Option<&str>) -> Result<String, Error> {
 
     let repo = builder
         .clone(url, &remote_path)
-        .map_err(|e| Error::ModuleLoaderError(format!("Git clone failed: {}", e)))?;
+        .map_err(|e| Error::ModuleLoaderError(format!("Git clone failed: {e}")))?;
 
     if let Some(branch_name) = branch {
         let (object, reference) = repo.revparse_ext(branch_name).map_err(|e| {
-            Error::ModuleLoaderError(format!("Branch `{}` not found: {}", branch_name, e))
+            Error::ModuleLoaderError(format!("Branch `{branch_name}` not found: {e}"))
         })?;
 
         repo.set_head(
@@ -124,10 +122,10 @@ fn clone_git_repo(url: &str, branch: Option<&str>) -> Result<String, Error> {
                 .ok_or_else(|| Error::ModuleLoaderError("Invalid branch ref".to_string()))?
                 .as_str(),
         )
-        .map_err(|e| Error::ModuleLoaderError(format!("Failed to set HEAD: {}", e)))?;
+        .map_err(|e| Error::ModuleLoaderError(format!("Failed to set HEAD: {e}")))?;
 
         repo.checkout_tree(&object, None)
-            .map_err(|e| Error::ModuleLoaderError(format!("Checkout failed: {}", e)))?;
+            .map_err(|e| Error::ModuleLoaderError(format!("Checkout failed: {e}")))?;
     }
 
     // Check if a specific file is requested via environment variable
@@ -137,8 +135,7 @@ fn clone_git_repo(url: &str, branch: Option<&str>) -> Result<String, Error> {
             specific_file_path.to_str().unwrap_or_default().to_string()
         } else {
             return Err(Error::MainNotFound(format!(
-                "Specified file '{}' not found in repository '{}'",
-                main_file, url
+                "Specified file '{main_file}' not found in repository '{url}'"
             )));
         }
     } else {
@@ -177,7 +174,7 @@ async fn download_file(url: &str, inner_folder: Option<&str>) -> Result<String, 
         remote_path.join(inner_folder)
     } else {
         let entries: Vec<_> = fs::read_dir(&remote_path)
-            .map_err(|e| Error::ModuleLoaderError(format!("Failed to read remote dir: {}", e)))?
+            .map_err(|e| Error::ModuleLoaderError(format!("Failed to read remote dir: {e}")))?
             .filter_map(Result::ok)
             .collect();
 
@@ -195,8 +192,7 @@ async fn download_file(url: &str, inner_folder: Option<&str>) -> Result<String, 
             specific_file_path.to_str().unwrap_or_default().to_string()
         } else {
             return Err(Error::MainNotFound(format!(
-                "Specified file '{}' not found in downloaded archive '{}'",
-                main_file, url
+                "Specified file '{main_file}' not found in downloaded archive '{url}'"
             )));
         }
     } else {
@@ -238,8 +234,8 @@ fn resolve_script(file: &str, main_file_path: String, print_yaml: bool) -> Resul
         let script_path = Path::new(&main_file_path)
             .parent()
             .unwrap_or_else(|| Path::new("."));
-        let script: String = preprocessor(&file, script_path, print_yaml).map_err(|errors| {
-            eprintln!("❌ Failed to transform YAML file: {}", main_file_path);
+        let script: String = preprocessor(file, script_path, print_yaml).map_err(|errors| {
+            eprintln!("❌ Failed to transform YAML file: {main_file_path}");
             Error::ModuleLoaderError(format!(
                 "YAML transformation failed with {} error(s)",
                 errors.len()
@@ -248,7 +244,7 @@ fn resolve_script(file: &str, main_file_path: String, print_yaml: bool) -> Resul
 
         if let Ok(yaml_show) = std::env::var("PHLOW_SCRIPT_SHOW") {
             if yaml_show == "true" {
-                println!("YAML: {}", script);
+                println!("YAML: {script}");
             }
         }
 
@@ -274,7 +270,7 @@ fn resolve_script(file: &str, main_file_path: String, print_yaml: bool) -> Resul
 }
 
 pub fn load_external_module_info(module: &str) -> Value {
-    let module_path = format!("phlow_packages/{}/phlow.yaml", module);
+    let module_path = format!("phlow_packages/{module}/phlow.yaml");
 
     if !Path::new(&module_path).exists() {
         return Value::Null;
@@ -297,7 +293,7 @@ pub fn load_external_module_info(module: &str) -> Value {
                 if let Some(serde_yaml::Value::String(input_type)) = input.get("type") {
                     if input_type == "object" {
                         if let Some(serde_yaml::Value::Mapping(properties)) =
-                            input.get(&serde_yaml::Value::String("properties".to_string()))
+                            input.get(serde_yaml::Value::String("properties".to_string()))
                         {
                             for (key, _) in properties {
                                 if let serde_yaml::Value::String(key) = key {
@@ -324,7 +320,7 @@ pub fn load_external_module_info(module: &str) -> Value {
 
 pub fn load_local_module_info(local_path: &str) -> Value {
     debug!("load_local_module_info");
-    let module_path = format!("{}/phlow.yaml", local_path);
+    let module_path = format!("{local_path}/phlow.yaml");
 
     if !Path::new(&module_path).exists() {
         debug!("phlow.yaml not exists");
@@ -348,7 +344,7 @@ pub fn load_local_module_info(local_path: &str) -> Value {
                 if let Some(serde_yaml::Value::String(input_type)) = input.get("type") {
                     if input_type == "object" {
                         if let Some(serde_yaml::Value::Mapping(properties)) =
-                            input.get(&serde_yaml::Value::String("properties".to_string()))
+                            input.get(serde_yaml::Value::String("properties".to_string()))
                         {
                             for (key, _) in properties {
                                 if let serde_yaml::Value::String(key) = key {

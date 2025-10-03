@@ -31,8 +31,8 @@ impl Display for RuntimeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             RuntimeError::ModuleRegisterError => write!(f, "Module register error"),
-            RuntimeError::FlowExecutionError(err) => write!(f, "Flow execution error: {}", err),
-            RuntimeError::ModuleWithError(err) => write!(f, "Module with error: {}", err),
+            RuntimeError::FlowExecutionError(err) => write!(f, "Flow execution error: {err}"),
+            RuntimeError::ModuleWithError(err) => write!(f, "Module with error: {err}"),
         }
     }
 }
@@ -52,7 +52,7 @@ impl Runtime {
         // Load the modules
         // -------------------------
         let app_data = loader.app_data.clone();
-        let loader_main_id = loader.main.clone();
+        let loader_main_id = loader.main;
 
         for (id, module) in loader.modules.into_iter().enumerate() {
             let (setup_sender, setup_receive) =
@@ -71,11 +71,11 @@ impl Runtime {
                     Err(err) => return Err(RuntimeError::ModuleWithError(err)),
                 };
 
-                let with = script
-                    .evaluate_without_context()
-                    .map_err(|err| RuntimeError::ModuleWithError(err))?;
+                
 
-                with
+                script
+                    .evaluate_without_context()
+                    .map_err(RuntimeError::ModuleWithError)?
             };
 
             let setup = ModuleSetup {
@@ -98,7 +98,7 @@ impl Runtime {
                     load_module(setup, &module_target, &module_version, local_path, settings);
 
                 if let Err(err) = result {
-                    error!("Runtime Error Load Module: {:?}", err)
+                    error!("Runtime Error Load Module: {err:?}")
                 }
             });
 
@@ -188,7 +188,7 @@ impl Runtime {
                                         main_package.send(result_value);
                                     }
                                     Err(err) => {
-                                        error!("Runtime Error Execute Steps: {:?}", err);
+                                        error!("Runtime Error Execute Steps: {err:?}");
                                     }
                                 }
                             });
@@ -241,12 +241,10 @@ impl Runtime {
                     Ok(value) => Some(value),
                     Err(err) => {
                         error!(
-                            "Failed to parse --var-main value '{}': {:?}",
-                            var_main_str, err
+                            "Failed to parse --var-main value '{var_main_str}': {err:?}"
                         );
                         return Err(RuntimeError::FlowExecutionError(format!(
-                            "Failed to parse --var-main value: {:?}",
-                            err
+                            "Failed to parse --var-main value: {err:?}"
                         )));
                     }
                 }
@@ -264,7 +262,7 @@ impl Runtime {
             };
 
             if let Err(err) = tx_main_package.send(package) {
-                error!("Failed to send package: {:?}", err);
+                error!("Failed to send package: {err:?}");
                 return Err(RuntimeError::FlowExecutionError(
                     "Failed to send package".to_string(),
                 ));
@@ -295,7 +293,7 @@ impl Runtime {
         Self::listener(rx_main_package, steps, modules, settings, None)
             .await
             .map_err(|err| {
-                error!("Runtime Error: {:?}", err);
+                error!("Runtime Error: {err:?}");
                 err
             })?;
 
@@ -323,7 +321,7 @@ impl Runtime {
         Self::listener(rx_main_package, steps, modules, settings, Some(context))
             .await
             .map_err(|err| {
-                error!("Runtime Error: {:?}", err);
+                error!("Runtime Error: {err:?}");
                 err
             })?;
 

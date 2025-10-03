@@ -25,7 +25,7 @@ impl Package {
             format!("Failed to create package in {}", self.module_dir.display())
         })?;
 
-        info!("Package created: {}", archive_name);
+        info!("Package created: {archive_name}");
         Ok(())
     }
 
@@ -84,12 +84,11 @@ impl Package {
             "EPL-2.0",
             "Unlicense",
         ];
-        if !known_licenses.contains(&metadata.license.as_str()) {
-            if !metadata.license.starts_with("http://") && !metadata.license.starts_with("https://")
+        if !known_licenses.contains(&metadata.license.as_str())
+            && !metadata.license.starts_with("http://") && !metadata.license.starts_with("https://")
             {
                 bail!("Invalid license: must be a known open source license or a URL to license terms");
             }
-        }
 
         info!("Starting project build...");
         Command::new("cargo")
@@ -117,7 +116,7 @@ impl Package {
         );
         fs::copy(
             &so_path,
-            temp_dir.join(format!("module.{}", MODULE_EXTENSION)),
+            temp_dir.join(format!("module.{MODULE_EXTENSION}")),
         )?;
 
         info!("Copying metadata file to temp folder");
@@ -128,7 +127,7 @@ impl Package {
 
         let archive_name = format!("{}-{}.tar.gz", metadata.name, metadata.version);
 
-        info!("Creating archive: {}", archive_name);
+        info!("Creating archive: {archive_name}");
         let status = Command::new("tar")
             .args(["-czf", &archive_name, "-C"])
             .arg(temp_dir.to_str().unwrap()) // entra direto na pasta criada, ex: .tmp/nome
@@ -137,10 +136,10 @@ impl Package {
             .context("Failed to create archive")?;
 
         if !status.success() {
-            bail!("Failed to generate package: {}", archive_name);
+            bail!("Failed to generate package: {archive_name}");
         }
 
-        info!("Success! Package created: {} 🎉", archive_name);
+        info!("Success! Package created: {archive_name} 🎉");
 
         info!("Cleaning up temporary directory: {}", temp_dir.display());
         fs::remove_dir_all(&temp_dir).with_context(|| {

@@ -40,7 +40,7 @@ impl Settings {
             .to_string();
 
         let script_main_absolute_path = if main_target.starts_with(".") {
-            format!("{}/{}", current_path, main_target)
+            format!("{current_path}/{main_target}")
         } else {
             main_target.clone()
         };

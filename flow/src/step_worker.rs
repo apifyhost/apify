@@ -30,10 +30,10 @@ pub enum StepWorkerError {
 impl Display for StepWorkerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            StepWorkerError::ConditionError(err) => write!(f, "Condition error: {}", err),
-            StepWorkerError::PayloadError(err) => write!(f, "Payload error: {}", err),
-            StepWorkerError::ModulesError(err) => write!(f, "Modules error: {}", err),
-            StepWorkerError::InputError(err) => write!(f, "Input error: {}", err),
+            StepWorkerError::ConditionError(err) => write!(f, "Condition error: {err}"),
+            StepWorkerError::PayloadError(err) => write!(f, "Payload error: {err}"),
+            StepWorkerError::ModulesError(err) => write!(f, "Modules error: {err}"),
+            StepWorkerError::InputError(err) => write!(f, "Input error: {err}"),
         }
     }
 }
@@ -101,24 +101,19 @@ impl StepWorker {
             Some(id) => ID::from(id),
             None => ID::new(),
         };
-        let label: Option<String> = match value.get("label") {
-            Some(label) => Some(label.as_string()),
-            None => None,
-        };
+        let label: Option<String> = value.get("label").map(|label| label.as_string());
         let condition = {
             if let Some(condition) = value
                 .get("condition")
                 .map(|condition| Condition::try_from_value(engine.clone(), condition))
             {
                 Some(condition.map_err(StepWorkerError::ConditionError)?)
+            } else if let Some(condition) = value.get("assert").map(|assert| {
+                Condition::try_build_with_assert(engine.clone(), assert.to_string())
+            }) {
+                Some(condition.map_err(StepWorkerError::ConditionError)?)
             } else {
-                if let Some(condition) = value.get("assert").map(|assert| {
-                    Condition::try_build_with_assert(engine.clone(), assert.to_string())
-                }) {
-                    Some(condition.map_err(StepWorkerError::ConditionError)?)
-                } else {
-                    None
-                }
+                None
             }
         };
         let payload = match value.get("payload") {
@@ -136,17 +131,11 @@ impl StepWorker {
             None => None,
         };
         let then_case = match value.get("then") {
-            Some(then_case) => match then_case.to_u64() {
-                Some(then_case) => Some(then_case as usize),
-                None => None,
-            },
+            Some(then_case) => then_case.to_u64().map(|then_case| then_case as usize),
             None => None,
         };
         let else_case = match value.get("else") {
-            Some(else_case) => match else_case.to_u64() {
-                Some(else_case) => Some(else_case as usize),
-                None => None,
-            },
+            Some(else_case) => else_case.to_u64().map(|else_case| else_case as usize),
             None => None,
         };
         let return_case = match value.get("return") {
@@ -156,10 +145,7 @@ impl StepWorker {
             },
             None => None,
         };
-        let module = match value.get("use") {
-            Some(module) => Some(module.to_string()),
-            None => None,
-        };
+        let module = value.get("use").map(|module| module.to_string());
 
         let to = match value.get("to") {
             Some(to_step) => match to_step.as_object() {
@@ -322,18 +308,18 @@ impl StepWorker {
         {
             let step_name = self.label.clone().unwrap_or(self.id.to_string());
 
-            span.record("otel.name", format!("step {}", step_name));
+            span.record("otel.name", format!("step {step_name}"));
 
             if let Some(ref input) = context.get_input() {
                 span.record("context.input", input.to_string());
             }
 
             if let Some(ref payload) = context.get_payload() {
-                span.record("context.payload", truncate_string(&payload));
+                span.record("context.payload", truncate_string(payload));
             }
 
             if let Some(ref main) = context.get_main() {
-                span.record("context.main", truncate_string(&main));
+                span.record("context.main", truncate_string(main));
             }
 
             span.record("step.id", self.id.to_string());
@@ -440,10 +426,10 @@ impl StepWorker {
             });
         }
 
-        return Ok(StepOutput {
+        Ok(StepOutput {
             next_step: NextStep::Next,
             output,
-        });
+        })
     }
 }
 

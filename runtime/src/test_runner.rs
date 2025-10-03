@@ -46,7 +46,7 @@ pub async fn run_tests(
     let steps = &loader.steps;
 
     if !tests.is_array() {
-        return Err(format!("Tests must be an array, got: {:?}", tests));
+        return Err(format!("Tests must be an array, got: {tests:?}"));
     }
 
     let test_cases = tests.as_array().unwrap();
@@ -75,7 +75,7 @@ pub async fn run_tests(
 
     if total == 0 {
         if let Some(filter) = test_filter {
-            println!("⚠️  No tests match filter: '{}'", filter);
+            println!("⚠️  No tests match filter: '{filter}'");
         } else {
             println!("⚠️  No tests to run");
         }
@@ -96,14 +96,14 @@ pub async fn run_tests(
             test_cases.len()
         );
     } else {
-        println!("🧪 Running {} test(s)...", total);
+        println!("🧪 Running {total} test(s)...");
     }
     println!();
 
     // Load modules following the same pattern as Runtime::run
     let modules = load_modules_like_runtime(&loader, settings)
         .await
-        .map_err(|e| format!("Failed to load modules for tests: {}", e))?;
+        .map_err(|e| format!("Failed to load modules for tests: {e}"))?;
 
     // Create flow from steps
     let workflow = json!({
@@ -111,7 +111,7 @@ pub async fn run_tests(
     });
 
     let flow = Flow::try_from_value(&workflow, Some(modules))
-        .map_err(|e| format!("Failed to create flow: {}", e))?;
+        .map_err(|e| format!("Failed to create flow: {e}"))?;
 
     // Run tests
     let mut results = Vec::new();
@@ -125,9 +125,9 @@ pub async fn run_tests(
 
         // Print test header with description
         if let Some(ref desc) = test_description {
-            print!("Test {}: {} - ", test_index, desc);
+            print!("Test {test_index}: {desc} - ");
         } else {
-            print!("Test {}: ", test_index);
+            print!("Test {test_index}: ");
         }
 
         let result = run_single_test(test_case, &flow).await;
@@ -144,7 +144,7 @@ pub async fn run_tests(
                 });
             }
             Err(msg) => {
-                println!("❌ FAILED - {}", msg);
+                println!("❌ FAILED - {msg}");
                 results.push(TestResult {
                     index: test_index,
                     passed: false,
@@ -158,9 +158,9 @@ pub async fn run_tests(
     let failed = total - passed;
     println!();
     println!("📊 Test Results:");
-    println!("   Total: {}", total);
-    println!("   Passed: {} ✅", passed);
-    println!("   Failed: {} ❌", failed);
+    println!("   Total: {total}");
+    println!("   Passed: {passed} ✅");
+    println!("   Failed: {failed} ❌");
 
     if failed > 0 {
         println!();
@@ -187,8 +187,7 @@ async fn run_single_test(test_case: &Value, flow: &Flow) -> Result<String, Strin
         .unwrap_or(Value::Undefined);
 
     debug!(
-        "Running test with main: {:?}, payload: {:?}",
-        main_value, initial_payload
+        "Running test with main: {main_value:?}, payload: {initial_payload:?}"
     );
 
     // Create context with test data
@@ -204,7 +203,7 @@ async fn run_single_test(test_case: &Value, flow: &Flow) -> Result<String, Strin
         let result = flow
             .execute(&mut context)
             .await
-            .map_err(|e| format!("Execution failed: {}", e))?;
+            .map_err(|e| format!("Execution failed: {e}"))?;
 
         result.unwrap_or(Value::Undefined)
     };
@@ -213,13 +212,12 @@ async fn run_single_test(test_case: &Value, flow: &Flow) -> Result<String, Strin
     if let Some(assert_eq_value) = test_case.get("assert_eq") {
         // ANSI escape code for red: \x1b[31m ... \x1b[0m
         if deep_equals(&result, assert_eq_value) {
-            Ok(format!("Expected and got: {}", result))
+            Ok(format!("Expected and got: {result}"))
         } else {
             let mut msg = String::new();
             write!(
                 &mut msg,
-                "Expected \x1b[34m{}\x1b[0m, got \x1b[31m{}\x1b[0m",
-                assert_eq_value, result
+                "Expected \x1b[34m{assert_eq_value}\x1b[0m, got \x1b[31m{result}\x1b[0m"
             )
             .unwrap();
             Err(msg)
@@ -227,12 +225,12 @@ async fn run_single_test(test_case: &Value, flow: &Flow) -> Result<String, Strin
     } else if let Some(assert_expr) = test_case.get("assert") {
         // For assert expressions, we need to evaluate them
         let assertion_result = evaluate_assertion(assert_expr, &result)
-            .map_err(|e| format!("Assertion error: {}", e))?;
+            .map_err(|e| format!("Assertion error: {e}"))?;
 
         if assertion_result {
-            Ok(format!("Assertion passed: {}", assert_expr))
+            Ok(format!("Assertion passed: {assert_expr}"))
         } else {
-            Err(format!("Assertion failed: {}", assert_expr))
+            Err(format!("Assertion failed: {assert_expr}"))
         }
     } else {
         Err("No assertion found (assert or assert_eq required)".to_string())
@@ -291,8 +289,7 @@ async fn load_modules_like_runtime(
         let settings = settings.clone();
 
         debug!(
-            "Module debug: name={}, is_local_path={}, local_path={:?}",
-            module_name, is_local_path, local_path
+            "Module debug: name={module_name}, is_local_path={is_local_path}, local_path={local_path:?}"
         );
 
         // Load module in separate thread - same as Runtime::run
@@ -300,7 +297,7 @@ async fn load_modules_like_runtime(
             let result = load_module(setup, &module_target, &module_version, local_path, settings);
 
             if let Err(err) = result {
-                error!("Test runtime Error Load Module: {:?}", err)
+                error!("Test runtime Error Load Module: {err:?}")
             }
         });
 
@@ -389,7 +386,7 @@ fn evaluate_assertion(assert_expr: &Value, result: &Value) -> Result<bool, Strin
 
     // Convert the assertion expression to a script
     let script = Script::try_build(engine, assert_expr)
-        .map_err(|e| format!("Failed to build assertion script: {}", e))?;
+        .map_err(|e| format!("Failed to build assertion script: {e}"))?;
 
     // Create a context where 'payload' refers to the result
     let _context = Context::from_main(json!({
@@ -404,7 +401,7 @@ fn evaluate_assertion(assert_expr: &Value, result: &Value) -> Result<bool, Strin
 
     let assertion_result = script
         .evaluate(&context_map)
-        .map_err(|e| format!("Failed to evaluate assertion: {}", e))?;
+        .map_err(|e| format!("Failed to evaluate assertion: {e}"))?;
 
     // Check if result is boolean true
     match assertion_result {
@@ -412,8 +409,7 @@ fn evaluate_assertion(assert_expr: &Value, result: &Value) -> Result<bool, Strin
         Value::String(s) if s == "true".into() => Ok(true),
         Value::String(s) if s == "false".into() => Ok(false),
         _ => Err(format!(
-            "Assertion must return boolean, got: {}",
-            assertion_result
+            "Assertion must return boolean, got: {assertion_result}"
         )),
     }
 }

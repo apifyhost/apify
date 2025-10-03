@@ -146,7 +146,7 @@ impl Variable {
                 .any(|x| other.into_iter().any(|y| x == y));
         }
 
-        return false;
+        false
     }
 
     pub fn starts_with(&self, other: &Variable) -> bool {
@@ -157,7 +157,7 @@ impl Variable {
             return target.starts_with(other);
         }
 
-        return false;
+        false
     }
 
     pub fn ends_with(&self, other: &Variable) -> bool {
@@ -168,7 +168,7 @@ impl Variable {
             return target.ends_with(other);
         }
 
-        return false;
+        false
     }
 
     pub fn regex(&self, other: &Variable) -> bool {
@@ -182,7 +182,7 @@ impl Variable {
             };
         }
 
-        return false;
+        false
     }
 }
 

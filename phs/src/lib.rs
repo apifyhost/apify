@@ -31,7 +31,7 @@ pub fn build_engine(repositories: Option<Repositories>) -> Arc<Engine> {
                 let mut args_map = HashMap::new();
 
                 for dynamic in args {
-                    let value: Value = from_dynamic(&dynamic).unwrap_or(Value::Null);
+                    let value: Value = from_dynamic(dynamic).unwrap_or(Value::Null);
 
                     if let Some(key) = repo.args.get(args_map.len()) {
                         args_map.insert(key.clone(), value);
@@ -73,7 +73,7 @@ mod tests {
                 // O valor recebido é um objeto com os argumentos mapeados
                 if let Value::Object(obj) = value {
                     if let Some(Value::String(s)) = obj.get("input") {
-                        Value::from(format!("{}-processed", s))
+                        Value::from(format!("{s}-processed"))
                     } else {
                         Value::Null
                     }
@@ -102,7 +102,7 @@ mod tests {
             "log".into(),
             |value: Value| async move {
                 if let Value::String(s) = value {
-                    Value::from(format!("Logged: {}", s))
+                    Value::from(format!("Logged: {s}"))
                 } else {
                     Value::from("Logged: unknown")
                 }

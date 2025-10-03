@@ -20,9 +20,9 @@ pub enum ScriptError {
 impl Display for ScriptError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ScriptError::EvalError(err) => write!(f, "Eval error: {}", err),
-            ScriptError::InvalidType(value) => write!(f, "Invalid type: {}", value),
-            ScriptError::CompileError(code, err) => write!(f, "Compile error: {}: {}", code, err),
+            ScriptError::EvalError(err) => write!(f, "Eval error: {err}"),
+            ScriptError::InvalidType(value) => write!(f, "Invalid type: {value}"),
+            ScriptError::CompileError(code, err) => write!(f, "Compile error: {code}: {err}"),
         }
     }
 }
@@ -39,7 +39,7 @@ impl Script {
         let mut map_index_ast = HashMap::new();
         let mut counter = 0;
         let map_extracted =
-            Self::extract_primitives(&engine, &script, &mut map_index_ast, &mut counter)?;
+            Self::extract_primitives(&engine, script, &mut map_index_ast, &mut counter)?;
 
         Ok(Self {
             map_extracted,
@@ -54,14 +54,14 @@ impl Script {
             code[2..code.len() - 2].to_string()
         } else if code.parse::<i128>().is_ok()
             || code.parse::<f64>().is_ok()
-            || code == "true".to_string()
-            || code == "false".to_string()
-            || code == "null".to_string()
-            || code == "undefined".to_string()
+            || code == "true"
+            || code == "false"
+            || code == "null"
+            || code == "undefined"
         {
             code.to_string()
         } else {
-            format!("`{}`", code)
+            format!("`{code}`")
         }
     }
 
@@ -73,7 +73,7 @@ impl Script {
         for (key, value) in self.map_index_ast.iter() {
             let value = self
                 .engine
-                .eval_ast_with_scope(scope, &value)
+                .eval_ast_with_scope(scope, value)
                 .map_err(ScriptError::EvalError)?;
 
             result_map.insert(*key, from_dynamic(&value).map_err(ScriptError::EvalError)?);
@@ -107,7 +107,6 @@ impl Script {
     fn default_scope(scope: &mut Scope) -> Result<(), ScriptError> {
         let envs = {
             let envs = std::env::vars()
-                .map(|(key, value)| (key, value))
                 .collect::<HashMap<String, String>>();
 
             to_dynamic(envs).map_err(ScriptError::EvalError)?
@@ -194,12 +193,12 @@ impl Script {
                     Some(index) => index as usize,
                     None => panic!("Index not found"),
                 };
-                let value = match result.get(&index) {
+                
+
+                match result.get(&index) {
                     Some(value) => value.clone(),
                     None => panic!("Index not found"),
-                };
-
-                value
+                }
             }
         }
     }
@@ -517,10 +516,10 @@ mod test {
         match result {
             Ok(payload) => {
                 let result = payload.evaluate(&context);
-                println!("Script executado com sucesso: {:?}", result);
+                println!("Script executado com sucesso: {result:?}");
             }
             Err(err) => {
-                println!("Erro ao construir script: {:?}", err);
+                println!("Erro ao construir script: {err:?}");
             }
         }
     }

@@ -18,11 +18,11 @@ pub enum ConditionError {
 impl Display for ConditionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConditionError::InvalidOperator(err) => write!(f, "Invalid operator: {}", err),
-            ConditionError::RightInvalid(err) => write!(f, "Right invalid: {}", err),
-            ConditionError::LeftInvalid(err) => write!(f, "Left invalid: {}", err),
-            ConditionError::AssertInvalid(err) => write!(f, "Assert invalid: {}", err),
-            ConditionError::ScriptError(err) => write!(f, "Script error: {}", err),
+            ConditionError::InvalidOperator(err) => write!(f, "Invalid operator: {err}"),
+            ConditionError::RightInvalid(err) => write!(f, "Right invalid: {err}"),
+            ConditionError::LeftInvalid(err) => write!(f, "Left invalid: {err}"),
+            ConditionError::AssertInvalid(err) => write!(f, "Assert invalid: {err}"),
+            ConditionError::ScriptError(err) => write!(f, "Script error: {err}"),
         }
     }
 }
@@ -97,7 +97,7 @@ pub struct Condition {
 impl Condition {
     pub fn try_from_value(engine: Arc<Engine>, value: &Value) -> Result<Self, ConditionError> {
         if let Some(assert) = value.get("assert") {
-            return Ok(Self::try_build_with_assert(engine, assert.to_string())?);
+            return Self::try_build_with_assert(engine, assert.to_string());
         }
 
         let left = match value.get("left") {
@@ -155,43 +155,43 @@ impl Condition {
         let assert = {
             match operator {
                 Operator::Or => {
-                    let query = format!("{{{{{} || {}}}}}", left, right);
+                    let query = format!("{{{{{left} || {right}}}}}");
                     query
                 }
                 Operator::And => {
-                    let query = format!("{{{{{} && {}}}}}", left, right);
+                    let query = format!("{{{{{left} && {right}}}}}");
                     query
                 }
                 Operator::Equal => {
-                    let query = format!("{{{{{} == {}}}}}", left, right);
+                    let query = format!("{{{{{left} == {right}}}}}");
                     query
                 }
                 Operator::NotEqual => {
-                    let query = format!("{{{{{} != {}}}}}", left, right);
+                    let query = format!("{{{{{left} != {right}}}}}");
                     query
                 }
                 Operator::GreaterThan => {
-                    let query = format!("{{{{{} > {}}}}}", left, right);
+                    let query = format!("{{{{{left} > {right}}}}}");
                     query
                 }
                 Operator::LessThan => {
-                    let query = format!("{{{{{} < {}}}}}", left, right);
+                    let query = format!("{{{{{left} < {right}}}}}");
                     query
                 }
                 Operator::GreaterThanOrEqual => {
-                    let query = format!("{{{{{} >= {}}}}}", left, right);
+                    let query = format!("{{{{{left} >= {right}}}}}");
                     query
                 }
                 Operator::LessThanOrEqual => {
-                    let query = format!("{{{{{} <= {}}}}}", left, right);
+                    let query = format!("{{{{{left} <= {right}}}}}");
                     query
                 }
                 Operator::Contains => {
-                    let query = format!("{{{{{} in {}}}}}", right, left);
+                    let query = format!("{{{{{right} in {left}}}}}");
                     query
                 }
                 Operator::NotContains => {
-                    let query = format!("{{{{!({} in {})}}}}", right, left);
+                    let query = format!("{{{{!({right} in {left})}}}}");
                     query
                 }
             }
@@ -240,7 +240,7 @@ mod test {
         let context = Context::new();
 
         let result = condition.evaluate(&context).unwrap();
-        assert_eq!(result, false);
+        assert!(!result);
     }
 
     #[test]
@@ -257,7 +257,7 @@ mod test {
         let context = Context::new();
 
         let result = condition.evaluate(&context).unwrap();
-        assert_eq!(result, true);
+        assert!(result);
     }
 
     #[test]
@@ -274,7 +274,7 @@ mod test {
         let context = Context::new();
 
         let result = condition.evaluate(&context).unwrap();
-        assert_eq!(result, false);
+        assert!(!result);
     }
 
     #[test]
@@ -291,6 +291,6 @@ mod test {
         let context = Context::new();
 
         let result = condition.evaluate(&context).unwrap();
-        assert_eq!(result, true);
+        assert!(result);
     }
 }

@@ -16,10 +16,10 @@ pub fn build_functions() -> Engine {
         let now = Utc::now();
         Utc.with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0)
             .unwrap()
-            .timestamp() as i64
+            .timestamp()
     });
     // now() -> timestamp atual (segundos)
-    engine.register_fn("now", || Utc::now().timestamp() as i64);
+    engine.register_fn("now", || Utc::now().timestamp());
     // format(ts, fmt) -> string formatada
     engine.register_fn("format", |ts: i64, fmt: &str| {
         if let Some(dt) = DateTime::<Utc>::from_timestamp(ts, 0) {
@@ -101,7 +101,7 @@ pub fn build_functions() -> Engine {
     // from_iso(iso_str) -> timestamp (segundos)
     engine.register_fn("from_iso", |iso: &str| {
         DateTime::parse_from_rfc3339(iso)
-            .map(|dt| dt.timestamp() as i64)
+            .map(|dt| dt.timestamp())
             .unwrap_or(0)
     });
     // to_iso(ts) -> string ISO
@@ -119,7 +119,7 @@ pub fn build_functions() -> Engine {
 
     engine.register_fn("merge", |x: rhai::Dynamic, y: rhai::Dynamic| {
         if let (Some(mut x), Some(y)) = (x.try_cast::<rhai::Map>(), y.try_cast::<rhai::Map>()) {
-            x.extend(y.into_iter());
+            x.extend(y);
             rhai::Dynamic::from(x)
         } else {
             rhai::Dynamic::UNIT
@@ -265,7 +265,7 @@ pub fn build_functions() -> Engine {
                     (b as char).to_string()
                 }
                 b' ' => "+".to_string(),
-                _ => format!("%{:02X}", b),
+                _ => format!("%{b:02X}"),
             })
             .collect::<String>()
     });
@@ -312,12 +312,12 @@ pub fn build_functions() -> Engine {
                     let hex2 = chars.next();
 
                     if let (Some(h1), Some(h2)) = (hex1, hex2) {
-                        let hex_str = format!("{}{}", h1, h2);
+                        let hex_str = format!("{h1}{h2}");
                         if let Ok(byte) = u8::from_str_radix(&hex_str, 16) {
                             result.push(byte);
                         } else {
                             // Se não for hex válido, adiciona os caracteres literalmente
-                            result.extend(format!("%{}{}", h1, h2).bytes());
+                            result.extend(format!("%{h1}{h2}").bytes());
                         }
                     } else {
                         // Se não há caracteres suficientes, adiciona '%' literal
@@ -356,13 +356,13 @@ pub fn build_functions() -> Engine {
                             // Float
                             num_str
                                 .parse::<f64>()
-                                .map(|f| rhai::Dynamic::from(f))
+                                .map(rhai::Dynamic::from)
                                 .unwrap_or_else(|_| rhai::Dynamic::from(num_str))
                         } else {
                             // Integer
                             num_str
                                 .parse::<i64>()
-                                .map(|i| rhai::Dynamic::from(i))
+                                .map(rhai::Dynamic::from)
                                 .unwrap_or_else(|_| rhai::Dynamic::from(num_str))
                         }
                     }
@@ -1096,11 +1096,11 @@ mod tests {
 
         // Teste com boolean JSON true
         let result: bool = engine.eval(r#""true".parse()"#).unwrap();
-        assert_eq!(result, true);
+        assert!(result);
 
         // Teste com boolean JSON false
         let result: bool = engine.eval(r#""false".parse()"#).unwrap();
-        assert_eq!(result, false);
+        assert!(!result);
 
         // Teste com null JSON
         let result: rhai::Dynamic = engine.eval(r#""null".parse()"#).unwrap();
@@ -1148,7 +1148,7 @@ mod tests {
             assert_eq!(array.len(), 2);
 
             // Verifica o primeiro objeto do array
-            if let Some(first_obj) = array.get(0) {
+            if let Some(first_obj) = array.first() {
                 if let Some(obj_map) = first_obj.clone().try_cast::<rhai::Map>() {
                     assert!(obj_map.contains_key("id"));
                     assert!(obj_map.contains_key("name"));

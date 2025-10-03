@@ -95,10 +95,7 @@ impl Cli {
 
         let matches = command.get_matches();
 
-        let main = match matches.get_one::<String>("main_path") {
-            Some(target) => Some(target.clone()),
-            None => None,
-        };
+        let main = matches.get_one::<String>("main_path").cloned();
 
         let install = *matches.get_one::<bool>("install").unwrap_or(&false);
         let package_path = matches.get_one::<String>("package").map(|s| s.to_string());

@@ -51,10 +51,7 @@ impl Loader {
                     return Err(Error::ModuleLoaderError("Modules not an array".to_string()));
                 }
 
-                let main_name = match script_loaded.script.get("main") {
-                    Some(main) => Some(main.to_string()),
-                    None => None,
-                };
+                let main_name = script_loaded.script.get("main").map(|main| main.to_string());
 
                 let mut main = -1;
 
@@ -129,9 +126,9 @@ impl Loader {
     }
 
     fn find_module_path(module_relative_path: &str) -> Result<ModuleTarget, Error> {
-        let path = format!("{}/module.{}", module_relative_path, MODULE_EXTENSION);
+        let path = format!("{module_relative_path}/module.{MODULE_EXTENSION}");
 
-        debug!("Find {}...", path);
+        debug!("Find {path}...");
 
         if Path::new(&path).exists() {
             Ok(ModuleTarget {
@@ -141,7 +138,7 @@ impl Loader {
         } else {
             let path = format!("{}/module.{}", module_relative_path, "yaml");
 
-            debug!("Find {}...", path);
+            debug!("Find {path}...");
 
             if Path::new(&path).exists() {
                 Ok(ModuleTarget {
@@ -151,7 +148,7 @@ impl Loader {
             } else {
                 let path = format!("{}.{}", module_relative_path, "yaml");
 
-                debug!("Find {}...", path);
+                debug!("Find {path}...");
 
                 if Path::new(&path).exists() {
                     Ok(ModuleTarget {
@@ -159,10 +156,9 @@ impl Loader {
                         module_type: ModuleType::Script,
                     })
                 } else {
-                    debug!("Module not found: {}", module_relative_path);
+                    debug!("Module not found: {module_relative_path}");
                     Err(Error::ModuleNotFound(format!(
-                        "Module not found at path: {}",
-                        module_relative_path
+                        "Module not found at path: {module_relative_path}"
                     )))
                 }
             }
@@ -220,8 +216,7 @@ impl Loader {
                         default_package_repository_url.to_string()
                     } else {
                         format!(
-                            "https://raw.githubusercontent.com/{}",
-                            default_package_repository_url
+                            "https://raw.githubusercontent.com/{default_package_repository_url}"
                         )
                     },
                     module
@@ -231,11 +226,11 @@ impl Loader {
                 ),
             };
 
-            info!("Base URL: {}", base_url);
+            info!("Base URL: {base_url}");
 
             let version = if module.version == "latest" {
-                let metadata_url = format!("{}/metadata.json", base_url);
-                info!("Metadata URL: {}", metadata_url);
+                let metadata_url = format!("{base_url}/metadata.json");
+                info!("Metadata URL: {metadata_url}");
 
                 let res = client
                     .get(&metadata_url)
@@ -270,9 +265,7 @@ impl Loader {
 
         let results = futures::future::join_all(downloads).await;
         for result in results {
-            if let Err(err) = result {
-                return Err(err);
-            }
+            result?
         }
 
         info!("All modules downloaded and extracted successfully");
@@ -287,13 +280,12 @@ impl Loader {
         use flate2::read::GzDecoder;
         use tar::Archive;
 
-        let tarball_name = format!("{}-{}-{}.tar.gz", module, version, RUNTIME_ARCH);
+        let tarball_name = format!("{module}-{version}-{RUNTIME_ARCH}.tar.gz");
         let target_url = format!("{}/{}", base_url.trim_end_matches('/'), tarball_name);
-        let target_path = format!("packages/{}/{}", module, tarball_name);
+        let target_path = format!("packages/{module}/{tarball_name}");
 
         if Path::new(&format!(
-            "packages/{}/module.{}",
-            module, MODULE_EXTENSION
+            "packages/{module}/module.{MODULE_EXTENSION}"
         ))
         .exists()
         {
@@ -301,8 +293,7 @@ impl Loader {
         }
 
         info!(
-            "Downloading module tarball {} from {}",
-            tarball_name, target_url
+            "Downloading module tarball {tarball_name} from {target_url}"
         );
 
         if let Some(parent) = Path::new(&target_path).parent() {
@@ -326,13 +317,13 @@ impl Loader {
         let decompressor = GzDecoder::new(tar_gz);
         let mut archive = Archive::new(decompressor);
         archive
-            .unpack(format!("packages/{}", module))
+            .unpack(format!("packages/{module}"))
             .map_err(Error::CopyError)?;
 
         // Remove o tar.gz após extração
         std::fs::remove_file(&target_path).map_err(Error::FileCreateError)?;
 
-        info!("Module extracted to packages/{}", module);
+        info!("Module extracted to packages/{module}");
 
         Ok(())
     }
@@ -363,7 +354,7 @@ pub fn load_module(
     let target = {
         let module_relative_path = match local_path {
             Some(local_path) => local_path,
-            None => format!("packages/{}", module_name),
+            None => format!("packages/{module_name}"),
         };
 
         let target = Loader::find_module_path(&module_relative_path)?;

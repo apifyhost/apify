@@ -43,7 +43,7 @@ async fn main() {
     let settings = match Settings::try_load() {
         Ok(settings) => settings,
         Err(err) => {
-            log::error!("Error loading settings: {:?}", err);
+            log::error!("Error loading settings: {err:?}");
             std::process::exit(1);
         }
     };
@@ -52,12 +52,12 @@ async fn main() {
         match Package::try_from(publish_path) {
             Ok(publish) => {
                 if let Err(err) = publish.run() {
-                    log::error!("Error publishing module: {:?}", err);
+                    log::error!("Error publishing module: {err:?}");
                     return;
                 }
             }
             Err(err) => {
-                log::error!("Error creating publish instance: {:?}", err);
+                log::error!("Error creating publish instance: {err:?}");
                 return;
             }
         }
@@ -67,7 +67,7 @@ async fn main() {
         match Loader::load(&settings.script_main_absolute_path, settings.print_yaml).await {
             Ok(main) => main,
             Err(err) => {
-                log::error!("Runtime Error Main File: {:?}", err);
+                log::error!("Runtime Error Main File: {err:?}");
                 return;
             }
         };
@@ -79,7 +79,7 @@ async fn main() {
     let guard = init_tracing_subscriber(loader.app_data.clone());
 
     if let Err(err) = tracing::dispatcher::set_global_default(guard.dispatch.clone()) {
-        log::error!("Failed to set global subscriber: {:?}", err);
+        log::error!("Failed to set global subscriber: {err:?}");
         std::process::exit(1);
     }
 
@@ -90,7 +90,7 @@ async fn main() {
                 .download(&settings.default_package_repository_url)
                 .await
             {
-                log::error!("Download failed: {:?}", err);
+                log::error!("Download failed: {err:?}");
                 return;
             }
         }
@@ -115,7 +115,7 @@ async fn main() {
                         }
                     }
                     Err(err) => {
-                        log::error!("Test execution error: {}", err);
+                        log::error!("Test execution error: {err}");
                         std::process::exit(1);
                     }
                 }
@@ -123,7 +123,7 @@ async fn main() {
                 log::debug!("Run application");
                 // Run normal workflow
                 if let Err(rr) = Runtime::run(loader, dispatch.clone(), settings).await {
-                    log::error!("Runtime Error: {:?}", rr);
+                    log::error!("Runtime Error: {rr:?}");
                 }
             }
         }
