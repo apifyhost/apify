@@ -9,53 +9,13 @@ use libloading::{Library, Symbol};
 use loader::{load_external_module_info, load_local_module_info, load_script};
 use log::debug;
 use log::info;
-use serde_json::Value as JsonValue;
+use sdk::prelude::ToValueBehavior;
+use sdk::prelude::Value;
+use sdk::structs::{ApplicationData, ModuleData, ModuleSetup};
+use sdk::valu3::json;
+use reqwest::Client;
 use std::io::Write;
 use std::{fs::File, path::Path};
-
-#[derive(Debug, Clone)]
-pub struct ModuleData {
-    pub id: usize,
-    pub name: String,
-    pub module: String,
-    pub version: String,
-    pub with: JsonValue,
-    pub local_path: Option<String>,
-    pub repository: Option<String>,
-    pub repository_path: Option<String>,
-    pub info: JsonValue,
-}
-
-impl ModuleData {
-    pub fn try_from(value: JsonValue) -> Result<Self, Error> {
-        let name = value["name"].as_str()
-            .ok_or_else(|| Error::ModuleLoaderError("Module name is required".to_string()))?
-            .to_string();
-            
-        let module = value["module"].as_str()
-            .or_else(|| value["name"].as_str())
-            .ok_or_else(|| Error::ModuleLoaderError("Module 'module' field is required".to_string()))?
-            .to_string();
-            
-        let version = value["version"].as_str().unwrap_or("latest").to_string();
-        
-        Ok(Self {
-            id: 0,
-            name,
-            module,
-            version,
-            with: value.get("with").cloned().unwrap_or(JsonValue::Null),
-            local_path: value["local_path"].as_str().map(|s| s.to_string()),
-            repository: value["repository"].as_str().map(|s| s.to_string()),
-            repository_path: value["repository_path"].as_str().map(|s| s.to_string()),
-            info: JsonValue::Null,
-        })
-    }
-    
-    pub fn set_info(&mut self, info: JsonValue) {
-        self.info = info;
-    }
-}
 
 enum ModuleType {
     Binary,
@@ -71,21 +31,9 @@ struct ModuleTarget {
 pub struct Loader {
     pub main: i32,
     pub modules: Vec<ModuleData>,
-    pub steps: JsonValue,
+    pub steps: Value,
     pub app_data: ApplicationData,
-    pub tests: Option<JsonValue>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ApplicationData {
-    pub name: Option<String>,
-    pub version: Option<String>,
-    pub environment: Option<String>,
-    pub author: Option<String>,
-    pub description: Option<String>,
-    pub license: Option<String>,
-    pub repository: Option<String>,
-    pub homepage: Option<String>,
+    pub tests: Option<Value>,
 }
 
 impl Loader {
@@ -104,7 +52,7 @@ impl Loader {
                 }
 
                 let main_name = match script_loaded.script.get("main") {
-                    Some(main) => main.as_str().map(|s| s.to_string()),
+                    Some(main) => Some(main.to_string()),
                     None => None,
                 };
 
@@ -121,7 +69,7 @@ impl Loader {
                         main = modules_vec.len() as i32;
                     }
 
-                    if let Some(local_path) = module.local_path.clone() {
+                    if let Some(local_path) = module.local_path {
                         let local_path_fix = format!("{}/{}", base_path, &local_path);
                         module.local_path = Some(local_path_fix);
                     }
@@ -139,14 +87,23 @@ impl Loader {
             None => return Err(Error::StepsNotDefined),
         };
 
-        let name = script_loaded.script.get("name").and_then(|v| v.as_str()).map(|s| s.to_string());
-        let version = script_loaded.script.get("version").and_then(|v| v.as_str()).map(|s| s.to_string());
-        let environment = script_loaded.script.get("environment").and_then(|v| v.as_str()).map(|s| s.to_string());
-        let author = script_loaded.script.get("author").and_then(|v| v.as_str()).map(|s| s.to_string());
-        let description = script_loaded.script.get("description").and_then(|v| v.as_str()).map(|s| s.to_string());
-        let license = script_loaded.script.get("license").and_then(|v| v.as_str()).map(|s| s.to_string());
-        let repository = script_loaded.script.get("repository").and_then(|v| v.as_str()).map(|s| s.to_string());
-        let homepage = script_loaded.script.get("homepage").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let name = script_loaded.script.get("name").map(|v| v.to_string());
+        let version = script_loaded.script.get("version").map(|v| v.to_string());
+        let environment = script_loaded
+            .script
+            .get("environment")
+            .map(|v| v.to_string());
+        let author = script_loaded.script.get("author").map(|v| v.to_string());
+        let description = script_loaded
+            .script
+            .get("description")
+            .map(|v| v.to_string());
+        let license = script_loaded.script.get("license").map(|v| v.to_string());
+        let repository = script_loaded
+            .script
+            .get("repository")
+            .map(|v| v.to_string());
+        let homepage = script_loaded.script.get("homepage").map(|v| v.to_string());
 
         let app_data = ApplicationData {
             name,
@@ -159,7 +116,7 @@ impl Loader {
             homepage,
         };
 
-        // 提取测试用例
+        // Extract tests if they exist
         let tests = script_loaded.script.get("tests").cloned();
 
         Ok(Self {
@@ -182,7 +139,7 @@ impl Loader {
                 module_type: ModuleType::Binary,
             })
         } else {
-            let path = format!("{}/module.runtime", module_relative_path);
+            let path = format!("{}/module.{}", module_relative_path, "yaml");
 
             debug!("Find {}...", path);
 
@@ -192,7 +149,7 @@ impl Loader {
                     module_type: ModuleType::Script,
                 })
             } else {
-                let path = format!("{}.runtime", module_relative_path);
+                let path = format!("{}.{}", module_relative_path, "yaml");
 
                 debug!("Find {}...", path);
 
@@ -212,15 +169,16 @@ impl Loader {
         }
     }
 
-    pub fn get_steps(&self) -> JsonValue {
-        serde_json::json!({
-            "steps": self.steps.clone()
+    pub fn get_steps(&self) -> Value {
+        let steps = self.steps.clone();
+        json!({
+            "steps": steps
         })
     }
 
     pub async fn download(&self, default_package_repository_url: &str) -> Result<(), Error> {
-        if !Path::new("runtime_packages").exists() {
-            std::fs::create_dir("runtime_packages").map_err(Error::FileCreateError)?;
+        if !Path::new("packages").exists() {
+            std::fs::create_dir("packages").map_err(Error::FileCreateError)?;
         }
 
         info!("Downloading modules...");
@@ -230,7 +188,7 @@ impl Loader {
         let mut downloads = Vec::new();
 
         for module in &self.modules {
-            // 跳过本地模块
+            // Skip local path modules - they don't need to be downloaded
             if module.local_path.is_some() {
                 info!(
                     "Module {} is a local path module, skipping download",
@@ -240,7 +198,7 @@ impl Loader {
             }
 
             let module_so_path = format!(
-                "runtime_packages/{}/module.{}",
+                "packages/{}/module.{}",
                 module.module, MODULE_EXTENSION
             );
             if Path::new(&module_so_path).exists() {
@@ -286,11 +244,11 @@ impl Loader {
                     .map_err(Error::GetFileError)?;
                 let metadata = {
                     let content = res.text().await.map_err(Error::BufferError)?;
-                    serde_json::from_str(&content).map_err(Error::LoaderErrorJsonValu3)?
+                    Value::json_to_value(&content).map_err(Error::LoaderErrorJsonValu3)?
                 };
 
                 match metadata.get("latest") {
-                    Some(version) => version.as_str().unwrap_or("latest").to_string(),
+                    Some(version) => version.to_string(),
                     None => {
                         return Err(Error::VersionNotFound(ModuleError {
                             module: module.name.clone(),
@@ -309,8 +267,6 @@ impl Loader {
 
             downloads.push(handler);
         }
-
-        info!("Waiting for all downloads to complete...");
 
         let results = futures::future::join_all(downloads).await;
         for result in results {
@@ -333,10 +289,10 @@ impl Loader {
 
         let tarball_name = format!("{}-{}-{}.tar.gz", module, version, RUNTIME_ARCH);
         let target_url = format!("{}/{}", base_url.trim_end_matches('/'), tarball_name);
-        let target_path = format!("runtime_packages/{}/{}", module, tarball_name);
+        let target_path = format!("packages/{}/{}", module, tarball_name);
 
         if Path::new(&format!(
-            "runtime_packages/{}/module.{}",
+            "packages/{}/module.{}",
             module, MODULE_EXTENSION
         ))
         .exists()
@@ -361,24 +317,22 @@ impl Loader {
             .map_err(Error::GetFileError)?;
         let content = response.bytes().await.map_err(Error::BufferError)?;
 
-        info!("Download completed, extracting... {}", target_path);
-
-        // 保存tarball
+        // Salva o tarball temporariamente
         let mut file = File::create(&target_path).map_err(Error::FileCreateError)?;
         file.write_all(&content).map_err(Error::CopyError)?;
 
-        // 解压内容
+        // Extrai o conteúdo
         let tar_gz = File::open(&target_path).map_err(Error::FileCreateError)?;
         let decompressor = GzDecoder::new(tar_gz);
         let mut archive = Archive::new(decompressor);
         archive
-            .unpack(format!("runtime_packages/{}", module))
+            .unpack(format!("packages/{}", module))
             .map_err(Error::CopyError)?;
 
-        // 移除tar.gz
+        // Remove o tar.gz após extração
         std::fs::remove_file(&target_path).map_err(Error::FileCreateError)?;
 
-        info!("Module extracted to runtime_packages/{}", module);
+        info!("Module extracted to packages/{}", module);
 
         Ok(())
     }
@@ -409,7 +363,7 @@ pub fn load_module(
     let target = {
         let module_relative_path = match local_path {
             Some(local_path) => local_path,
-            None => format!("runtime_packages/{}", module_name),
+            None => format!("packages/{}", module_name),
         };
 
         let target = Loader::find_module_path(&module_relative_path)?;
@@ -445,63 +399,3 @@ pub fn load_module(
 
     Ok(())
 }
-
-// 模块相关结构定义
-#[derive(Debug)]
-pub struct ModuleSetup {
-    pub id: usize,
-    pub setup_sender: tokio::sync::oneshot::Sender<Option<crossbeam::channel::Sender<ModulePackage>>>,
-    pub main_sender: Option<crossbeam::channel::Sender<Package>>,
-    pub with: JsonValue,
-    pub dispatch: tracing::Dispatch,
-    pub app_data: ApplicationData,
-    pub is_test_mode: bool,
-}
-
-#[derive(Debug)]
-pub struct ModulePackage {
-    pub data: JsonValue,
-    pub response_channel: crossbeam::channel::Sender<JsonValue>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Package {
-    pub response: Option<tokio::sync::oneshot::Sender<JsonValue>>,
-    pub request_data: Option<JsonValue>,
-    pub origin: usize,
-    pub span: Option<tracing::Span>,
-    pub dispatch: Option<tracing::Dispatch>,
-}
-
-impl Package {
-    pub fn get_data(&self) -> Option<&JsonValue> {
-        self.request_data.as_ref()
-    }
-    
-    pub fn send(&mut self, value: JsonValue) {
-        if let Some(tx) = self.response.take() {
-            let _ = tx.send(value);
-        }
-    }
-}
-
-pub struct Modules {
-    modules: std::collections::HashMap<String, crossbeam::channel::Sender<ModulePackage>>,
-}
-
-impl Modules {
-    pub fn default() -> Self {
-        Self {
-            modules: std::collections::HashMap::new(),
-        }
-    }
-    
-    pub fn register(&mut self, module: ModuleData, sender: crossbeam::channel::Sender<ModulePackage>) {
-        self.modules.insert(module.name, sender);
-    }
-    
-    pub fn get_sender(&self, name: &str) -> Option<&crossbeam::channel::Sender<ModulePackage>> {
-        self.modules.get(name)
-    }
-}
-    

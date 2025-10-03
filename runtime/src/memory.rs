@@ -14,11 +14,3 @@ pub fn force_memory_release(min_allocated_memory: usize) {
         }
     }
 }
-
-// 非GNU环境的空实现
-#[cfg(not(target_env = "gnu"))]
-pub fn force_memory_release(_min_allocated_memory: usize) {
-    use log::debug;
-    debug!("Memory release is not supported on this platform");
-}
-    

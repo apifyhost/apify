@@ -37,13 +37,13 @@ impl Package {
             self.module_dir.display()
         );
 
-        let metadata_path = ["runtime.yaml", "runtime.yml"]
+        let metadata_path = ["apify.yaml", "apify.yml"]
             .iter()
             .map(|f| self.module_dir.join(f))
             .find(|p| p.exists())
             .ok_or_else(|| {
                 anyhow!(
-                    "No runtime.yaml/yml file found in {}",
+                    "No apify.yaml/yml/json file found in {}",
                     self.module_dir.display()
                 )
             })?;
@@ -131,8 +131,8 @@ impl Package {
         info!("Creating archive: {}", archive_name);
         let status = Command::new("tar")
             .args(["-czf", &archive_name, "-C"])
-            .arg(temp_dir.to_str().unwrap())
-            .arg(".")
+            .arg(temp_dir.to_str().unwrap()) // entra direto na pasta criada, ex: .tmp/nome
+            .arg(".") // empacota apenas o conteúdo, sem incluir a pasta
             .status()
             .context("Failed to create archive")?;
 
@@ -170,4 +170,3 @@ impl TryFrom<String> for Package {
         Ok(Package { module_dir })
     }
 }
-    

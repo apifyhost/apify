@@ -1,19 +1,22 @@
 use crate::runtime::Runtime;
 use crate::settings::Settings;
-use crate::loader::{Loader, ModuleSetup, Package};
-use crossbeam::channel;
 use log::{debug, error};
 use flow::Context;
-use serde_json::Value as JsonValue;
-use tokio;
+use sdk::{
+    module_channel,
+    structs::{ModuleResponse, ModuleSetup},
+};
+use sdk::{otel, prelude::*};
+
+use crate::loader::Loader;
 
 pub fn run_script(path: &str, setup: ModuleSetup, settings: &Settings) {
     debug!("Running script at path: {}", path);
     let dispatch = setup.dispatch.clone();
 
     tracing::dispatcher::with_default(&dispatch, || {
-        let _guard = flow::otel::init_tracing_subscriber(setup.app_data.clone());
-        flow::use_log!();
+        let _guard = otel::init_tracing_subscriber(setup.app_data.clone());
+        use_log!();
 
         if let Ok(rt) = tokio::runtime::Runtime::new() {
             rt.block_on(async move {
@@ -24,9 +27,9 @@ pub fn run_script(path: &str, setup: ModuleSetup, settings: &Settings) {
                 let dispatch_for_runtime = dispatch.clone();
                 let settings_cloned = settings.clone();
 
-                // 创建runtime任务
+                // Criar uma task para o runtime que não irá dropar o tx_main_package
                 let tx_for_runtime = tx_main_package.clone();
-                let context = Context::from_main(setup.with.clone());
+                let context = Context::from_setup(setup.with.clone());
 
                 let runtime_handle = tokio::task::spawn(async move {
                     Runtime::run_script(
@@ -53,8 +56,8 @@ pub fn run_script(path: &str, setup: ModuleSetup, settings: &Settings) {
                         otel.name = app_data.name.clone().unwrap_or("unknown".to_string()),
                     );
 
-                    // 创建响应通道
-                    let (response_tx, response_rx) = tokio::sync::oneshot::channel::<JsonValue>();
+                    // Criar um canal para receber a resposta do runtime
+                    let (response_tx, response_rx) = tokio::sync::oneshot::channel::<Value>();
 
                     let runtime_package = Package {
                         response: Some(response_tx),
@@ -74,8 +77,8 @@ pub fn run_script(path: &str, setup: ModuleSetup, settings: &Settings) {
                     debug!("Package sent to main loop, waiting for response");
 
                     let response = match response_rx.await {
-                        Ok(result) if result.is_null() => ModuleResponse::from_success(
-                            package.payload().unwrap_or(JsonValue::Null),
+                        Ok(result) if result.is_undefined() => ModuleResponse::from_success(
+                            package.payload().unwrap_or(Value::Undefined),
                         ),
                         Ok(result) => ModuleResponse::from_success(result),
                         Err(err) => ModuleResponse::from_error(format!("Runtime error: {}", err)),
@@ -107,57 +110,3 @@ pub fn run_script(path: &str, setup: ModuleSetup, settings: &Settings) {
         }
     });
 }
-
-// 模块响应结构
-#[derive(Debug)]
-pub enum ModuleResponse {
-    Success(JsonValue),
-    Error(String),
-}
-
-impl ModuleResponse {
-    pub fn from_success(value: JsonValue) -> Self {
-        ModuleResponse::Success(value)
-    }
-    
-    pub fn from_error(message: String) -> Self {
-        ModuleResponse::Error(message)
-    }
-}
-
-// 模块通道宏
-#[macro_export]
-macro_rules! module_channel {
-    ($setup:expr) => {{
-        use crossbeam::channel;
-        let (tx, rx) = channel::unbounded::<ModuleRequest>();
-        let _ = $setup.setup_sender.send(Some(tx));
-        rx
-    }};
-}
-
-#[derive(Debug)]
-pub struct ModuleRequest {
-    input_data: Option<JsonValue>,
-    payload_data: Option<JsonValue>,
-    sender: channel::Sender<ModuleResponse>,
-}
-
-impl ModuleRequest {
-    pub fn new(input: Option<JsonValue>, payload: Option<JsonValue>, sender: channel::Sender<ModuleResponse>) -> Self {
-        Self {
-            input_data: input,
-            payload_data: payload,
-            sender,
-        }
-    }
-    
-    pub fn input(&self) -> Option<&JsonValue> {
-        self.input_data.as_ref()
-    }
-    
-    pub fn payload(&self) -> Option<&JsonValue> {
-        self.payload_data.as_ref()
-    }
-}
-    

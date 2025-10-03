@@ -21,14 +21,14 @@ pub struct Cli {
 
 impl Cli {
     pub fn load() -> Result<Cli, Error> {
-        let command = Command::new("Runtime")
+        let command = Command::new("APIFY Runtime")
             .version(env!("CARGO_PKG_VERSION"))
             .arg(
                 Arg::new("main_path")
-                    .help("要加载的主路径/文件")
+                    .help("Main path/file to load")
                     .required(false)
                     .index(1)
-                    .num_args(1..),
+                    .num_args(1..), // <= Aqui adiciona múltiplos valores possíveis
             )
             .arg(
                 Arg::new("install")
@@ -36,27 +36,27 @@ impl Cli {
                     .short('i')
                     .action(ArgAction::SetTrue)
                     .value_parser(clap::builder::BoolishValueParser::new())
-                    .help("安装依赖")
+                    .help("Install dependencies")
                     .default_value("false"),
             )
             .arg(
                 Arg::new("download")
                     .long("download")
                     .short('d')
-                    .help("运行前启用模块下载")
+                    .help("Enable download modules before running")
                     .value_parser(clap::builder::BoolValueParser::new())
                     .default_value("true"),
             )
             .arg(
                 Arg::new("package")
                     .long("package")
-                    .help("包文件路径"),
+                    .help("Path to the package file"),
             )
             .arg(
                 Arg::new("no_run")
                     .long("no-run")
                     .short('n')
-                    .help("不运行主文件")
+                    .help("Do not run the main file")
                     .value_parser(clap::builder::BoolishValueParser::new())
                     .action(ArgAction::SetTrue)
                     .default_value("false"),
@@ -65,7 +65,7 @@ impl Cli {
                 Arg::new("print_yaml")
                     .long("print")
                     .short('p')
-                    .help("打印从目标文件生成的YAML文件")
+                    .help("Print the YAML file generated from the target file")
                     .value_parser(clap::builder::BoolishValueParser::new())
                     .action(ArgAction::SetTrue)
                     .default_value("false"),
@@ -74,7 +74,7 @@ impl Cli {
                 Arg::new("test")
                     .long("test")
                     .short('t')
-                    .help("运行phlow文件中定义的测试")
+                    .help("Run tests defined in the yaml file")
                     .value_parser(clap::builder::BoolishValueParser::new())
                     .action(ArgAction::SetTrue)
                     .default_value("false"),
@@ -82,14 +82,14 @@ impl Cli {
             .arg(
                 Arg::new("test_filter")
                     .long("test-filter")
-                    .help("按描述筛选测试（子字符串匹配）")
+                    .help("Filter tests by description (substring match)")
                     .requires("test")
                     .value_name("FILTER"),
             )
             .arg(
                 Arg::new("var_main")
                     .long("var-main")
-                    .help("设置main变量值（模拟主模块输出）")
+                    .help("Set the main variable value (simulates main module output)")
                     .value_name("VALUE"),
             );
 
@@ -149,4 +149,3 @@ impl From<&str> for ModuleExtension {
         }
     }
 }
-    

@@ -21,6 +21,7 @@ clap = { version = "4.4", features = ["derive"] }
 crossbeam = { version = "0.8" }
 evalexpr = { version = "12.0" }
 flate2 = { version = "1.0" }
+futures = { version = "0.3" }
 git2 = { version = "0.20" }
 libloading = { version = "0.8" }
 once_cell = { version = "1" }
@@ -49,3 +50,8 @@ tracing-core = { version="0" }
 tracing-log = { version = "0" }
 tracing-opentelemetry = { version = "0" }
 tracing-subscriber = { version = "0" }
+
+# to be removed
+rhai = { version = "1.22.2", features = ["serde", "sync"] }
+phs = { path = "phs", version = "0" }
+chrono = { version = "0.4.41", features = ["serde"] }

@@ -6,7 +6,7 @@ use crossbeam::channel;
 use futures::future::join_all;
 use log::{debug, error, info};
 use flow::phs::{build_engine, Script, ScriptError};
-use flow::{Context, Phlow};  // 引用flow项目的Context和Phlow
+use flow::{Context, Flow};
 use sdk::structs::Package;
 use sdk::tokio;
 use sdk::{
@@ -58,7 +58,7 @@ impl Runtime {
             let (setup_sender, setup_receive) =
                 oneshot::channel::<Option<channel::Sender<ModulePackage>>>();
 
-            // 如果指定了--var-main，不允许主模块执行
+            // Se --var-main foi especificado, não permitir que módulos principais sejam executados
             let main_sender = if loader_main_id == id as i32 && settings.var_main.is_none() {
                 Some(tx_main_package.clone())
             } else {
@@ -131,9 +131,8 @@ impl Runtime {
         settings: Settings,
         default_context: Option<Context>,
     ) -> Result<(), RuntimeError> {
-        // 使用flow项目的Phlow
         let flow = Arc::new({
-            match Phlow::try_from_value(&steps, Some(Arc::new(modules))) {
+            match Flow::try_from_value(&steps, Some(Arc::new(modules))) {
                 Ok(flow) => flow,
                 Err(err) => return Err(RuntimeError::FlowExecutionError(err.to_string())),
             }
@@ -173,7 +172,6 @@ impl Runtime {
                             context.set_main(data);
                             context
                         } else {
-                            // 使用flow项目的Context
                             Context::from_main(data)
                         }
                     };
@@ -212,7 +210,9 @@ impl Runtime {
         dispatch: Dispatch,
         settings: Settings,
     ) -> Result<(), RuntimeError> {
-        // 创建通道
+        // -------------------------
+        // Create the channels
+        // -------------------------
         let (tx_main_package, rx_main_package) = channel::unbounded::<Package>();
 
         let no_main = loader.main == -1 || settings.var_main.is_some();
@@ -225,17 +225,18 @@ impl Runtime {
         )
         .await?;
 
-        // 如果没有定义main或指定了--var-main，强制启动步骤
+        // Se não há main definido ou --var-main foi especificado, forçar o início dos steps
         if no_main {
-            // 创建默认span
+            // Criar um span padrão para o início dos steps
             let span = tracing::span!(
                 tracing::Level::INFO,
                 "auto_start_steps",
-                otel.name = "runtime auto start"
+                otel.name = "phlow auto start"
             );
 
-            // 处理--var-main参数
+            // Se --var-main foi especificado, processar o valor usando valu3
             let request_data = if let Some(var_main_str) = &settings.var_main {
+                // Usar valu3 para processar o valor da mesma forma que outros valores
                 match Value::json_to_value(var_main_str) {
                     Ok(value) => Some(value),
                     Err(err) => {
@@ -253,7 +254,7 @@ impl Runtime {
                 None
             };
 
-            // 发送启动包
+            // Enviar um pacote com os dados do --var-main para iniciar os steps
             let package = Package {
                 response: None,
                 request_data,
@@ -286,9 +287,11 @@ impl Runtime {
             });
         }
 
-        info!("Runtime started!");
+        info!("Flow!");
 
-        // 启动监听器
+        // -------------------------
+        // Create the flow
+        // -------------------------
         Self::listener(rx_main_package, steps, modules, settings, None)
             .await
             .map_err(|err| {
@@ -327,4 +330,3 @@ impl Runtime {
         Ok(())
     }
 }
-    

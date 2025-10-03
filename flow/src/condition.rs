@@ -1,183 +1,296 @@
-use crate::{context::Context, error::FlowError, expression::evaluate_expression};
-use serde_json::Value as JsonValue;
+use std::{fmt::Display, sync::Arc};
+
+use rhai::Engine;
+use serde::Serialize;
+use valu3::{prelude::StringBehavior, traits::ToValueBehavior, value::Value};
+
+use crate::{context::Context, script::Script};
+
+#[derive(Debug)]
+pub enum ConditionError {
+    InvalidOperator(String),
+    RightInvalid(String),
+    LeftInvalid(String),
+    AssertInvalid(String),
+    ScriptError(phs::ScriptError),
+}
+
+impl Display for ConditionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConditionError::InvalidOperator(err) => write!(f, "Invalid operator: {}", err),
+            ConditionError::RightInvalid(err) => write!(f, "Right invalid: {}", err),
+            ConditionError::LeftInvalid(err) => write!(f, "Left invalid: {}", err),
+            ConditionError::AssertInvalid(err) => write!(f, "Assert invalid: {}", err),
+            ConditionError::ScriptError(err) => write!(f, "Script error: {}", err),
+        }
+    }
+}
+
+impl std::error::Error for ConditionError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ConditionError::InvalidOperator(_) => None,
+            ConditionError::RightInvalid(_) => None,
+            ConditionError::LeftInvalid(_) => None,
+            ConditionError::AssertInvalid(_) => None,
+            ConditionError::ScriptError(_) => None, // ScriptError doesn't implement std::error::Error
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub enum Operator {
+    Or,
+    And,
+    Equal,
+    NotEqual,
+    GreaterThan,
+    LessThan,
+    GreaterThanOrEqual,
+    LessThanOrEqual,
+    Contains,
+    NotContains,
+}
+
+impl ToValueBehavior for Operator {
+    fn to_value(&self) -> Value {
+        match self {
+            Operator::Or => "or".to_value(),
+            Operator::And => "and".to_value(),
+            Operator::Equal => "equal".to_value(),
+            Operator::NotEqual => "not_equal".to_value(),
+            Operator::GreaterThan => "greater_than".to_value(),
+            Operator::LessThan => "less_than".to_value(),
+            Operator::GreaterThanOrEqual => "greater_than_or_equal".to_value(),
+            Operator::LessThanOrEqual => "less_than_or_equal".to_value(),
+            Operator::Contains => "contains".to_value(),
+            Operator::NotContains => "not_contains".to_value(),
+        }
+    }
+}
+
+impl From<&Value> for Operator {
+    fn from(value: &Value) -> Self {
+        match value.as_str() {
+            "or" => Operator::Or,
+            "and" => Operator::And,
+            "equal" => Operator::Equal,
+            "not_equal" => Operator::NotEqual,
+            "greater_than" => Operator::GreaterThan,
+            "less_than" => Operator::LessThan,
+            "greater_than_or_equal" => Operator::GreaterThanOrEqual,
+            "less_than_or_equal" => Operator::LessThanOrEqual,
+            "contains" => Operator::Contains,
+            "not_contains" => Operator::NotContains,
+            _ => panic!("Invalid operator"),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Condition {
-    expr_str: String,
+    pub(crate) expression: Script,
+    pub(crate) raw: Value,
 }
 
 impl Condition {
-    pub fn from_json(value: &JsonValue) -> Result<Self, FlowError> {
-        let left = value["left"]
-            .as_str()
-            .ok_or_else(|| FlowError::ConditionError("missing 'left' field".into()))?;
+    pub fn try_from_value(engine: Arc<Engine>, value: &Value) -> Result<Self, ConditionError> {
+        if let Some(assert) = value.get("assert") {
+            return Ok(Self::try_build_with_assert(engine, assert.to_string())?);
+        }
 
-        let right = match value["right"].as_str() {
-            Some(s) => s.to_string(),
-            None => match &value["right"] {
-                JsonValue::Number(n) => n.to_string(),
-                JsonValue::Bool(b) => {
-                    if *b {
-                        "true".to_string()
-                    } else {
-                        "false".to_string()
-                    }
-                }
-                JsonValue::String(s) => format!("\"{}\"", s.escape_default()),
-                _ => return Err(FlowError::ConditionError("unsupported 'right' type".into())),
-            },
+        let left = match value.get("left") {
+            Some(left) => left.to_string(),
+            None => return Err(ConditionError::LeftInvalid("does not exist".to_string())),
         };
 
-        let operator = value["operator"]
-            .as_str()
-            .ok_or_else(|| FlowError::ConditionError("missing 'operator' field".into()))?;
+        let right = match value.get("right") {
+            Some(right) => {
+                if let Value::String(right) = right {
+                    right.to_string()
+                } else {
+                    right.to_json(valu3::prelude::JsonMode::Inline)
+                }
+            }
+            None => return Err(ConditionError::RightInvalid("does not exist".to_string())),
+        };
 
-        let left = left.replace('.', "_");
-
-        let expr_str = match operator {
-            "equal" => format!("{left} == {right}"),
-            "not_equal" => format!("{left} != {right}"),
-            "greater_than" => format!("{left} > {right}"),
-            "less_than" => format!("{left} < {right}"),
-            "greater_than_or_equal" => format!("{left} >= {right}"),
-            "less_than_or_equal" => format!("{left} <= {right}"),
-            "and" => format!("{left} && {right}"),
-            "or" => format!("{left} || {right}"),
-            _ => {
-                return Err(FlowError::ConditionError(format!(
-                    "operator not supported: {operator}"
-                )));
+        let operator = match value.get("operator") {
+            Some(operator) => Operator::from(operator),
+            None => {
+                return Err(ConditionError::InvalidOperator(
+                    "does not exist".to_string(),
+                ))
             }
         };
 
-        Ok(Self { expr_str })
+        let condition = Self::try_build_with_operator(engine, left, right, operator)?;
+
+        Ok(condition)
     }
 
-    pub fn evaluate(&self, context: &Context) -> Result<bool, FlowError> {
-        evaluate_expression(&self.expr_str, context)
+    pub fn try_build_with_assert(
+        engine: Arc<Engine>,
+        assert: String,
+    ) -> Result<Self, ConditionError> {
+        let expression =
+            Script::try_build(engine, &assert.to_value()).map_err(ConditionError::ScriptError)?;
+
+        Ok(Self {
+            expression,
+            raw: assert.to_value(),
+        })
+    }
+
+    pub fn try_build_with_operator(
+        engine: Arc<Engine>,
+        left: String,
+        right: String,
+        operator: Operator,
+    ) -> Result<Self, ConditionError> {
+        let left = phs::Script::to_code_string(&left);
+        let right = phs::Script::to_code_string(&right);
+
+        let assert = {
+            match operator {
+                Operator::Or => {
+                    let query = format!("{{{{{} || {}}}}}", left, right);
+                    query
+                }
+                Operator::And => {
+                    let query = format!("{{{{{} && {}}}}}", left, right);
+                    query
+                }
+                Operator::Equal => {
+                    let query = format!("{{{{{} == {}}}}}", left, right);
+                    query
+                }
+                Operator::NotEqual => {
+                    let query = format!("{{{{{} != {}}}}}", left, right);
+                    query
+                }
+                Operator::GreaterThan => {
+                    let query = format!("{{{{{} > {}}}}}", left, right);
+                    query
+                }
+                Operator::LessThan => {
+                    let query = format!("{{{{{} < {}}}}}", left, right);
+                    query
+                }
+                Operator::GreaterThanOrEqual => {
+                    let query = format!("{{{{{} >= {}}}}}", left, right);
+                    query
+                }
+                Operator::LessThanOrEqual => {
+                    let query = format!("{{{{{} <= {}}}}}", left, right);
+                    query
+                }
+                Operator::Contains => {
+                    let query = format!("{{{{{} in {}}}}}", right, left);
+                    query
+                }
+                Operator::NotContains => {
+                    let query = format!("{{{{!({} in {})}}}}", right, left);
+                    query
+                }
+            }
+        };
+
+        let expression =
+            Script::try_build(engine, &assert.to_value()).map_err(ConditionError::ScriptError)?;
+
+        Ok(Self {
+            expression,
+            raw: assert.to_value(),
+        })
+    }
+
+    pub fn evaluate(&self, context: &Context) -> Result<bool, ConditionError> {
+        let result = self
+            .expression
+            .evaluate(context)
+            .map_err(ConditionError::ScriptError)?;
+
+        match result {
+            Value::Boolean(result) => Ok(result),
+            _ => Err(ConditionError::ScriptError(phs::ScriptError::InvalidType(
+                result,
+            ))),
+        }
     }
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
-    use crate::context::Context;
-    use serde_json::json;
+    use phs::build_engine;
 
     #[test]
-    fn test_condition_from_json() {
-        let json_condition = json!({
-            "left": "params.age",
-            "operator": "greater_than",
-            "right": 18
-        });
-
-        let condition = Condition::from_json(&json_condition).unwrap();
-        assert_eq!(condition.expr_str, "params_age > 18");
-    }
-
-    #[test]
-    fn test_all_operators() {
-        let test_cases = vec![
-            ("equal", "=="),
-            ("not_equal", "!="),
-            ("greater_than", ">"),
-            ("less_than", "<"),
-            ("greater_than_or_equal", ">="),
-            ("less_than_or_equal", "<="),
-            ("and", "&&"),
-            ("or", "||"),
-        ];
-
-        for (operator, expected_op) in test_cases {
-            let json_condition = json!({
-                "left": "params.value",
-                "operator": operator,
-                "right": 10
-            });
-
-            let condition = Condition::from_json(&json_condition).unwrap();
-            assert!(condition.expr_str.contains(expected_op));
-        }
-    }
-
-    #[test]
-    fn test_condition_evaluation() {
-        let ctx = Context::from_main(json!({
-            "age": 25,
-            "score": 85,
-            "active": true
-        }));
-
-        let condition1 = Condition::from_json(&json!({
-            "left": "params.age",
-            "operator": "greater_than",
-            "right": 18
-        }))
+    fn test_condition_execute_equal() {
+        let engine = build_engine(None);
+        let condition = Condition::try_build_with_operator(
+            engine,
+            "10".to_string(),
+            "20".to_string(),
+            Operator::Equal,
+        )
         .unwrap();
 
-        let condition2 = Condition::from_json(&json!({
-            "left": "params.score",
-            "operator": "less_than",
-            "right": 90
-        }))
-        .unwrap();
+        let context = Context::new();
 
-        let condition3 = Condition::from_json(&json!({
-            "left": "params.active",
-            "operator": "equal",
-            "right": true
-        }))
-        .unwrap();
-
-        // Add debug output
-        println!("Condition 1 expr: {}", condition1.expr_str);
-        println!("Condition 2 expr: {}", condition2.expr_str);
-        println!("Condition 3 expr: {}", condition3.expr_str);
-
-        // Test each condition individually
-        match condition3.evaluate(&ctx) {
-            Ok(result) => {
-                println!("Condition 3 result: {result}");
-                assert!(result, "Condition 3 should evaluate to true");
-            }
-            Err(e) => {
-                panic!("Condition 3 evaluation failed: {e}");
-            }
-        }
-
-        assert!(condition1.evaluate(&ctx).unwrap());
-        assert!(condition2.evaluate(&ctx).unwrap());
-        assert!(condition3.evaluate(&ctx).unwrap());
+        let result = condition.evaluate(&context).unwrap();
+        assert_eq!(result, false);
     }
 
     #[test]
-    fn test_condition_errors() {
-        assert!(Condition::from_json(&json!({})).is_err());
-        assert!(Condition::from_json(&json!({"left": "value"})).is_err());
+    fn test_condition_execute_not_equal() {
+        let engine = build_engine(None);
+        let condition = Condition::try_build_with_operator(
+            engine,
+            "10".to_string(),
+            "20".to_string(),
+            Operator::NotEqual,
+        )
+        .unwrap();
 
-        assert!(
-            Condition::from_json(&json!({
-                "left": "params.value",
-                "operator": "unknown",
-                "right": 10
-            }))
-            .is_err()
-        );
+        let context = Context::new();
+
+        let result = condition.evaluate(&context).unwrap();
+        assert_eq!(result, true);
     }
 
     #[test]
-    fn test_condition_with_different_right_types() {
-        let test_cases = vec![json!(42), json!(true), json!("string")];
+    fn test_condition_execute_greater_than() {
+        let engine = build_engine(None);
+        let condition = Condition::try_build_with_operator(
+            engine,
+            "10".to_string(),
+            "20".to_string(),
+            Operator::GreaterThan,
+        )
+        .unwrap();
 
-        for right_value in test_cases {
-            let json_condition = json!({
-                "left": "params.test",
-                "operator": "equal",
-                "right": right_value
-            });
+        let context = Context::new();
 
-            assert!(Condition::from_json(&json_condition).is_ok());
-        }
+        let result = condition.evaluate(&context).unwrap();
+        assert_eq!(result, false);
+    }
+
+    #[test]
+    fn test_condition_execute_contains() {
+        let engine = build_engine(None);
+        let condition = Condition::try_build_with_operator(
+            engine,
+            "hello world".to_string(),
+            "hello".to_string(),
+            Operator::Contains,
+        )
+        .unwrap();
+
+        let context = Context::new();
+
+        let result = condition.evaluate(&context).unwrap();
+        assert_eq!(result, true);
     }
 }

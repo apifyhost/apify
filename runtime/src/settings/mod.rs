@@ -16,7 +16,7 @@ pub struct Settings {
     pub test_filter: Option<String>,
     pub var_main: Option<String>,
 
-    // 环境变量配置
+    // envs
     pub package_consumer_count: i32,
     #[cfg(target_env = "gnu")]
     pub min_allocated_memory: usize,
@@ -68,4 +68,3 @@ impl Settings {
         Ok(settings)
     }
 }
-    

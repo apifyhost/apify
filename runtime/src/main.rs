@@ -38,7 +38,7 @@ pub const RUNTIME_ARCH: &str = "linux-amd64";
 #[tokio::main]
 async fn main() {
     use_log!();
-    log::debug!("Starting Runtime");
+    log::debug!("Starting APIFY Runtime");
 
     let settings = match Settings::try_load() {
         Ok(settings) => settings,
@@ -129,7 +129,6 @@ async fn main() {
         }
     };
 
-    // 运行工作流
+    // passamos a future para o escopo correto de dispatcher
     tracing::dispatcher::with_default(&dispatch, || fut).await;
 }
-    

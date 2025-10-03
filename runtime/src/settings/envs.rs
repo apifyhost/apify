@@ -4,102 +4,102 @@ use sdk::tracing::debug;
 
 pub struct Envs {
     /**
-     * 包消费者数量
+     * Number of package consumers
      *
-     * 用于处理包的线程数量
-     * 环境变量: PHLOW_PACKAGE_CONSUMERS_COUNT
-     * 默认值: 10
+     * This is the number of threads that will be used to process packages.
+     * Environment variable: APIFY_PACKAGE_CONSUMERS_COUNT
+     * Default: 10
      */
     pub package_consumer_count: i32,
     /**
-     * 最小分配内存(MB)
+     * Minimum allocated memory in MB
      *
-     * 进程将分配的最小内存量
-     * 环境变量: PHLOW_MIN_ALLOCATED_MEMORY_MB
-     * 默认值: 10
+     * This is the minimum amount of memory that will be allocated to the process.
+     * Environment variable: APIFY_MIN_ALLOCATED_MEMORY_MB
+     * Default: 10
      */
     #[cfg(target_env = "gnu")]
     pub min_allocated_memory: usize,
     /**
-     * 启用垃圾回收
+     * Enable garbage collection
      *
-     * 控制是否启用垃圾回收
-     * 环境变量: PHLOW_GARBAGE_COLLECTION_ENABLED
-     * 默认值: true
+     * This will enable or disable garbage collection.
+     * Environment variable: APIFY_GARBAGE_COLLECTION_ENABLED
+     * Default: true
      */
     #[cfg(target_env = "gnu")]
     pub garbage_collection: bool,
     /**
-     * 垃圾回收间隔(秒)
+     * Garbage collection interval in seconds
      *
-     * 执行垃圾回收的时间间隔
-     * 环境变量: PHLOW_GARBAGE_COLLECTION_INTERVAL_SECONDS
-     * 默认值: 60
+     * This is the interval at which garbage collection will be performed.
+     * Environment variable: APIFY_GARBAGE_COLLECTION_INTERVAL_SECONDS
+     * Default: 60
      */
     #[cfg(target_env = "gnu")]
     pub garbage_collection_interval: u64,
 
     /**
-     * 默认包仓库URL
+     * Default package repository URL
      *
-     * 用于获取包的默认仓库URL
-     * 环境变量: PHLOW_DEFAULT_PACKAGE_REPOSITORY_URL
-     * 默认值: phlowdotdev/phlow-packages
+     * This is the URL of the default package repository that will be used to fetch packages.
+     * Environment variable: APIFY_DEFAULT_PACKAGE_REPOSITORY_URL
+     * Default: apify.host/packages
      */
     pub default_package_repository_url: String,
     /**
-     * 默认phlow文件主入口
+     * Default apify yaml file main
      *
-     * 用于运行phlow文件的默认主入口文件
-     * 环境变量: PHLOW_MAIN
-     * 默认值: None
+     * This is the default main file that will be used to run the apify yaml file.
+     * Environment variable: APIFY_MAIN
+     * Default: None
      */
     pub main: String,
 }
 
 impl Envs {
     pub fn load() -> Self {
-        let package_consumer_count = env::var("PHLOW_PACKAGE_CONSUMERS_COUNT")
+        let package_consumer_count = env::var("APIFY_PACKAGE_CONSUMERS_COUNT")
             .ok()
             .and_then(|v| v.parse::<usize>().ok())
             .unwrap_or(10) as i32;
         #[cfg(target_env = "gnu")]
-        let min_allocated_memory = env::var("PHLOW_MIN_ALLOCATED_MEMORY_MB")
+        let min_allocated_memory = env::var("APIFY_MIN_ALLOCATED_MEMORY_MB")
             .ok()
             .and_then(|v| v.parse::<usize>().ok())
             .unwrap_or(10);
 
         #[cfg(target_env = "gnu")]
-        let garbage_collection = env::var("PHLOW_GARBAGE_COLLECTION_ENABLED")
+        let garbage_collection = env::var("APIFY_GARBAGE_COLLECTION_ENABLED")
             .ok()
             .and_then(|v| v.parse::<bool>().ok())
             .unwrap_or(true);
         #[cfg(target_env = "gnu")]
-        let garbage_collection_interval = env::var("PHLOW_GARBAGE_COLLECTION_INTERVAL_SECONDS")
+        let garbage_collection_interval = env::var("APIFY_GARBAGE_COLLECTION_INTERVAL_SECONDS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
             .unwrap_or(60);
 
-        let default_package_repository_url = match env::var("PHLOW_DEFAULT_PACKAGE_REPOSITORY_URL")
+        let default_package_repository_url = match env::var("APIFY_DEFAULT_PACKAGE_REPOSITORY_URL")
         {
             Ok(repo) => repo,
-            Err(_) => "phlowdotdev/phlow-packages".to_string(),
+            Err(_) => "apify.host/packages".to_string(),
         };
 
-        let main = env::var("PHLOW_MAIN").unwrap_or(".".to_string());
+        let main = env::var("APIFY_MAIN").unwrap_or(".".to_string());
 
-        debug!("PHLOW_PACKAGE_CONSUMERS_COUNT = {}", package_consumer_count);
+        debug!("APIFY_PACKAGE_CONSUMERS_COUNT = {}", package_consumer_count);
         #[cfg(target_env = "gnu")]
-        debug!("PHLOW_MIN_ALLOCATED_MEMORY_MB = {}", min_allocated_memory);
+        debug!("APIFY_MIN_ALLOCATED_MEMORY_MB = {}", min_allocated_memory);
         #[cfg(target_env = "gnu")]
-        debug!("PHLOW_GARBAGE_COLLECTION_ENABLED = {}", garbage_collection);
+        debug!("APIFY_GARBAGE_COLLECTION_ENABLED = {}", garbage_collection);
         #[cfg(target_env = "gnu")]
         debug!(
-            "PHLOW_GARBAGE_COLLECTION_INTERVAL_SECONDS = {}",
+            "APIFY_GARBAGE_COLLECTION_INTERVAL_SECONDS = {}",
             garbage_collection_interval
         );
         debug!(
-            "PHLOW_DEFAULT_PACKAGE_REPOSITORY_URL = {}",
+            "APIFY_DEFAULT_PACKAGE_REPOSITORY_URL = {}",
             default_package_repository_url
         );
 
@@ -116,4 +116,3 @@ impl Envs {
         }
     }
 }
-    

@@ -1,4 +1,4 @@
-use serde_yaml::Error as YamlError;
+use sdk::valu3;
 use std::fmt::Display;
 use zip::result::ZipError;
 
@@ -18,8 +18,8 @@ pub enum Error {
     ModuleNotFound(String),
     StepsNotDefined,
     LibLoadingError(libloading::Error),
-    LoaderErrorJsonValu3(serde_json::Error),
-    LoaderErrorScript(YamlError),
+    LoaderErrorJsonValu3(valu3::Error),
+    LoaderErrorScript(serde_yaml::Error),
     GetFileError(reqwest::Error),
     FileCreateError(std::io::Error),
     ZipErrorError(ZipError),
@@ -36,8 +36,8 @@ impl std::fmt::Debug for Error {
             Error::StepsNotDefined => write!(f, "Steps not defined"),
             Error::ModuleNotFound(name) => write!(f, "Module not found: {}", name),
             Error::LibLoadingError(err) => write!(f, "Lib loading error: {:?}", err),
-            Error::LoaderErrorJsonValu3(err) => write!(f, "Json error: {:?}", err),
-            Error::LoaderErrorScript(err) => write!(f, "Yaml error: {:?}", err),
+            Error::LoaderErrorJsonValu3(err) => write!(f, "Json Valu3 error: {:?}", err),
+            Error::LoaderErrorScript(err) => write!(f, "Script error: {:?}", err),
             Error::GetFileError(err) => write!(f, "Get file error: {:?}", err),
             Error::FileCreateError(err) => write!(f, "File create error: {:?}", err),
             Error::BufferError(err) => write!(f, "Buffer error: {:?}", err),
@@ -56,7 +56,7 @@ impl Display for Error {
             Error::StepsNotDefined => write!(f, "Steps not defined"),
             Error::ModuleNotFound(name) => write!(f, "Module not found: {}", name),
             Error::LibLoadingError(err) => write!(f, "Lib loading error: {:?}", err),
-            Error::LoaderErrorJsonValu3(err) => write!(f, "Json error: {:?}", err),
+            Error::LoaderErrorJsonValu3(err) => write!(f, "Json Valu3 error: {:?}", err),
             Error::LoaderErrorScript(err) => write!(f, "Yaml error: {:?}", err),
             Error::GetFileError(err) => write!(f, "Get file error: {:?}", err),
             Error::FileCreateError(err) => write!(f, "File create error: {:?}", err),
@@ -67,4 +67,3 @@ impl Display for Error {
         }
     }
 }
-    

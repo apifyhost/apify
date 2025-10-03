@@ -2,7 +2,7 @@ use super::Error;
 use crate::preprocessor::preprocessor;
 use flate2::read::GzDecoder;
 use log::debug;
-use serde_json::Value as JsonValue;
+use sdk::prelude::*;
 use reqwest::header::AUTHORIZATION;
 use reqwest::Client;
 use std::fs;
@@ -12,7 +12,7 @@ use tar::Archive;
 use zip::ZipArchive;
 
 pub struct ScriptLoaded {
-    pub script: JsonValue,
+    pub script: Value,
     pub script_file_path: String,
 }
 
@@ -41,9 +41,10 @@ pub async fn load_script(script_target: &str, print_yaml: bool) -> Result<Script
 }
 
 fn get_remote_path() -> Result<PathBuf, Error> {
-    let remote_path = PathBuf::from("runtime_remote");
+    let remote_path = PathBuf::from("phlow_remote");
 
     if remote_path.exists() {
+        // remove
         fs::remove_dir_all(&remote_path).map_err(|e| {
             Error::ModuleLoaderError(format!("Failed to remove remote path: {}", e))
         })?;
@@ -62,14 +63,17 @@ fn clone_git_repo(url: &str, branch: Option<&str>) -> Result<String, Error> {
 
     let mut callbacks = RemoteCallbacks::new();
 
+    // Add certificate check callback to handle SSH host key verification
     callbacks.certificate_check(|_cert, _valid| {
+        // Accept all certificates - you might want to implement proper host key checking
+        // in a production environment by verifying against known_hosts
         Ok(git2::CertificateCheckStatus::CertificateOk)
     });
 
     if url.contains("@") {
         debug!("Using SSH authentication for Git: {}", url);
         if let Some(ssh_user) = url.split('@').next() {
-            let id_rsa_path: String = std::env::var("RUNTIME_REMOTE_ID_RSA_PATH")
+            let id_rsa_path: String = std::env::var("PHLOW_REMOTE_ID_RSA_PATH")
                 .unwrap_or_else(|_| format!("{}/.ssh/id_rsa", std::env::var("HOME").unwrap()));
 
             debug!("Using SSH user: {}", ssh_user);
@@ -126,7 +130,8 @@ fn clone_git_repo(url: &str, branch: Option<&str>) -> Result<String, Error> {
             .map_err(|e| Error::ModuleLoaderError(format!("Checkout failed: {}", e)))?;
     }
 
-    let file_path = if let Ok(main_file) = std::env::var("RUNTIME_MAIN_FILE") {
+    // Check if a specific file is requested via environment variable
+    let file_path = if let Ok(main_file) = std::env::var("PHLOW_MAIN_FILE") {
         let specific_file_path = remote_path.join(&main_file);
         if specific_file_path.exists() {
             specific_file_path.to_str().unwrap_or_default().to_string()
@@ -148,7 +153,7 @@ async fn download_file(url: &str, inner_folder: Option<&str>) -> Result<String, 
 
     let mut request = client.get(url);
 
-    if let Ok(auth_header) = std::env::var("RUNTIME_REMOTE_HEADER_AUTHORIZATION") {
+    if let Ok(auth_header) = std::env::var("PHLOW_REMOTE_HEADER_AUTHORIZATION") {
         request = request.header(AUTHORIZATION, auth_header);
     }
 
@@ -183,7 +188,8 @@ async fn download_file(url: &str, inner_folder: Option<&str>) -> Result<String, 
         }
     };
 
-    let main_path = if let Ok(main_file) = std::env::var("RUNTIME_MAIN_FILE") {
+    // Check if a specific file is requested via environment variable
+    let main_path = if let Ok(main_file) = std::env::var("PHLOW_MAIN_FILE") {
         let specific_file_path = effective_path.join(&main_file);
         if specific_file_path.exists() {
             specific_file_path.to_str().unwrap_or_default().to_string()
@@ -227,8 +233,8 @@ async fn resolve_script_path(script_path: &str) -> Result<String, Error> {
     Err(Error::MainNotFound(script_path.to_string()))
 }
 
-fn resolve_script(file: &str, main_file_path: String, print_yaml: bool) -> Result<JsonValue, Error> {
-    let mut value: JsonValue = {
+fn resolve_script(file: &str, main_file_path: String, print_yaml: bool) -> Result<Value, Error> {
+    let mut value: Value = {
         let script_path = Path::new(&main_file_path)
             .parent()
             .unwrap_or_else(|| Path::new("."));
@@ -240,7 +246,7 @@ fn resolve_script(file: &str, main_file_path: String, print_yaml: bool) -> Resul
             ))
         })?;
 
-        if let Ok(yaml_show) = std::env::var("RUNTIME_SCRIPT_SHOW") {
+        if let Ok(yaml_show) = std::env::var("PHLOW_SCRIPT_SHOW") {
             if yaml_show == "true" {
                 println!("YAML: {}", script);
             }
@@ -258,24 +264,25 @@ fn resolve_script(file: &str, main_file_path: String, print_yaml: bool) -> Resul
             return Err(Error::ModuleLoaderError("Modules not an array".to_string()));
         }
 
-        value["modules"] = modules.clone();
+        value.insert("modules", modules.clone());
     } else {
-        value["modules"] = serde_yaml::Value::Sequence(vec![]);
+        // Se modules não foi definido, criar uma lista vazia
+        value.insert("modules", Value::Array(sdk::prelude::Array::new()));
     }
 
     Ok(value)
 }
 
-pub fn load_external_module_info(module: &str) -> JsonValue {
-    let module_path = format!("runtime_packages/{}/runtime.yaml", module);
+pub fn load_external_module_info(module: &str) -> Value {
+    let module_path = format!("phlow_packages/{}/phlow.yaml", module);
 
     if !Path::new(&module_path).exists() {
-        return JsonValue::Null;
+        return Value::Null;
     }
 
     let file = match std::fs::read_to_string(&module_path) {
         Ok(file) => file,
-        Err(_) => return JsonValue::Null,
+        Err(_) => return Value::Null,
     };
 
     let mut input_order = Vec::new();
@@ -306,29 +313,27 @@ pub fn load_external_module_info(module: &str) -> JsonValue {
         drop(value)
     }
 
-    let mut value: JsonValue = serde_yaml::from_str::<JsonValue>(&file)
+    let mut value: Value = serde_yaml::from_str::<Value>(&file)
         .map_err(Error::LoaderErrorScript)
         .unwrap();
 
-    value["input_order"] = serde_json::Value::Array(
-        input_order.iter().map(|s| serde_json::Value::String(s.clone())).collect()
-    );
+    value.insert("input_order".to_string(), input_order.to_value());
 
     value
 }
 
-pub fn load_local_module_info(local_path: &str) -> JsonValue {
+pub fn load_local_module_info(local_path: &str) -> Value {
     debug!("load_local_module_info");
-    let module_path = format!("{}/runtime.yaml", local_path);
+    let module_path = format!("{}/phlow.yaml", local_path);
 
     if !Path::new(&module_path).exists() {
-        debug!("runtime.yaml not exists");
-        return JsonValue::Null;
+        debug!("phlow.yaml not exists");
+        return Value::Null;
     }
 
     let file = match std::fs::read_to_string(&module_path) {
         Ok(file) => file,
-        Err(_) => return JsonValue::Null,
+        Err(_) => return Value::Null,
     };
 
     let mut input_order = Vec::new();
@@ -359,13 +364,11 @@ pub fn load_local_module_info(local_path: &str) -> JsonValue {
         drop(value)
     }
 
-    let mut value: JsonValue = serde_yaml::from_str::<JsonValue>(&file)
+    let mut value: Value = serde_yaml::from_str::<Value>(&file)
         .map_err(Error::LoaderErrorScript)
         .unwrap();
 
-    value["input_order"] = serde_json::Value::Array(
-        input_order.iter().map(|s| serde_json::Value::String(s.clone())).collect()
-    );
+    value.insert("input_order".to_string(), input_order.to_value());
 
     value
 }
@@ -378,14 +381,14 @@ fn find_default_file(base: &PathBuf) -> Option<String> {
     if base.is_dir() {
         {
             let mut base_path = base.clone();
-            base_path.set_extension("runtime");
+            base_path.set_extension("phlow");
 
             if base_path.exists() {
                 return Some(base_path.to_str().unwrap_or_default().to_string());
             }
         }
 
-        let files = vec!["main.runtime", "mod.runtime", "module.runtime"];
+        let files = vec!["main.phlow", "mod.phlow", "module.phlow"];
 
         for file in files {
             let file_path = base.join(file);
@@ -398,4 +401,3 @@ fn find_default_file(base: &PathBuf) -> Option<String> {
 
     None
 }
-    
