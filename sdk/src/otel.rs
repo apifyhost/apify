@@ -28,30 +28,30 @@ use tracing_subscriber::prelude::*;
 
 use crate::prelude::ApplicationData;
 // otel active
-static PHLOW_OTEL_ACTIVE: once_cell::sync::Lazy<bool> =
-    once_cell::sync::Lazy::new(|| match std::env::var("PHLOW_OTEL") {
+static APIFY_OTEL_ACTIVE: once_cell::sync::Lazy<bool> =
+    once_cell::sync::Lazy::new(|| match std::env::var("APIFY_OTEL") {
         Ok(active) => active.parse::<bool>().unwrap_or(false),
         Err(_) => false,
     });
 
-static PHLOW_SPAN_ACTIVE: once_cell::sync::Lazy<Level> =
-    once_cell::sync::Lazy::new(|| match std::env::var("PHLOW_SPAN") {
+static APIFY_SPAN_ACTIVE: once_cell::sync::Lazy<Level> =
+    once_cell::sync::Lazy::new(|| match std::env::var("APIFY_SPAN") {
         Ok(level) => level.parse::<Level>().unwrap_or(Level::INFO),
         Err(_) => Level::INFO,
     });
 
-static PHLOW_LOG: once_cell::sync::Lazy<Level> =
-    once_cell::sync::Lazy::new(|| match std::env::var("PHLOW_LOG") {
+static APIFY_LOG: once_cell::sync::Lazy<Level> =
+    once_cell::sync::Lazy::new(|| match std::env::var("APIFY_LOG") {
         Ok(level) => level.parse::<Level>().unwrap_or(Level::INFO),
         Err(_) => Level::INFO,
     });
 
 fn resource(app_data: ApplicationData) -> Resource {
     let service_name = env::var("OTEL_SERVICE_NAME")
-        .unwrap_or_else(|_| app_data.name.unwrap_or_else(|| "phlow".to_string()));
+        .unwrap_or_else(|_| app_data.name.unwrap_or_else(|| "apify".to_string()));
     let service_version = env::var("OTEL_SERVICE_VERSION").unwrap_or_else(|_| {
         app_data.version.unwrap_or_else(|| {
-            env::var("PHLOW_VERSION")
+            env::var("APIFY_VERSION")
                 .unwrap_or_else(|_| "".to_string())
                 .to_string()
         })
@@ -59,7 +59,7 @@ fn resource(app_data: ApplicationData) -> Resource {
     let deployment_environment_name =
         env::var("OTEL_DEPLOYMENT_ENVIRONMENT_NAME").unwrap_or_else(|_| {
             app_data.environment.unwrap_or_else(|| {
-                env::var("PHLOW_ENV")
+                env::var("APIFY_ENV")
                     .unwrap_or_else(|_| "development".to_string())
                     .to_string()
             })
@@ -86,7 +86,7 @@ fn resource(app_data: ApplicationData) -> Resource {
 }
 
 pub fn get_tracer() -> BoxedTracer {
-    global::tracer("phlow-tracing-otel-subscriber")
+    global::tracer("apify-tracing-otel-subscriber")
 }
 
 fn init_meter_provider(resource: Resource) -> Result<SdkMeterProvider, ExporterBuildError> {
@@ -137,15 +137,15 @@ fn init_tracer_provider(resource: Resource) -> Result<SdkTracerProvider, Exporte
 }
 
 pub fn get_log_level() -> Level {
-    *PHLOW_LOG
+    *APIFY_LOG
 }
 
 fn get_span_level() -> Level {
-    *PHLOW_SPAN_ACTIVE
+    *APIFY_SPAN_ACTIVE
 }
 
 pub fn get_otel_active() -> bool {
-    *PHLOW_OTEL_ACTIVE
+    *APIFY_OTEL_ACTIVE
 }
 
 pub fn init_tracing_subscriber(app_data: ApplicationData) -> OtelGuard {
@@ -158,7 +158,7 @@ pub fn init_tracing_subscriber(app_data: ApplicationData) -> OtelGuard {
 
         let dispatch = Dispatch::new(subscriber);
 
-        debug!("PHLOW_OTEL is set to false, using default subscriber");
+        debug!("APIFY_OTEL is set to false, using default subscriber");
 
         return OtelGuard {
             tracer_provider: None,

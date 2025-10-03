@@ -13,8 +13,8 @@ use sdk::{
 use serde::Serialize;
 use std::{fmt::Display, sync::Arc};
 
-static PHLOW_TRUNCATE_SPAN_VALUE: Lazy<usize> =
-    Lazy::new(|| match std::env::var("PHLOW_TRUNCATE_SPAN_VALUE") {
+static APIFY_TRUNCATE_SPAN_VALUE: Lazy<usize> =
+    Lazy::new(|| match std::env::var("APIFY_TRUNCATE_SPAN_VALUE") {
         Ok(value) => value.parse::<usize>().unwrap_or(100),
         Err(_) => 100,
     });
@@ -435,7 +435,7 @@ impl StepWorker {
 }
 
 fn truncate_string(string: &Value) -> String {
-    let limit = *PHLOW_TRUNCATE_SPAN_VALUE;
+    let limit = *APIFY_TRUNCATE_SPAN_VALUE;
     let string = string.to_string();
     if string.len() > limit {
         format!("{}...", &string[..limit])

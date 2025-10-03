@@ -230,7 +230,7 @@ impl Runtime {
             let span = tracing::span!(
                 tracing::Level::INFO,
                 "auto_start_steps",
-                otel.name = "phlow auto start"
+                otel.name = "apify auto start"
             );
 
             // Se --var-main foi especificado, processar o valor usando valu3

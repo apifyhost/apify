@@ -600,7 +600,6 @@ mod tests {
     fn test_complex_mixed_scenario() {
         let preprocessor = SpreadPreprocessor::new();
 
-        // Cenário do test.phlow
         let code = r#"{
             let val = payload * 10;
             let no = [1, 2, 3];
@@ -625,10 +624,9 @@ mod tests {
     }
 
     #[test]
-    fn test_debug_test_phlow_case() {
+    fn test_debug_test_flow_case() {
         let preprocessor = SpreadPreprocessor::new();
 
-        // Caso exato do test.phlow
         let code = r#"{
         let val = payload * 10;
         let no = [1, 2, 3];

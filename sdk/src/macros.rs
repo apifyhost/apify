@@ -24,7 +24,7 @@ macro_rules! use_log {
         let _ = env_logger::Builder::from_env(
             env_logger::Env::new()
                 .default_filter_or("info")
-                .filter_or("PHLOW_LOG", "info"),
+                .filter_or("APIFY_LOG", "info"),
         )
         .try_init();
     }};

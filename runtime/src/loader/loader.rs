@@ -40,7 +40,7 @@ pub async fn load_script(script_target: &str, print_yaml: bool) -> Result<Script
 }
 
 fn get_remote_path() -> Result<PathBuf, Error> {
-    let remote_path = PathBuf::from("phlow_remote");
+    let remote_path = PathBuf::from("apify_remote");
 
     if remote_path.exists() {
         // remove
@@ -71,7 +71,7 @@ fn clone_git_repo(url: &str, branch: Option<&str>) -> Result<String, Error> {
     if url.contains("@") {
         debug!("Using SSH authentication for Git: {url}");
         if let Some(ssh_user) = url.split('@').next() {
-            let id_rsa_path: String = std::env::var("PHLOW_REMOTE_ID_RSA_PATH")
+            let id_rsa_path: String = std::env::var("APIFY_REMOTE_ID_RSA_PATH")
                 .unwrap_or_else(|_| format!("{}/.ssh/id_rsa", std::env::var("HOME").unwrap()));
 
             debug!("Using SSH user: {ssh_user}");
@@ -128,7 +128,7 @@ fn clone_git_repo(url: &str, branch: Option<&str>) -> Result<String, Error> {
     }
 
     // Check if a specific file is requested via environment variable
-    let file_path = if let Ok(main_file) = std::env::var("PHLOW_MAIN_FILE") {
+    let file_path = if let Ok(main_file) = std::env::var("APIFY_MAIN_FILE") {
         let specific_file_path = remote_path.join(&main_file);
         if specific_file_path.exists() {
             specific_file_path.to_str().unwrap_or_default().to_string()
@@ -149,7 +149,7 @@ async fn download_file(url: &str, inner_folder: Option<&str>) -> Result<String, 
 
     let mut request = client.get(url);
 
-    if let Ok(auth_header) = std::env::var("PHLOW_REMOTE_HEADER_AUTHORIZATION") {
+    if let Ok(auth_header) = std::env::var("APIFY_REMOTE_HEADER_AUTHORIZATION") {
         request = request.header(AUTHORIZATION, auth_header);
     }
 
@@ -184,7 +184,7 @@ async fn download_file(url: &str, inner_folder: Option<&str>) -> Result<String, 
     };
 
     // Check if a specific file is requested via environment variable
-    let main_path = if let Ok(main_file) = std::env::var("PHLOW_MAIN_FILE") {
+    let main_path = if let Ok(main_file) = std::env::var("APIFY_MAIN_FILE") {
         let specific_file_path = effective_path.join(&main_file);
         if specific_file_path.exists() {
             specific_file_path.to_str().unwrap_or_default().to_string()
@@ -240,7 +240,7 @@ fn resolve_script(file: &str, main_file_path: String, print_yaml: bool) -> Resul
             ))
         })?;
 
-        if let Ok(yaml_show) = std::env::var("PHLOW_SCRIPT_SHOW")
+        if let Ok(yaml_show) = std::env::var("APIFY_SCRIPT_SHOW")
             && yaml_show == "true"
         {
             println!("YAML: {script}");
@@ -268,7 +268,7 @@ fn resolve_script(file: &str, main_file_path: String, print_yaml: bool) -> Resul
 }
 
 pub fn load_external_module_info(module: &str) -> Value {
-    let module_path = format!("phlow_packages/{module}/phlow.yaml");
+    let module_path = format!("packages/{module}/apify.yaml");
 
     if !Path::new(&module_path).exists() {
         return Value::Null;
@@ -313,10 +313,10 @@ pub fn load_external_module_info(module: &str) -> Value {
 
 pub fn load_local_module_info(local_path: &str) -> Value {
     debug!("load_local_module_info");
-    let module_path = format!("{local_path}/phlow.yaml");
+    let module_path = format!("{local_path}/apify.yaml");
 
     if !Path::new(&module_path).exists() {
-        debug!("phlow.yaml not exists");
+        debug!("apify.yaml not exists");
         return Value::Null;
     }
 
@@ -363,14 +363,14 @@ fn find_default_file(base: &Path) -> Option<String> {
     if base.is_dir() {
         {
             let mut base_path = base.to_path_buf();
-            base_path.set_extension("phlow");
+            base_path.set_extension("yaml");
 
             if base_path.exists() {
                 return Some(base_path.to_str().unwrap_or_default().to_string());
             }
         }
 
-        let files = vec!["main.phlow", "mod.phlow", "module.phlow"];
+        let files = vec!["main.yaml", "mod.yaml", "module.yaml"];
 
         for file in files {
             let file_path = base.join(file);
