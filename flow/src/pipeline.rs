@@ -46,10 +46,9 @@ impl Pipeline {
                 Ok(step_output) => {
                     context.add_step_payload(step_output.output.clone());
 
-                    if step.get_id().is_some() {
-                        if let Some(payload) = &step_output.output {
+                    if step.get_id().is_some()
+                        && let Some(payload) = &step_output.output {
                             context.add_step_id_output(step.get_id().clone(), payload.clone());
-                        }
                     }
 
                     match step_output.next_step {

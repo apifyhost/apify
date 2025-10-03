@@ -209,8 +209,7 @@ fn value_to_structs(
                                                 // Check if this step references our pipeline as a then branch
                                                 if let Some(then_val) =
                                                     step_obj.get("then").and_then(|v| v.to_u64())
-                                                {
-                                                    if then_val as usize == pipeline_index {
+                                                    && then_val as usize == pipeline_index {
                                                         // Find the next available step in the parent pipeline
                                                         let next_step_idx = parent_step_idx + 1;
                                                         if next_step_idx < parent_steps.values.len()
@@ -261,13 +260,11 @@ fn value_to_structs(
                                                                 break;
                                                             }
                                                         }
-                                                    }
                                                 }
                                                 // Check if this step references our pipeline as an else branch
                                                 if let Some(else_val) =
                                                     step_obj.get("else").and_then(|v| v.to_u64())
-                                                {
-                                                    if else_val as usize == pipeline_index {
+                                                    && else_val as usize == pipeline_index {
                                                         // Find the next available step in the parent pipeline
                                                         let next_step_idx = parent_step_idx + 1;
                                                         if next_step_idx < parent_steps.values.len()
@@ -319,7 +316,6 @@ fn value_to_structs(
                                                             }
                                                         }
                                                     }
-                                                }
                                             }
                                         }
                                         if found_parent {
