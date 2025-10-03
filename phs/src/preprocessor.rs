@@ -145,10 +145,9 @@ impl SpreadPreprocessor {
         ];
 
         for pattern in &non_object_patterns {
-            if let Ok(regex) = regex::Regex::new(pattern) {
-                if regex.is_match(content) {
+            if let Ok(regex) = regex::Regex::new(pattern)
+                && regex.is_match(content) {
                     return false;
-                }
             }
         }
 
@@ -163,10 +162,9 @@ impl SpreadPreprocessor {
         ];
 
         for pattern in &object_patterns {
-            if let Ok(regex) = regex::Regex::new(pattern) {
-                if regex.is_match(content) {
+            if let Ok(regex) = regex::Regex::new(pattern)
+                && regex.is_match(content) {
                     return true;
-                }
             }
         }
 
