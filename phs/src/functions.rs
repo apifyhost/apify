@@ -1,4 +1,4 @@
-use base64::{engine::general_purpose, Engine as Base64Engine};
+use base64::{Engine as Base64Engine, engine::general_purpose};
 use chrono::Datelike;
 use chrono::TimeZone;
 use chrono::Timelike;
@@ -176,11 +176,7 @@ pub fn build_functions() -> Engine {
         let len = s.chars().count() as i64;
         let start = if start < 0 {
             let abs_start = start.abs();
-            if abs_start > len {
-                0
-            } else {
-                len - abs_start
-            }
+            if abs_start > len { 0 } else { len - abs_start }
         } else {
             start
         };
@@ -288,9 +284,7 @@ pub fn build_functions() -> Engine {
         }
 
         match general_purpose::STANDARD.decode(&padded_input) {
-            Ok(bytes) => {
-                String::from_utf8(bytes).unwrap_or_default()
-            }
+            Ok(bytes) => String::from_utf8(bytes).unwrap_or_default(),
             Err(_) => String::new(), // Retorna string vazia se não for Base64 válido
         }
     });

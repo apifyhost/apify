@@ -4,11 +4,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-pub fn preprocessor(
-    flow: &str,
-    base_path: &Path,
-    print_flow: bool,
-) -> Result<String, Vec<String>> {
+pub fn preprocessor(flow: &str, base_path: &Path, print_flow: bool) -> Result<String, Vec<String>> {
     let (flow, errors) = preprocessor_directives(flow, base_path);
 
     if !errors.is_empty() {
@@ -514,8 +510,6 @@ fn escape_yaml_exclamation_values(yaml: &str) -> String {
         Err(_) => return yaml.to_string(),
     };
 
-    
-
     regex
         .replace_all(yaml, |caps: &regex::Captures| {
             let prefix = &caps[1];
@@ -531,8 +525,6 @@ fn unescape_yaml_exclamation_values(yaml: &str) -> String {
         Ok(re) => re,
         Err(_) => return yaml.to_string(),
     };
-
-    
 
     regex
         .replace_all(yaml, |caps: &regex::Captures| {

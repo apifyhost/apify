@@ -5,11 +5,11 @@ use crate::{
     script::Script,
 };
 use once_cell::sync::Lazy;
+use rhai::Engine;
 use sdk::{
     prelude::{log::debug, *},
     tracing::field,
 };
-use rhai::Engine;
 use serde::Serialize;
 use std::{fmt::Display, sync::Arc};
 
@@ -108,9 +108,10 @@ impl StepWorker {
                 .map(|condition| Condition::try_from_value(engine.clone(), condition))
             {
                 Some(condition.map_err(StepWorkerError::ConditionError)?)
-            } else if let Some(condition) = value.get("assert").map(|assert| {
-                Condition::try_build_with_assert(engine.clone(), assert.to_string())
-            }) {
+            } else if let Some(condition) = value
+                .get("assert")
+                .map(|assert| Condition::try_build_with_assert(engine.clone(), assert.to_string()))
+            {
                 Some(condition.map_err(StepWorkerError::ConditionError)?)
             } else {
                 None
@@ -153,10 +154,10 @@ impl StepWorker {
                     let pipeline = to_step.get("pipeline").and_then(|v| v.to_u64());
                     let step = to_step.get("step").and_then(|v| v.to_u64());
 
-                    if pipeline.is_some() && step.is_some() {
+                    if let (Some(pipeline), Some(step)) = (pipeline, step) {
                         Some(StepReference {
-                            pipeline: pipeline.unwrap() as usize,
-                            step: step.unwrap() as usize,
+                            pipeline: pipeline as usize,
+                            step: step as usize,
                         })
                     } else {
                         None
@@ -446,8 +447,8 @@ fn truncate_string(string: &Value) -> String {
 #[cfg(test)]
 mod test {
     use super::*;
-    use sdk::valu3;
     use phs::build_engine;
+    use sdk::valu3;
     use valu3::prelude::ToValueBehavior;
     use valu3::value::Value;
 

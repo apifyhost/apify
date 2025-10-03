@@ -1,7 +1,7 @@
 use crate::context::Context;
-use sdk::prelude::*;
 use phs::ScriptError;
-use rhai::{plugin::*, serde::to_dynamic, Engine, Scope};
+use rhai::{Engine, Scope, plugin::*, serde::to_dynamic};
+use sdk::prelude::*;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]

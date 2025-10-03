@@ -2,10 +2,10 @@ use crate::{
     context::Context,
     pipeline::{Pipeline, PipelineError},
     step_worker::NextStep,
-    transform::{value_to_pipelines, TransformError},
+    transform::{TransformError, value_to_pipelines},
 };
-use sdk::prelude::{log::error, *};
 use phs::build_engine;
+use sdk::prelude::{log::error, *};
 use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 #[derive(Debug)]
@@ -46,10 +46,7 @@ pub struct Flow {
 }
 
 impl Flow {
-    pub fn try_from_value(
-        value: &Value,
-        modules: Option<Arc<Modules>>,
-    ) -> Result<Self, FlowError> {
+    pub fn try_from_value(value: &Value, modules: Option<Arc<Modules>>) -> Result<Self, FlowError> {
         let engine = match &modules {
             Some(modules) => {
                 let repositories = modules.extract_repositories();
@@ -79,9 +76,7 @@ impl Flow {
         let mut current_step = 0;
 
         loop {
-            log::debug!(
-                "Executing pipeline {current_pipeline} step {current_step}"
-            );
+            log::debug!("Executing pipeline {current_pipeline} step {current_step}");
             let pipeline = self
                 .pipelines
                 .get(&current_pipeline)
@@ -101,14 +96,20 @@ impl Flow {
                                 return Ok(step_output.output);
                             }
                             NextStep::Next => {
-                                log::debug!("NextStep::Next - checking if sub-pipeline needs to return to parent");
+                                log::debug!(
+                                    "NextStep::Next - checking if sub-pipeline needs to return to parent"
+                                );
                                 // Check if this is the main pipeline (highest index)
                                 let main_pipeline = self.pipelines.len() - 1;
                                 if current_pipeline == main_pipeline {
-                                    log::debug!("NextStep::Next - terminating execution (main pipeline completed)");
+                                    log::debug!(
+                                        "NextStep::Next - terminating execution (main pipeline completed)"
+                                    );
                                     return Ok(step_output.output);
                                 } else {
-                                    log::debug!("NextStep::Next - sub-pipeline completed, checking for parent return");
+                                    log::debug!(
+                                        "NextStep::Next - sub-pipeline completed, checking for parent return"
+                                    );
                                     // This is a sub-pipeline that completed - we should return to parent
                                     // For now, terminate execution but this needs proper parent tracking
                                     return Ok(step_output.output);

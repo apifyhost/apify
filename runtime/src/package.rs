@@ -1,5 +1,5 @@
 use crate::MODULE_EXTENSION;
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use log::info;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -57,8 +57,10 @@ impl Package {
             })?
         };
 
-        info!("Metadata loaded:\n  - name: {}\n  - version: {}\n  - repository: {}\n  - license: {}\n  - author: {}",
-            metadata.name, metadata.version, metadata.repository, metadata.license, metadata.author);
+        info!(
+            "Metadata loaded:\n  - name: {}\n  - version: {}\n  - repository: {}\n  - license: {}\n  - author: {}",
+            metadata.name, metadata.version, metadata.repository, metadata.license, metadata.author
+        );
 
         info!("Validating version...");
         let version_regex = Regex::new(r"^\d+\.\d+\.\d+(?:-[\w\.-]+)?(?:\+[\w\.-]+)?$")?;
@@ -85,10 +87,11 @@ impl Package {
             "Unlicense",
         ];
         if !known_licenses.contains(&metadata.license.as_str())
-            && !metadata.license.starts_with("http://") && !metadata.license.starts_with("https://")
-            {
-                bail!("Invalid license: must be a known open source license or a URL to license terms");
-            }
+            && !metadata.license.starts_with("http://")
+            && !metadata.license.starts_with("https://")
+        {
+            bail!("Invalid license: must be a known open source license or a URL to license terms");
+        }
 
         info!("Starting project build...");
         Command::new("cargo")

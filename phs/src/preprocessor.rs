@@ -20,7 +20,7 @@ impl SpreadPreprocessor {
         // Depois processa arrays com spread
         let code = self.process_arrays_simple(&code);
         // Por último, processa objetos com spread
-        
+
         self.process_objects_simple(&code)
     }
 

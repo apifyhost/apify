@@ -1,7 +1,7 @@
 use crate::runtime::Runtime;
 use crate::settings::Settings;
-use log::{debug, error};
 use flow::Context;
+use log::{debug, error};
 use sdk::{
     module_channel,
     structs::{ModuleResponse, ModuleSetup},

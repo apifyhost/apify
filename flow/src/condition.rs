@@ -121,7 +121,7 @@ impl Condition {
             None => {
                 return Err(ConditionError::InvalidOperator(
                     "does not exist".to_string(),
-                ))
+                ));
             }
         };
 

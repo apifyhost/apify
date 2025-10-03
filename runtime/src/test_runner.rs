@@ -1,9 +1,9 @@
-use crate::loader::{load_module, Loader};
+use crate::loader::{Loader, load_module};
 use crate::settings::Settings;
 use crossbeam::channel;
-use log::{debug, error};
-use flow::phs::{build_engine, Script};
+use flow::phs::{Script, build_engine};
 use flow::{Context, Flow};
+use log::{debug, error};
 use sdk::otel::init_tracing_subscriber;
 use sdk::prelude::json;
 use sdk::structs::{ModulePackage, ModuleSetup, Modules};
@@ -186,9 +186,7 @@ async fn run_single_test(test_case: &Value, flow: &Flow) -> Result<String, Strin
         .cloned()
         .unwrap_or(Value::Undefined);
 
-    debug!(
-        "Running test with main: {main_value:?}, payload: {initial_payload:?}"
-    );
+    debug!("Running test with main: {main_value:?}, payload: {initial_payload:?}");
 
     // Create context with test data
     let mut context = Context::from_main(main_value);

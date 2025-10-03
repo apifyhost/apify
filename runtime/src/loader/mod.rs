@@ -1,19 +1,19 @@
 pub mod error;
 pub mod loader;
-use crate::scripts::run_script;
-use crate::settings::Settings;
 use crate::MODULE_EXTENSION;
 use crate::RUNTIME_ARCH;
+use crate::scripts::run_script;
+use crate::settings::Settings;
 use error::{Error, ModuleError};
 use libloading::{Library, Symbol};
 use loader::{load_external_module_info, load_local_module_info, load_script};
 use log::debug;
 use log::info;
+use reqwest::Client;
 use sdk::prelude::ToValueBehavior;
 use sdk::prelude::Value;
 use sdk::structs::{ApplicationData, ModuleData, ModuleSetup};
 use sdk::valu3::json;
-use reqwest::Client;
 use std::io::Write;
 use std::{fs::File, path::Path};
 
@@ -51,7 +51,10 @@ impl Loader {
                     return Err(Error::ModuleLoaderError("Modules not an array".to_string()));
                 }
 
-                let main_name = script_loaded.script.get("main").map(|main| main.to_string());
+                let main_name = script_loaded
+                    .script
+                    .get("main")
+                    .map(|main| main.to_string());
 
                 let mut main = -1;
 
@@ -193,10 +196,7 @@ impl Loader {
                 continue;
             }
 
-            let module_so_path = format!(
-                "packages/{}/module.{}",
-                module.module, MODULE_EXTENSION
-            );
+            let module_so_path = format!("packages/{}/module.{}", module.module, MODULE_EXTENSION);
             if Path::new(&module_so_path).exists() {
                 info!(
                     "Module {} ({}) already exists at {}, skipping download",
@@ -247,7 +247,7 @@ impl Loader {
                     None => {
                         return Err(Error::VersionNotFound(ModuleError {
                             module: module.name.clone(),
-                        }))
+                        }));
                     }
                 }
             } else {
@@ -284,17 +284,11 @@ impl Loader {
         let target_url = format!("{}/{}", base_url.trim_end_matches('/'), tarball_name);
         let target_path = format!("packages/{module}/{tarball_name}");
 
-        if Path::new(&format!(
-            "packages/{module}/module.{MODULE_EXTENSION}"
-        ))
-        .exists()
-        {
+        if Path::new(&format!("packages/{module}/module.{MODULE_EXTENSION}")).exists() {
             return Ok(());
         }
 
-        info!(
-            "Downloading module tarball {tarball_name} from {target_url}"
-        );
+        info!("Downloading module tarball {tarball_name} from {target_url}");
 
         if let Some(parent) = Path::new(&target_path).parent() {
             std::fs::create_dir_all(parent).map_err(Error::FileCreateError)?;

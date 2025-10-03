@@ -7,9 +7,9 @@ mod settings;
 mod test_runner;
 use loader::Loader;
 use package::Package;
+use runtime::Runtime;
 use sdk::otel::init_tracing_subscriber;
 use sdk::{tracing, use_log};
-use runtime::Runtime;
 use settings::Settings;
 mod scripts;
 

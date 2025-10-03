@@ -2,9 +2,9 @@ use super::Error;
 use crate::preprocessor::preprocessor;
 use flate2::read::GzDecoder;
 use log::debug;
-use sdk::prelude::*;
-use reqwest::header::AUTHORIZATION;
 use reqwest::Client;
+use reqwest::header::AUTHORIZATION;
+use sdk::prelude::*;
 use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
@@ -44,9 +44,8 @@ fn get_remote_path() -> Result<PathBuf, Error> {
 
     if remote_path.exists() {
         // remove
-        fs::remove_dir_all(&remote_path).map_err(|e| {
-            Error::ModuleLoaderError(format!("Failed to remove remote path: {e}"))
-        })?;
+        fs::remove_dir_all(&remote_path)
+            .map_err(|e| Error::ModuleLoaderError(format!("Failed to remove remote path: {e}")))?;
     }
 
     fs::create_dir_all(&remote_path)
@@ -56,7 +55,7 @@ fn get_remote_path() -> Result<PathBuf, Error> {
 }
 
 fn clone_git_repo(url: &str, branch: Option<&str>) -> Result<String, Error> {
-    use git2::{build::RepoBuilder, FetchOptions, RemoteCallbacks};
+    use git2::{FetchOptions, RemoteCallbacks, build::RepoBuilder};
 
     let remote_path = get_remote_path()?;
 

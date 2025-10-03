@@ -1,18 +1,18 @@
-use crate::loader::{load_module, Loader};
+use crate::loader::{Loader, load_module};
 #[cfg(target_env = "gnu")]
 use crate::memory::force_memory_release;
 use crate::settings::Settings;
 use crossbeam::channel;
+use flow::phs::{Script, ScriptError, build_engine};
+use flow::{Context, Flow};
 use futures::future::join_all;
 use log::{debug, error, info};
-use flow::phs::{build_engine, Script, ScriptError};
-use flow::{Context, Flow};
 use sdk::structs::Package;
 use sdk::tokio;
 use sdk::{
     prelude::Value,
     structs::{ModulePackage, ModuleSetup, Modules},
-    tracing::{self, dispatcher, Dispatch},
+    tracing::{self, Dispatch, dispatcher},
 };
 use std::fmt::Display;
 use std::sync::Arc;
@@ -70,8 +70,6 @@ impl Runtime {
                     Ok(payload) => payload,
                     Err(err) => return Err(RuntimeError::ModuleWithError(err)),
                 };
-
-                
 
                 script
                     .evaluate_without_context()
@@ -240,9 +238,7 @@ impl Runtime {
                 match Value::json_to_value(var_main_str) {
                     Ok(value) => Some(value),
                     Err(err) => {
-                        error!(
-                            "Failed to parse --var-main value '{var_main_str}': {err:?}"
-                        );
+                        error!("Failed to parse --var-main value '{var_main_str}': {err:?}");
                         return Err(RuntimeError::FlowExecutionError(format!(
                             "Failed to parse --var-main value: {err:?}"
                         )));
@@ -277,11 +273,13 @@ impl Runtime {
 
         #[cfg(target_env = "gnu")]
         if settings.garbage_collection {
-            thread::spawn(move || loop {
-                thread::sleep(std::time::Duration::from_secs(
-                    settings.garbage_collection_interval,
-                ));
-                force_memory_release(settings.min_allocated_memory);
+            thread::spawn(move || {
+                loop {
+                    thread::sleep(std::time::Duration::from_secs(
+                        settings.garbage_collection_interval,
+                    ));
+                    force_memory_release(settings.min_allocated_memory);
+                }
             });
         }
 

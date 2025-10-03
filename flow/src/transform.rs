@@ -3,11 +3,11 @@ use crate::{
     pipeline::Pipeline,
     step_worker::{StepReference, StepWorker, StepWorkerError},
 };
+use rhai::Engine;
 use sdk::{
     prelude::{log::debug, *},
     valu3,
 };
-use rhai::Engine;
 use std::sync::Arc;
 use std::{collections::HashMap, fmt::Display};
 use valu3::{traits::ToValueBehavior, value::Value};
@@ -72,24 +72,21 @@ pub(crate) fn process_raw_steps(input: &Value, map: &mut Vec<Value>) -> Value {
             vec![new_pipeline.to_value()]
         };
 
-        if let Some(steps) = pipeline.get("steps") {
-            if let Value::Array(steps) = steps {
-                for step in steps {
-                    let mut new_step = step.clone();
+        if let Some(Value::Array(steps)) = pipeline.get("steps") {
+            for step in steps {
+                let mut new_step = step.clone();
 
-                    if let Some(then) = step.get("then") {
-                        new_step.insert("then".to_string(), process_raw_steps(then, map));
-                    }
-
-                    if let Some(els) = step.get("else") {
-                        new_step.insert("else".to_string(), process_raw_steps(els, map));
-                    }
-
-                    new_steps.push(new_step);
+                if let Some(then) = step.get("then") {
+                    new_step.insert("then".to_string(), process_raw_steps(then, map));
                 }
+
+                if let Some(els) = step.get("else") {
+                    new_step.insert("else".to_string(), process_raw_steps(els, map));
+                }
+
+                new_steps.push(new_step);
             }
         }
-
         map.push(new_steps.to_value());
     } else if let Value::Array(pipeline) = input {
         let mut new_steps = Vec::new();
@@ -162,15 +159,29 @@ fn value_to_structs(
                             let next_step_ref = get_next_step(pipelines_raw, target);
                             // Validate that the next step actually exists
                             if is_valid_step(pipelines_raw, &next_step_ref) {
-                                log::debug!("Setting up parent return: pipeline {} → pipeline {} step {}", pipeline_index, next_step_ref.pipeline, next_step_ref.step);
+                                log::debug!(
+                                    "Setting up parent return: pipeline {} → pipeline {} step {}",
+                                    pipeline_index,
+                                    next_step_ref.pipeline,
+                                    next_step_ref.step
+                                );
                                 new_step.insert("to".to_string(), next_step_ref.to_value());
                             } else {
-                                log::warn!("Invalid next step reference: pipeline {} step {} - looking for alternative", next_step_ref.pipeline, next_step_ref.step);
+                                log::warn!(
+                                    "Invalid next step reference: pipeline {} step {} - looking for alternative",
+                                    next_step_ref.pipeline,
+                                    next_step_ref.step
+                                );
                                 // Try to find a valid continuation point
                                 if let Some(valid_step) =
                                     find_valid_continuation(pipelines_raw, target)
                                 {
-                                    log::debug!("Found valid continuation: pipeline {} → pipeline {} step {}", pipeline_index, valid_step.pipeline, valid_step.step);
+                                    log::debug!(
+                                        "Found valid continuation: pipeline {} → pipeline {} step {}",
+                                        pipeline_index,
+                                        valid_step.pipeline,
+                                        valid_step.step
+                                    );
                                     new_step.insert("to".to_string(), valid_step.to_value());
                                 } else {
                                     log::warn!(
@@ -196,21 +207,24 @@ fn value_to_structs(
                                         {
                                             if let Value::Object(step_obj) = parent_step {
                                                 // Check if this step references our pipeline as a then branch
-                                                if let Some(then_val) = step_obj
-                                                    .get("then")
-                                                    .and_then(|v| v.to_u64())
+                                                if let Some(then_val) =
+                                                    step_obj.get("then").and_then(|v| v.to_u64())
                                                 {
                                                     if then_val as usize == pipeline_index {
                                                         // Find the next available step in the parent pipeline
                                                         let next_step_idx = parent_step_idx + 1;
-                                                        if next_step_idx
-                                                            < parent_steps.values.len()
+                                                        if next_step_idx < parent_steps.values.len()
                                                         {
                                                             let next_step = StepReference {
                                                                 pipeline: parent_pipeline_idx,
                                                                 step: next_step_idx,
                                                             };
-                                                            log::debug!("Setting up then branch return: pipeline {} → pipeline {} step {}", pipeline_index, next_step.pipeline, next_step.step);
+                                                            log::debug!(
+                                                                "Setting up then branch return: pipeline {} → pipeline {} step {}",
+                                                                pipeline_index,
+                                                                next_step.pipeline,
+                                                                next_step.step
+                                                            );
                                                             new_step.insert(
                                                                 "to".to_string(),
                                                                 next_step.to_value(),
@@ -219,12 +233,13 @@ fn value_to_structs(
                                                             break;
                                                         } else {
                                                             // No more steps in parent pipeline, need to find its parent
-                                                            log::debug!("Then branch pipeline {pipeline_index} has no next step in parent pipeline {parent_pipeline_idx}");
+                                                            log::debug!(
+                                                                "Then branch pipeline {pipeline_index} has no next step in parent pipeline {parent_pipeline_idx}"
+                                                            );
                                                             // For now, let's see if this parent pipeline has a parent
                                                             if let Some(parent_target) = parents
                                                                 .get(&StepReference {
-                                                                    pipeline:
-                                                                        parent_pipeline_idx,
+                                                                    pipeline: parent_pipeline_idx,
                                                                     step: 0,
                                                                 })
                                                             {
@@ -232,7 +247,12 @@ fn value_to_structs(
                                                                     pipelines_raw,
                                                                     parent_target,
                                                                 );
-                                                                log::debug!("Setting up then branch return via grandparent: pipeline {} → pipeline {} step {}", pipeline_index, next_step.pipeline, next_step.step);
+                                                                log::debug!(
+                                                                    "Setting up then branch return via grandparent: pipeline {} → pipeline {} step {}",
+                                                                    pipeline_index,
+                                                                    next_step.pipeline,
+                                                                    next_step.step
+                                                                );
                                                                 new_step.insert(
                                                                     "to".to_string(),
                                                                     next_step.to_value(),
@@ -244,21 +264,24 @@ fn value_to_structs(
                                                     }
                                                 }
                                                 // Check if this step references our pipeline as an else branch
-                                                if let Some(else_val) = step_obj
-                                                    .get("else")
-                                                    .and_then(|v| v.to_u64())
+                                                if let Some(else_val) =
+                                                    step_obj.get("else").and_then(|v| v.to_u64())
                                                 {
                                                     if else_val as usize == pipeline_index {
                                                         // Find the next available step in the parent pipeline
                                                         let next_step_idx = parent_step_idx + 1;
-                                                        if next_step_idx
-                                                            < parent_steps.values.len()
+                                                        if next_step_idx < parent_steps.values.len()
                                                         {
                                                             let next_step = StepReference {
                                                                 pipeline: parent_pipeline_idx,
                                                                 step: next_step_idx,
                                                             };
-                                                            log::debug!("Setting up else branch return: pipeline {} → pipeline {} step {}", pipeline_index, next_step.pipeline, next_step.step);
+                                                            log::debug!(
+                                                                "Setting up else branch return: pipeline {} → pipeline {} step {}",
+                                                                pipeline_index,
+                                                                next_step.pipeline,
+                                                                next_step.step
+                                                            );
                                                             new_step.insert(
                                                                 "to".to_string(),
                                                                 next_step.to_value(),
@@ -267,12 +290,13 @@ fn value_to_structs(
                                                             break;
                                                         } else {
                                                             // No more steps in parent pipeline, need to find its parent
-                                                            log::debug!("Else branch pipeline {pipeline_index} has no next step in parent pipeline {parent_pipeline_idx}");
+                                                            log::debug!(
+                                                                "Else branch pipeline {pipeline_index} has no next step in parent pipeline {parent_pipeline_idx}"
+                                                            );
                                                             // For now, let's see if this parent pipeline has a parent
                                                             if let Some(parent_target) = parents
                                                                 .get(&StepReference {
-                                                                    pipeline:
-                                                                        parent_pipeline_idx,
+                                                                    pipeline: parent_pipeline_idx,
                                                                     step: 0,
                                                                 })
                                                             {
@@ -280,7 +304,12 @@ fn value_to_structs(
                                                                     pipelines_raw,
                                                                     parent_target,
                                                                 );
-                                                                log::debug!("Setting up else branch return via grandparent: pipeline {} → pipeline {} step {}", pipeline_index, next_step.pipeline, next_step.step);
+                                                                log::debug!(
+                                                                    "Setting up else branch return via grandparent: pipeline {} → pipeline {} step {}",
+                                                                    pipeline_index,
+                                                                    next_step.pipeline,
+                                                                    next_step.step
+                                                                );
                                                                 new_step.insert(
                                                                     "to".to_string(),
                                                                     next_step.to_value(),
@@ -306,7 +335,12 @@ fn value_to_structs(
                                         pipeline: main_pipeline,
                                         step: 1, // Continue from step 1 in main pipeline
                                     };
-                                    log::debug!("Setting up orphan pipeline return: pipeline {} → pipeline {} step {}", pipeline_index, next_step.pipeline, next_step.step);
+                                    log::debug!(
+                                        "Setting up orphan pipeline return: pipeline {} → pipeline {} step {}",
+                                        pipeline_index,
+                                        next_step.pipeline,
+                                        next_step.step
+                                    );
                                     new_step.insert("to".to_string(), next_step.to_value());
                                 }
                             }
@@ -341,7 +375,7 @@ fn value_to_structs(
 }
 
 /// Function to check if a step reference is valid
-fn is_valid_step(pipelines: &Vec<Value>, step_ref: &StepReference) -> bool {
+fn is_valid_step(pipelines: &[Value], step_ref: &StepReference) -> bool {
     if step_ref.pipeline >= pipelines.len() {
         return false;
     }
@@ -354,10 +388,7 @@ fn is_valid_step(pipelines: &Vec<Value>, step_ref: &StepReference) -> bool {
 }
 
 /// Function to find a valid continuation point when the direct next step is invalid
-fn find_valid_continuation(
-    pipelines: &Vec<Value>,
-    target: &StepReference,
-) -> Option<StepReference> {
+fn find_valid_continuation(pipelines: &[Value], target: &StepReference) -> Option<StepReference> {
     let main_pipeline = pipelines.len() - 1;
 
     // If we're looking for continuation and the target is in the main pipeline,
@@ -393,7 +424,7 @@ fn find_valid_continuation(
 
 /// Function to get the next step
 /// This function takes a vector of pipelines and a target step reference.
-fn get_next_step(pipelines: &Vec<Value>, target: &StepReference) -> StepReference {
+fn get_next_step(pipelines: &[Value], target: &StepReference) -> StepReference {
     if let Value::Array(arr) = &pipelines[target.pipeline] {
         let next_step_index = target.step + 1;
         if arr.get(next_step_index).is_some() {
@@ -422,7 +453,7 @@ fn get_next_step(pipelines: &Vec<Value>, target: &StepReference) -> StepReferenc
 /// Function to map parents
 /// This function takes a vector of pipelines and builds a parent map.
 fn map_parents(
-    pipelines: &Vec<Value>,
+    pipelines: &[Value],
 ) -> (
     HashMap<StepReference, StepReference>,
     HashMap<String, StepReference>,
@@ -435,7 +466,7 @@ fn map_parents(
 /// This function takes a vector of pipelines and builds a parent map.
 /// It uses a hashmap to store the step references.
 fn build_parent_map(
-    pipelines: &Vec<Value>,
+    pipelines: &[Value],
 ) -> (
     HashMap<StepReference, StepReference>,
     HashMap<String, StepReference>,

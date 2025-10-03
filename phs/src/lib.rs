@@ -1,24 +1,25 @@
 pub mod functions;
+pub mod preprocessor;
 pub mod script;
 pub mod variable;
-pub mod preprocessor;
 use functions::build_functions;
 use rhai::serde::from_dynamic;
 use rhai::{Dynamic, Engine};
 pub use script::{Script, ScriptError};
+use sdk::structs::Repositories;
 use std::collections::HashMap;
 use std::future::Future;
-use std::sync::Arc;
 use std::pin::Pin;
+use std::sync::Arc;
 use valu3::prelude::*;
-use sdk::structs::{Repositories};
 
 pub fn build_engine(repositories: Option<Repositories>) -> Arc<Engine> {
     let mut engine = build_functions();
 
     if let Some(repositories) = repositories {
         for (key, repo) in repositories.repositories {
-            type Function = Arc<dyn Fn(Value) -> Pin<Box<dyn Future<Output = Value> + Send>> + Send + Sync>;
+            type Function =
+                Arc<dyn Fn(Value) -> Pin<Box<dyn Future<Output = Value> + Send>> + Send + Sync>;
             let call: Function = repo.function.clone();
 
             let arg_types: Vec<std::any::TypeId> =
@@ -51,13 +52,12 @@ pub fn build_engine(repositories: Option<Repositories>) -> Arc<Engine> {
     Arc::new(engine)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sdk::structs::wrap_async_fn;
     use std::collections::HashMap;
     use valu3::value::Value;
-    use sdk::structs::{wrap_async_fn};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_repository_function() {

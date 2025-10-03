@@ -2,8 +2,8 @@ use crate::preprocessor::SpreadPreprocessor;
 use crate::variable::Variable;
 use regex::Regex;
 use rhai::{
+    AST, Engine, EvalAltResult, ParseError, Scope,
     serde::{from_dynamic, to_dynamic},
-    Engine, EvalAltResult, ParseError, Scope, AST,
 };
 use std::{collections::HashMap, fmt::Display, sync::Arc};
 use valu3::prelude::*;
@@ -106,8 +106,7 @@ impl Script {
 
     fn default_scope(scope: &mut Scope) -> Result<(), ScriptError> {
         let envs = {
-            let envs = std::env::vars()
-                .collect::<HashMap<String, String>>();
+            let envs = std::env::vars().collect::<HashMap<String, String>>();
 
             to_dynamic(envs).map_err(ScriptError::EvalError)?
         };
@@ -193,7 +192,6 @@ impl Script {
                     Some(index) => index as usize,
                     None => panic!("Index not found"),
                 };
-                
 
                 match result.get(&index) {
                     Some(value) => value.clone(),
