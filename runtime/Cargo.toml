@@ -1,0 +1,40 @@
+[package]
+name = "runtime"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+flow = { workspace = true }
+sdk = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+tokio ={ workspace = true }
+crossbeam = { workspace = true }
+libloading = { workspace = true }
+reqwest = { workspace = true }
+flate2 = { workspace = true }
+tar = { workspace = true }
+zip = { workspace = true }
+git2 = { workspace = true }
+regex = { workspace = true }
+log = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber ={ workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+thiserror = { workspace = true }
+
+[features]
+default = []
+mimalloc = ["dep:mimalloc"]
+jemalloc = ["dep:jemallocator"]
+
+[dependencies.mimalloc]
+version = "0.1"
+optional = true
+
+[dependencies.jemallocator]
+version = "0.5"
+optional = true

@@ -1,0 +1,507 @@
+pub mod error;
+pub mod loader;
+use crate::scripts::run_script;
+use crate::settings::Settings;
+use crate::MODULE_EXTENSION;
+use crate::RUNTIME_ARCH;
+use error::{Error, ModuleError};
+use libloading::{Library, Symbol};
+use loader::{load_external_module_info, load_local_module_info, load_script};
+use log::debug;
+use log::info;
+use serde_json::Value as JsonValue;
+use std::io::Write;
+use std::{fs::File, path::Path};
+
+#[derive(Debug, Clone)]
+pub struct ModuleData {
+    pub id: usize,
+    pub name: String,
+    pub module: String,
+    pub version: String,
+    pub with: JsonValue,
+    pub local_path: Option<String>,
+    pub repository: Option<String>,
+    pub repository_path: Option<String>,
+    pub info: JsonValue,
+}
+
+impl ModuleData {
+    pub fn try_from(value: JsonValue) -> Result<Self, Error> {
+        let name = value["name"].as_str()
+            .ok_or_else(|| Error::ModuleLoaderError("Module name is required".to_string()))?
+            .to_string();
+            
+        let module = value["module"].as_str()
+            .or_else(|| value["name"].as_str())
+            .ok_or_else(|| Error::ModuleLoaderError("Module 'module' field is required".to_string()))?
+            .to_string();
+            
+        let version = value["version"].as_str().unwrap_or("latest").to_string();
+        
+        Ok(Self {
+            id: 0,
+            name,
+            module,
+            version,
+            with: value.get("with").cloned().unwrap_or(JsonValue::Null),
+            local_path: value["local_path"].as_str().map(|s| s.to_string()),
+            repository: value["repository"].as_str().map(|s| s.to_string()),
+            repository_path: value["repository_path"].as_str().map(|s| s.to_string()),
+            info: JsonValue::Null,
+        })
+    }
+    
+    pub fn set_info(&mut self, info: JsonValue) {
+        self.info = info;
+    }
+}
+
+enum ModuleType {
+    Binary,
+    Script,
+}
+
+struct ModuleTarget {
+    pub path: String,
+    pub module_type: ModuleType,
+}
+
+#[derive(Debug, Clone)]
+pub struct Loader {
+    pub main: i32,
+    pub modules: Vec<ModuleData>,
+    pub steps: JsonValue,
+    pub app_data: ApplicationData,
+    pub tests: Option<JsonValue>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ApplicationData {
+    pub name: Option<String>,
+    pub version: Option<String>,
+    pub environment: Option<String>,
+    pub author: Option<String>,
+    pub description: Option<String>,
+    pub license: Option<String>,
+    pub repository: Option<String>,
+    pub homepage: Option<String>,
+}
+
+impl Loader {
+    pub async fn load(script_absolute_path: &str, print_yaml: bool) -> Result<Self, Error> {
+        let script_loaded = load_script(script_absolute_path, print_yaml).await?;
+
+        let base_path = Path::new(&script_loaded.script_file_path)
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| "./".to_string());
+
+        let (main, modules) = match script_loaded.script.get("modules") {
+            Some(modules) => {
+                if !modules.is_array() {
+                    return Err(Error::ModuleLoaderError("Modules not an array".to_string()));
+                }
+
+                let main_name = match script_loaded.script.get("main") {
+                    Some(main) => main.as_str().map(|s| s.to_string()),
+                    None => None,
+                };
+
+                let mut main = -1;
+
+                let mut modules_vec = Vec::new();
+                let modules_array = modules.as_array().unwrap();
+
+                for module in modules_array {
+                    let mut module = ModuleData::try_from(module.clone())
+                        .map_err(|_| Error::ModuleLoaderError("Module not found".to_string()))?;
+
+                    if Some(module.name.clone()) == main_name {
+                        main = modules_vec.len() as i32;
+                    }
+
+                    if let Some(local_path) = module.local_path.clone() {
+                        let local_path_fix = format!("{}/{}", base_path, &local_path);
+                        module.local_path = Some(local_path_fix);
+                    }
+
+                    modules_vec.push(module);
+                }
+
+                (main, modules_vec)
+            }
+            None => (-1, Vec::new()),
+        };
+
+        let steps = match script_loaded.script.get("steps") {
+            Some(steps) => steps.clone(),
+            None => return Err(Error::StepsNotDefined),
+        };
+
+        let name = script_loaded.script.get("name").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let version = script_loaded.script.get("version").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let environment = script_loaded.script.get("environment").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let author = script_loaded.script.get("author").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let description = script_loaded.script.get("description").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let license = script_loaded.script.get("license").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let repository = script_loaded.script.get("repository").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let homepage = script_loaded.script.get("homepage").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+        let app_data = ApplicationData {
+            name,
+            version,
+            environment,
+            author,
+            description,
+            license,
+            repository,
+            homepage,
+        };
+
+        // 提取测试用例
+        let tests = script_loaded.script.get("tests").cloned();
+
+        Ok(Self {
+            main,
+            modules,
+            steps,
+            app_data,
+            tests,
+        })
+    }
+
+    fn find_module_path(module_relative_path: &str) -> Result<ModuleTarget, Error> {
+        let path = format!("{}/module.{}", module_relative_path, MODULE_EXTENSION);
+
+        debug!("Find {}...", path);
+
+        if Path::new(&path).exists() {
+            Ok(ModuleTarget {
+                path,
+                module_type: ModuleType::Binary,
+            })
+        } else {
+            let path = format!("{}/module.runtime", module_relative_path);
+
+            debug!("Find {}...", path);
+
+            if Path::new(&path).exists() {
+                Ok(ModuleTarget {
+                    path,
+                    module_type: ModuleType::Script,
+                })
+            } else {
+                let path = format!("{}.runtime", module_relative_path);
+
+                debug!("Find {}...", path);
+
+                if Path::new(&path).exists() {
+                    Ok(ModuleTarget {
+                        path,
+                        module_type: ModuleType::Script,
+                    })
+                } else {
+                    debug!("Module not found: {}", module_relative_path);
+                    Err(Error::ModuleNotFound(format!(
+                        "Module not found at path: {}",
+                        module_relative_path
+                    )))
+                }
+            }
+        }
+    }
+
+    pub fn get_steps(&self) -> JsonValue {
+        serde_json::json!({
+            "steps": self.steps.clone()
+        })
+    }
+
+    pub async fn download(&self, default_package_repository_url: &str) -> Result<(), Error> {
+        if !Path::new("runtime_packages").exists() {
+            std::fs::create_dir("runtime_packages").map_err(Error::FileCreateError)?;
+        }
+
+        info!("Downloading modules...");
+
+        let client = Client::new();
+
+        let mut downloads = Vec::new();
+
+        for module in &self.modules {
+            // 跳过本地模块
+            if module.local_path.is_some() {
+                info!(
+                    "Module {} is a local path module, skipping download",
+                    module.name
+                );
+                continue;
+            }
+
+            let module_so_path = format!(
+                "runtime_packages/{}/module.{}",
+                module.module, MODULE_EXTENSION
+            );
+            if Path::new(&module_so_path).exists() {
+                info!(
+                    "Module {} ({}) already exists at {}, skipping download",
+                    module.name, module.version, module_so_path
+                );
+                continue;
+            }
+
+            let base_url = match &module.repository {
+                Some(repo) => repo.clone(),
+                None => format!(
+                    "{}/refs/heads/main/packages/{}",
+                    if regex::Regex::new(r"^(https?://|\.git|.*@.*)")
+                        .unwrap()
+                        .is_match(default_package_repository_url)
+                    {
+                        default_package_repository_url.to_string()
+                    } else {
+                        format!(
+                            "https://raw.githubusercontent.com/{}",
+                            default_package_repository_url
+                        )
+                    },
+                    module
+                        .repository_path
+                        .clone()
+                        .ok_or_else(|| Error::ModuleNotFound(module.name.clone()))?
+                ),
+            };
+
+            info!("Base URL: {}", base_url);
+
+            let version = if module.version == "latest" {
+                let metadata_url = format!("{}/metadata.json", base_url);
+                info!("Metadata URL: {}", metadata_url);
+
+                let res = client
+                    .get(&metadata_url)
+                    .send()
+                    .await
+                    .map_err(Error::GetFileError)?;
+                let metadata = {
+                    let content = res.text().await.map_err(Error::BufferError)?;
+                    serde_json::from_str(&content).map_err(Error::LoaderErrorJsonValu3)?
+                };
+
+                match metadata.get("latest") {
+                    Some(version) => version.as_str().unwrap_or("latest").to_string(),
+                    None => {
+                        return Err(Error::VersionNotFound(ModuleError {
+                            module: module.name.clone(),
+                        }))
+                    }
+                }
+            } else {
+                module.version.clone()
+            };
+
+            let handler = Self::download_and_extract_tarball(
+                base_url.clone(),
+                module.module.clone(),
+                version.clone(),
+            );
+
+            downloads.push(handler);
+        }
+
+        info!("Waiting for all downloads to complete...");
+
+        let results = futures::future::join_all(downloads).await;
+        for result in results {
+            if let Err(err) = result {
+                return Err(err);
+            }
+        }
+
+        info!("All modules downloaded and extracted successfully");
+        Ok(())
+    }
+
+    async fn download_and_extract_tarball(
+        base_url: String,
+        module: String,
+        version: String,
+    ) -> Result<(), Error> {
+        use flate2::read::GzDecoder;
+        use tar::Archive;
+
+        let tarball_name = format!("{}-{}-{}.tar.gz", module, version, RUNTIME_ARCH);
+        let target_url = format!("{}/{}", base_url.trim_end_matches('/'), tarball_name);
+        let target_path = format!("runtime_packages/{}/{}", module, tarball_name);
+
+        if Path::new(&format!(
+            "runtime_packages/{}/module.{}",
+            module, MODULE_EXTENSION
+        ))
+        .exists()
+        {
+            return Ok(());
+        }
+
+        info!(
+            "Downloading module tarball {} from {}",
+            tarball_name, target_url
+        );
+
+        if let Some(parent) = Path::new(&target_path).parent() {
+            std::fs::create_dir_all(parent).map_err(Error::FileCreateError)?;
+        }
+
+        let client = Client::new();
+        let response = client
+            .get(&target_url)
+            .send()
+            .await
+            .map_err(Error::GetFileError)?;
+        let content = response.bytes().await.map_err(Error::BufferError)?;
+
+        info!("Download completed, extracting... {}", target_path);
+
+        // 保存tarball
+        let mut file = File::create(&target_path).map_err(Error::FileCreateError)?;
+        file.write_all(&content).map_err(Error::CopyError)?;
+
+        // 解压内容
+        let tar_gz = File::open(&target_path).map_err(Error::FileCreateError)?;
+        let decompressor = GzDecoder::new(tar_gz);
+        let mut archive = Archive::new(decompressor);
+        archive
+            .unpack(format!("runtime_packages/{}", module))
+            .map_err(Error::CopyError)?;
+
+        // 移除tar.gz
+        std::fs::remove_file(&target_path).map_err(Error::FileCreateError)?;
+
+        info!("Module extracted to runtime_packages/{}", module);
+
+        Ok(())
+    }
+
+    pub fn update_info(&mut self) {
+        debug!("update_info");
+
+        for module in &mut self.modules {
+            let value = if let Some(local_path) = &module.local_path {
+                load_local_module_info(local_path)
+            } else {
+                load_external_module_info(&module.module)
+            };
+
+            debug!("module info loaded");
+            module.set_info(value);
+        }
+    }
+}
+
+pub fn load_module(
+    setup: ModuleSetup,
+    module_name: &str,
+    module_version: &str,
+    local_path: Option<String>,
+    settings: Settings,
+) -> Result<(), Error> {
+    let target = {
+        let module_relative_path = match local_path {
+            Some(local_path) => local_path,
+            None => format!("runtime_packages/{}", module_name),
+        };
+
+        let target = Loader::find_module_path(&module_relative_path)?;
+
+        info!(
+            "🧪 Load Module: {} ({}), in {}",
+            module_name, module_version, target.path
+        );
+
+        target
+    };
+
+    match target.module_type {
+        ModuleType::Script => {
+            run_script(&target.path, setup, &settings);
+        }
+        ModuleType::Binary => unsafe {
+            info!("Loading binary module: {}", target.path);
+
+            let lib: Library = match Library::new(&target.path) {
+                Ok(lib) => lib,
+                Err(err) => return Err(Error::LibLoadingError(err)),
+            };
+
+            let func: Symbol<unsafe extern "C" fn(ModuleSetup)> = match lib.get(b"plugin") {
+                Ok(func) => func,
+                Err(err) => return Err(Error::LibLoadingError(err)),
+            };
+
+            func(setup);
+        },
+    }
+
+    Ok(())
+}
+
+// 模块相关结构定义
+#[derive(Debug)]
+pub struct ModuleSetup {
+    pub id: usize,
+    pub setup_sender: tokio::sync::oneshot::Sender<Option<crossbeam::channel::Sender<ModulePackage>>>,
+    pub main_sender: Option<crossbeam::channel::Sender<Package>>,
+    pub with: JsonValue,
+    pub dispatch: tracing::Dispatch,
+    pub app_data: ApplicationData,
+    pub is_test_mode: bool,
+}
+
+#[derive(Debug)]
+pub struct ModulePackage {
+    pub data: JsonValue,
+    pub response_channel: crossbeam::channel::Sender<JsonValue>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Package {
+    pub response: Option<tokio::sync::oneshot::Sender<JsonValue>>,
+    pub request_data: Option<JsonValue>,
+    pub origin: usize,
+    pub span: Option<tracing::Span>,
+    pub dispatch: Option<tracing::Dispatch>,
+}
+
+impl Package {
+    pub fn get_data(&self) -> Option<&JsonValue> {
+        self.request_data.as_ref()
+    }
+    
+    pub fn send(&mut self, value: JsonValue) {
+        if let Some(tx) = self.response.take() {
+            let _ = tx.send(value);
+        }
+    }
+}
+
+pub struct Modules {
+    modules: std::collections::HashMap<String, crossbeam::channel::Sender<ModulePackage>>,
+}
+
+impl Modules {
+    pub fn default() -> Self {
+        Self {
+            modules: std::collections::HashMap::new(),
+        }
+    }
+    
+    pub fn register(&mut self, module: ModuleData, sender: crossbeam::channel::Sender<ModulePackage>) {
+        self.modules.insert(module.name, sender);
+    }
+    
+    pub fn get_sender(&self, name: &str) -> Option<&crossbeam::channel::Sender<ModulePackage>> {
+        self.modules.get(name)
+    }
+}
+    
