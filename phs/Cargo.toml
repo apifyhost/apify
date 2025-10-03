@@ -1,0 +1,17 @@
+[package]
+name = "phs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sdk = { workspace = true }
+
+serde = { workspace = true }
+rhai = { workspace = true }
+regex = { workspace = true }
+valu3 = { workspace = true }
+tokio = { workspace = true }
+base64 = "0.22"
+chrono = { workspace = true }
