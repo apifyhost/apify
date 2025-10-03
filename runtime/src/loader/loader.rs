@@ -334,14 +334,12 @@ pub fn load_local_module_info(local_path: &str) -> Value {
 
         if let Some(serde_yaml::Value::Mapping(input)) = value.get("input")
             && let Some(serde_yaml::Value::String(input_type)) = input.get("type")
+            && input_type == "object"
+            && let Some(serde_yaml::Value::Mapping(properties)) = input.get("properties")
         {
-            if input_type == "object"
-                && let Some(serde_yaml::Value::Mapping(properties)) = input.get("properties")
-            {
-                for (key, _) in properties {
-                    if let serde_yaml::Value::String(key) = key {
-                        input_order.push(key.clone());
-                    }
+            for (key, _) in properties {
+                if let serde_yaml::Value::String(key) = key {
+                    input_order.push(key.clone());
                 }
             }
         }
