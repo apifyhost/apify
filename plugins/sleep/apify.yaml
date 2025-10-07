@@ -1,0 +1,36 @@
+
+name: sleep
+description: Sleep for a specified duration.
+version: 0.0.1
+author: Philippe Assis <codephilippe@gmail.com>
+repository: https://github.com/apifyhost/apify
+license: MIT
+type: step
+tags:
+  - sleep
+  - wait
+  - delay
+input:
+  type: object
+  required: false
+  properties:
+    milliseconds:
+      type: number
+      description: The number of milliseconds to sleep.
+      required: false
+      default: 0  
+    seconds:
+      type: number
+      description: The number of seconds to sleep.
+      required: false
+      default: 0
+    minutes:
+      type: number
+      description: The number of minutes to sleep.
+      required: false
+      default: 0
+    hours:
+      type: number
+      description: The number of hours to sleep.
+      required: false
+      default: 0

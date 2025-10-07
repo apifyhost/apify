@@ -1,0 +1,12 @@
+[package]
+name = "sleep"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sdk = { workspace = true }
+
+
+[lib]
+name = "sleep"
+crate-type = ["cdylib"]

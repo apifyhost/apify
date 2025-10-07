@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+
+set -e
+
+cargo install cross
+
+# Detect operating system or target
+# Define OS_SUFFIX, TARGET e MODULE_EXTENSION dinamicamente
+if [[ -z "$OS_SUFFIX" || -z "$TARGET" || -z "$MODULE_EXTENSION" ]]; then
+  if [[ -z "$OS_SUFFIX" ]]; then OS_SUFFIX=""; fi
+  if [[ -z "$TARGET" ]]; then TARGET=""; fi
+  if [[ -z "$MODULE_EXTENSION" ]]; then MODULE_EXTENSION=""; fi
+
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    if [[ -z "$OS_SUFFIX" ]]; then OS_SUFFIX="-darwin"; fi
+    if [[ -z "$TARGET" ]]; then TARGET="x86_64-apple-darwin"; fi
+    if [[ "$(uname -m)" == "arm64" ]]; then
+        OS_SUFFIX="-darwin-aarch64"
+        TARGET="aarch64-apple-darwin"
+    elif [[ "$(uname -m)" == "x86_64" ]]; then
+        OS_SUFFIX="-darwin-x86_64"
+        TARGET="x86_64-apple-darwin"
+    fi
+    MODULE_EXTENSION="dylib"
+    echo "🍎 Detected macOS platform"
+  elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    ARCH=$(uname -m)
+    if [[ "$ARCH" == "x86_64" ]]; then
+      if [[ -z "$OS_SUFFIX" ]]; then OS_SUFFIX="-linux-amd64"; fi
+      if [[ -z "$TARGET" ]]; then TARGET="x86_64-unknown-linux-gnu"; fi
+      MODULE_EXTENSION="so"
+      echo "🐧 Detected Linux amd64 platform"
+    elif [[ "$ARCH" == "aarch64" ]]; then
+      if [[ -z "$OS_SUFFIX" ]]; then OS_SUFFIX="-linux-aarch64"; fi
+      if [[ -z "$TARGET" ]]; then TARGET="aarch64-unknown-linux-gnu"; fi
+      MODULE_EXTENSION="so"
+      echo "🐧 Detected Linux aarch64 platform"
+    else
+      echo "⚠️ Unknown Linux architecture: $ARCH"
+      exit 1
+    fi
+  else
+    echo "⚠️ Unknown OSTYPE: $OSTYPE"
+    exit 1
+  fi
+fi
+
+if [ ! -d "./plugins" ]; then
+    echo "📦 Create folder ./plugins"
+    mkdir -p ./plugins
+fi
+
+echo "📦 Clean folder ./plugins"
+rm -rf ./plugins/*
+
+if ! command -v yq &> /dev/null; then
+  echo "yq not found. Please install yq (https://github.com/mikefarah/yq)"
+  exit 1
+fi
+
+
+package_module() {
+    MODULE_DIR="$1"
+
+    cd "$MODULE_DIR"
+
+    if [ -f "apify.yaml" ]; then
+      METADATA_FILE="apify.yaml"
+    elif [ -f "apify.yml" ]; then
+      METADATA_FILE="apify.yml"
+    else
+      echo "No apify.yaml/yml file found in $MODULE_DIR"
+      exit 1
+    fi
+
+    echo "📄 Metadata file found: $METADATA_FILE"
+
+    NAME=$(yq -r '.name' "$METADATA_FILE")
+    VERSION=$(yq -r '.version' "$METADATA_FILE")
+    REPOSITORY=$(yq -r '.repository' "$METADATA_FILE")
+    LICENSE=$(yq -r '.license' "$METADATA_FILE")
+    AUTHOR=$(yq -r '.author' "$METADATA_FILE")
+
+    echo "🔎 Loaded metadata:"
+    echo "  name: $NAME"
+    echo "  version: $VERSION"
+    echo "  repository: $REPOSITORY"
+    echo "  license: $LICENSE"
+    echo "  author: $AUTHOR"
+
+    # Validações
+    if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-a-zA-Z0-9\.]+)?(\+[a-zA-Z0-9\.]+)?$ ]]; then
+      echo "❌ Invalid version format: $VERSION"
+      exit 1
+    fi
+
+    KNOWN_LICENSES=("MIT" "Apache-2.0" "GPL-3.0" "BSD-3-Clause" "MPL-2.0" "LGPL-3.0" "CDDL-1.0" "EPL-2.0" "Unlicense")
+    VALID_LICENSE=false
+    for lic in "${KNOWN_LICENSES[@]}"; do
+      if [ "$LICENSE" == "$lic" ]; then
+        VALID_LICENSE=true
+        break
+      fi
+    done
+
+    if ! $VALID_LICENSE; then
+      if ! [[ "$LICENSE" =~ ^https?://.*$ ]]; then
+        echo "❌ Invalid license: $LICENSE"
+        exit 1
+      fi
+    fi
+
+    echo "⚙️ Building module..."
+    cross build --target "$TARGET" --release --locked
+
+    TMP_DIR=".tmp/${NAME}"
+    mkdir -p "$TMP_DIR"
+
+    SO_NAME="lib${NAME}.${MODULE_EXTENSION}"
+    RELEASE_PATH="../../target/$TARGET/release/$SO_NAME"
+
+    if [ ! -f "$RELEASE_PATH" ]; then
+      echo "❌ Missing built file: $RELEASE_PATH"
+      exit 1
+    fi
+
+    cp "$RELEASE_PATH" "$TMP_DIR/module.${MODULE_EXTENSION}"
+    cp "$METADATA_FILE" "$TMP_DIR/"
+
+    ARCHIVE_NAME="${NAME}-${VERSION}.tar.gz"
+
+    echo "📦 Creating archive: $ARCHIVE_NAME"
+    tar -czf "$ARCHIVE_NAME" -C "$TMP_DIR" .
+
+    rm -rf "$TMP_DIR"
+
+    cd - > /dev/null
+
+    RENAMED_ARCHIVE="${NAME}-${VERSION}${OS_SUFFIX}.tar.gz"
+    mv "$MODULE_DIR/$ARCHIVE_NAME" "./plugins/$RENAMED_ARCHIVE"
+
+    echo "✅ Module packaged: $RENAMED_ARCHIVE"
+}
+
+for dir in ./plugins/*/; do
+    if [ -d "$dir" ]; then
+        echo "🚀 Processing module: $dir"
+        package_module "$dir"
+    fi
+done
+
+echo "🎉 All plugins packaged successfully!"
