@@ -291,6 +291,7 @@ async fn handle_exists(
 }
 
 /// Handle list action
+#[allow(clippy::too_many_arguments)]
 async fn handle_list(
     cache: CacheInstance,
     filter_type: String,

@@ -86,7 +86,7 @@ async fn handle_rpc_client(
                 Err(e) => {
                     log::error!("RPC client error: {e}");
                     let error_response =
-                        format!("{{\"error\": \"{}\", \"success\": false}}", e)
+                        format!("{{\"error\": \"{e}\", \"success\": false}}")
                             .to_value();
                     sender_safe!(plugin.sender, error_response.into());
                 }

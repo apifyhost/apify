@@ -20,7 +20,7 @@ pub async fn start_rpc_server(
         dispatch: dispatch.clone(),
         service_name: config.service_name.clone(),
         main_sender: main_sender.clone(),
-        id: id,
+        id,
     };
 
     let mut listener = tarpc::serde_transport::tcp::listen(&server_addr, Json::default).await?;

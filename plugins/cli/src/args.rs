@@ -252,27 +252,27 @@ impl Args {
         );
 
         if let Some(version) = self.app_data.version {
-            println!("       Version: {}", version);
+            println!("       Version: {version}");
         }
 
         if let Some(description) = self.app_data.description {
-            println!("       Description: {}", description);
+            println!("       Description: {description}");
         }
 
         if let Some(license) = self.app_data.license {
-            println!("       License: {}", license);
+            println!("       License: {license}");
         }
 
         if let Some(author) = self.app_data.author {
-            println!("       Author: {}", author);
+            println!("       Author: {author}");
         }
 
         if let Some(homepage) = self.app_data.homepage {
-            println!("       Homepage: {}", homepage);
+            println!("       Homepage: {homepage}");
         }
 
         if let Some(repository) = self.app_data.repository {
-            println!("       Repository: {}", repository);
+            println!("       Repository: {repository}");
         }
 
         println!();
