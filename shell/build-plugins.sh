@@ -45,13 +45,13 @@ if [[ -z "$OS_SUFFIX" || -z "$TARGET" || -z "$MODULE_EXTENSION" ]]; then
   fi
 fi
 
-if [ ! -d "./plugins" ]; then
-    echo "📦 Create folder ./plugins"
-    mkdir -p ./plugins
+if [ ! -d "./plugins-target" ]; then
+    echo "📦 Create folder ./plugins-target"
+    mkdir -p ./plugins-target
 fi
 
-echo "📦 Clean folder ./plugins"
-rm -rf ./plugins/*
+echo "📦 Clean folder ./plugins-target"
+rm -rf ./plugins-target/*
 
 if ! command -v yq &> /dev/null; then
   echo "yq not found. Please install yq (https://github.com/mikefarah/yq)"
@@ -137,7 +137,7 @@ package_plugin() {
     cd - > /dev/null
 
     RENAMED_ARCHIVE="${NAME}-${VERSION}${OS_SUFFIX}.tar.gz"
-    mv "$MODULE_DIR/$ARCHIVE_NAME" "./plugins/$RENAMED_ARCHIVE"
+    mv "$MODULE_DIR/$ARCHIVE_NAME" "./plugins-target/$RENAMED_ARCHIVE"
 
     echo "✅ Plugin packaged: $RENAMED_ARCHIVE"
 }
