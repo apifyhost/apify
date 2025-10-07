@@ -214,9 +214,7 @@ impl Loader {
                     if repo_regex.is_match(default_plugin_repository_url) {
                         default_plugin_repository_url.to_string()
                     } else {
-                        format!(
-                            "https://raw.githubusercontent.com/{default_plugin_repository_url}"
-                        )
+                        format!("https://raw.githubusercontent.com/{default_plugin_repository_url}")
                     },
                     module
                         .repository_path

@@ -80,8 +80,7 @@ impl Envs {
             .and_then(|v| v.parse::<u64>().ok())
             .unwrap_or(60);
 
-        let default_plugin_repository_url = match env::var("APIFY_DEFAULT_PLUGIN_REPOSITORY_URL")
-        {
+        let default_plugin_repository_url = match env::var("APIFY_DEFAULT_PLUGIN_REPOSITORY_URL") {
             Ok(repo) => repo,
             Err(_) => "apifyhost/apify-plugins".to_string(),
         };

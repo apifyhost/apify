@@ -21,9 +21,9 @@ struct ModuleMetadata {
 
 impl Plugin {
     pub fn run(&self) -> Result<()> {
-        let archive_name = self.create_plugin().with_context(|| {
-            format!("Failed to create plugin in {}", self.module_dir.display())
-        })?;
+        let archive_name = self
+            .create_plugin()
+            .with_context(|| format!("Failed to create plugin in {}", self.module_dir.display()))?;
 
         info!("Plugin created: {archive_name}");
         Ok(())
