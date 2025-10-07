@@ -56,7 +56,7 @@ impl ProducerResponse {
 }
 
 pub async fn producer(
-    setup_sender: pluginsetupSender,
+    setup_sender: ModuleSetupSender,
     config: Config,
     mut channel: lapin::Channel,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

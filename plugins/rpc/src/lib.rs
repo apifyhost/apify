@@ -45,7 +45,7 @@ pub async fn start_rpc_module(
 }
 
 async fn handle_rpc_client(
-    setup_sender: pluginsetupSender,
+    setup_sender: ModuleSetupSender,
     config: Config,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (tx, rx) = channel::unbounded::<ModulePackage>();
