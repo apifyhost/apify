@@ -370,23 +370,43 @@ fn import_definition(
                                     let key_str = key.to_string();
                                     match value {
                                         Value::String(s) => {
-                                            args_map.insert(key_str, serde_json::Value::String(s.as_string()));
+                                            args_map.insert(
+                                                key_str,
+                                                serde_json::Value::String(s.as_string()),
+                                            );
                                         }
                                         Value::Number(n) => {
                                             if let Some(i) = n.get_i64() {
-                                                args_map.insert(key_str, serde_json::Value::Number(serde_json::Number::from(i)));
+                                                args_map.insert(
+                                                    key_str,
+                                                    serde_json::Value::Number(
+                                                        serde_json::Number::from(i),
+                                                    ),
+                                                );
                                             } else if let Some(f) = n.get_f64() {
-                                                args_map.insert(key_str, serde_json::Value::Number(serde_json::Number::from_f64(f).unwrap_or(serde_json::Number::from(0))));
+                                                args_map.insert(
+                                                    key_str,
+                                                    serde_json::Value::Number(
+                                                        serde_json::Number::from_f64(f)
+                                                            .unwrap_or(serde_json::Number::from(0)),
+                                                    ),
+                                                );
                                             } else {
                                                 // fallback para outros tipos numéricos
-                                                args_map.insert(key_str, serde_json::Value::String(n.to_string()));
+                                                args_map.insert(
+                                                    key_str,
+                                                    serde_json::Value::String(n.to_string()),
+                                                );
                                             }
                                         }
                                         Value::Boolean(b) => {
                                             args_map.insert(key_str, serde_json::Value::Bool(*b));
                                         }
                                         _ => {
-                                            args_map.insert(key_str, serde_json::Value::String(value.to_string()));
+                                            args_map.insert(
+                                                key_str,
+                                                serde_json::Value::String(value.to_string()),
+                                            );
                                         }
                                     }
                                 }

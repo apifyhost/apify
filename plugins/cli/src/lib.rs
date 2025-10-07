@@ -3,16 +3,15 @@ mod resolve;
 use std::env;
 
 use args::Args;
+use resolve::resolve;
 use sdk::{
     prelude::*,
-    tracing::{field, Level},
+    tracing::{Level, field},
 };
-use resolve::resolve;
 
 create_main!(cli(setup));
 
-pub async fn cli(setup: pluginsetup) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    
+pub async fn cli(setup: ModuleSetup) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     sender_safe!(setup.setup_sender, None);
 
     let _ = sdk::tracing::dispatcher::with_default(&setup.dispatch.clone(), || async move {

@@ -52,33 +52,32 @@ impl APIFYRpc for APIFYRpcServer {
 
         // Execute the request through the APIFY pipeline system
         // This integrates with the steps defined in the YAML configuration
-        let response_value =
-            sdk::tracing::dispatcher::with_default(&self.dispatch.clone(), || {
-                let span = tracing::span!(
-                    Level::INFO,
-                    "rpc_call",
-                    "rpc.method" = request.method.clone(),
-                    "rpc.service" = self.service_name.clone(),
-                );
+        let response_value = sdk::tracing::dispatcher::with_default(&self.dispatch.clone(), || {
+            let span = tracing::span!(
+                Level::INFO,
+                "rpc_call",
+                "rpc.method" = request.method.clone(),
+                "rpc.service" = self.service_name.clone(),
+            );
 
-                span_enter!(span);
+            span_enter!(span);
 
-                Box::pin(async move {
-                    let response_value = sender_plugin!(
-                        span.clone(),
-                        self.dispatch.clone(),
-                        self.id.clone(),
-                        self.main_sender.clone(),
-                        Some(request.to_value())
-                    )
-                    .await
-                    .unwrap_or(Value::Null);
+            Box::pin(async move {
+                let response_value = sender_plugin!(
+                    span.clone(),
+                    self.dispatch.clone(),
+                    self.id.clone(),
+                    self.main_sender.clone(),
+                    Some(request.to_value())
+                )
+                .await
+                .unwrap_or(Value::Null);
 
-                    log::debug!("Received response from steps: {:?}", response_value);
-                    response_value
-                })
+                log::debug!("Received response from steps: {:?}", response_value);
+                response_value
             })
-            .await;
+        })
+        .await;
 
         log::debug!("Final response from steps: {:?}", response_value);
 

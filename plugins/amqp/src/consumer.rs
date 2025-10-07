@@ -1,8 +1,8 @@
 use crate::setup::Config;
 use lapin::message::DeliveryResult;
-use lapin::{options::*, types::FieldTable, BasicProperties};
+use lapin::{BasicProperties, options::*, types::FieldTable};
 use sdk::prelude::*;
-use sdk::tracing::{field, Dispatch, Level};
+use sdk::tracing::{Dispatch, Level, field};
 
 use std::sync::Arc;
 
@@ -10,7 +10,7 @@ use std::sync::Arc;
 async fn check_dlq_configured(config: &Config) -> bool {
     let management_port = 15672; // Porta padrão da Management API
     let client = reqwest::Client::new();
-    
+
     // Verificar se a fila tem dead letter exchange configurado
     let url = format!(
         "http://{}:{}/api/queues/{}/{}",
@@ -19,7 +19,7 @@ async fn check_dlq_configured(config: &Config) -> bool {
         urlencoding::encode(&config.vhost),
         urlencoding::encode(&config.queue_name)
     );
-    
+
     match client
         .get(&url)
         .basic_auth(&config.username, Some(&config.password))
@@ -66,7 +66,11 @@ pub async fn consumer(
     channel: lapin::Channel,
     dispatch: Dispatch,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    log::debug!("Starting consumer with max_retry={} and dlq_enable={}", config.max_retry, config.dlq_enable);
+    log::debug!(
+        "Starting consumer with max_retry={} and dlq_enable={}",
+        config.max_retry,
+        config.dlq_enable
+    );
 
     let config = Arc::new(config);
     let main_sender = Arc::new(main_sender);
@@ -183,9 +187,9 @@ pub async fn consumer(
                         if retry_count < config.max_retry {
                             let mut headers = delivery.properties.headers().as_ref().cloned().unwrap_or_default();
                             headers.insert("x-retry-count".into(), (retry_count + 1).into());
-                            
+
                             let properties = BasicProperties::default().with_headers(headers);
-                            
+
                             match channel.basic_publish(
                                 &config.exchange,
                                 &config.routing_key,
@@ -210,10 +214,10 @@ pub async fn consumer(
                         } else if config.dlq_enable {
                             // Excedeu limite de tentativas - verificar se DLQ está configurada
                             log::warn!("Max retries ({}) exceeded for message, checking DLQ configuration...", config.max_retry);
-                            
+
                             // Verificar se DLQ está configurada via API do RabbitMQ
                             let dlq_configured = check_dlq_configured(&config).await;
-                            
+
                             if dlq_configured {
                                 // DLQ está configurada - enviar para DLQ
                                 log::warn!("DLQ is configured, sending message to DLQ");
@@ -232,7 +236,7 @@ pub async fn consumer(
                                 // DLQ NÃO está configurada - requeue com warning
                                 log::warn!("DLQ is enabled but NOT configured (no x-dead-letter-exchange found)");
                                 log::warn!("Requeuing message to continue processing (DLQ enabled but not configured)");
-                                
+
                                 // Requeue para continuar processando
                                 match delivery.nack(BasicNackOptions {
                                     multiple: false,

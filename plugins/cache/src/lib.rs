@@ -4,9 +4,9 @@ mod stats;
 
 use config::CacheConfig;
 use input::CacheInput;
-use stats::CacheStats;
+use quickleaf::{Duration, Filter, ListProps, Order, Quickleaf};
 use sdk::prelude::*;
-use quickleaf::{Quickleaf, Filter, ListProps, Order, Duration};
+use stats::CacheStats;
 use std::sync::{Arc, Mutex};
 
 create_step!(cache_handler(setup));
@@ -16,7 +16,7 @@ type CacheInstance = Arc<Mutex<Quickleaf>>;
 
 /// Cache handler that manages a QuickLeaf cache instance
 pub async fn cache_handler(
-    setup: pluginsetup,
+    setup: ModuleSetup,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let rx = module_channel!(setup);
 
@@ -124,7 +124,7 @@ async fn handle_set(
 
     // Convert sdk Value to quickleaf Value
     let quickleaf_value = quickleaf::valu3::value::Value::from(value.clone());
-    
+
     if let Some(ttl_secs) = ttl {
         cache_guard.insert_with_ttl(&key, quickleaf_value, Duration::from_secs(ttl_secs));
     } else {
@@ -359,11 +359,8 @@ async fn handle_list(
         .skip(start_idx)
         .take(end_idx.saturating_sub(start_idx))
         .map(|(key, value)| {
-            std::collections::HashMap::from([
-                ("key", key.to_value()),
-                ("value", (*value).clone()),
-            ])
-            .to_value()
+            std::collections::HashMap::from([("key", key.to_value()), ("value", (*value).clone())])
+                .to_value()
         })
         .collect();
 
@@ -441,11 +438,10 @@ async fn handle_stats(
     ])
     .to_value();
 
-    Ok(std::collections::HashMap::from([
-        ("success", true.to_value()),
-        ("stats", stats_map),
-    ])
-    .to_value())
+    Ok(
+        std::collections::HashMap::from([("success", true.to_value()), ("stats", stats_map)])
+            .to_value(),
+    )
 }
 
 /// Estimate memory usage in bytes (rough calculation)

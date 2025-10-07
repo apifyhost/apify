@@ -1,5 +1,5 @@
-use sdk::prelude::*;
 use regex::Regex;
+use sdk::prelude::*;
 use std::{collections::HashMap, path::Path};
 
 #[derive(Debug, Clone)]
@@ -1091,10 +1091,12 @@ mod tests {
             !result.is_valid,
             "Whitespace-only strings should fail minLength validation"
         );
-        assert!(result
-            .errors
-            .iter()
-            .any(|e| e.field.as_ref().map_or(false, |f| f == "name")));
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.field.as_ref().map_or(false, |f| f == "name"))
+        );
 
         // Test that pattern validation works generically
         let invalid_email = Value::json_to_value(
@@ -1111,9 +1113,11 @@ mod tests {
             !result.is_valid,
             "Invalid email pattern should fail validation"
         );
-        assert!(result
-            .errors
-            .iter()
-            .any(|e| e.field.as_ref().map_or(false, |f| f == "email")));
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.field.as_ref().map_or(false, |f| f == "email"))
+        );
     }
 }

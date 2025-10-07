@@ -1,6 +1,6 @@
-use sdk::prelude::*;
-use reqwest::header::{self, HeaderMap};
 use reqwest::Method;
+use reqwest::header::{self, HeaderMap};
+use sdk::prelude::*;
 
 pub struct Input {
     pub method: Method,

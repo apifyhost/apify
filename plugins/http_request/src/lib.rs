@@ -3,14 +3,14 @@ mod input;
 mod request;
 use config::Config;
 use input::Input;
-use sdk::prelude::*;
 use reqwest::Client;
+use sdk::prelude::*;
 use std::collections::HashMap;
 
 create_step!(http_request(setup));
 
 pub async fn http_request(
-    setup: pluginsetup,
+    setup: ModuleSetup,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let rx = module_channel!(setup);
     let config = Config::from(setup.with);

@@ -4,14 +4,14 @@ mod response;
 use std::sync::Arc;
 
 use input::Input;
-use sdk::prelude::*;
 use postgres::PostgresConfig;
 use response::QueryResult;
+use sdk::prelude::*;
 use tokio_postgres::types::ToSql;
 
 create_step!(postgres(setup));
 
-pub async fn postgres(setup: pluginsetup) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+pub async fn postgres(setup: ModuleSetup) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let rx = module_channel!(setup);
     let config = PostgresConfig::try_from(setup.with.clone())?;
     let pool = Arc::new(config.create_pool()?);

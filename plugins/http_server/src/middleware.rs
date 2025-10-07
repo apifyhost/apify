@@ -1,8 +1,8 @@
-use crate::{settings::AuthorizationSpanMode, router::Router, openapi::OpenAPIValidator};
-use hyper::{body::Incoming, service::Service, Request};
+use crate::{openapi::OpenAPIValidator, router::Router, settings::AuthorizationSpanMode};
+use hyper::{Request, body::Incoming, service::Service};
 use sdk::{
     prelude::*,
-    tracing::{field, Dispatch, Level},
+    tracing::{Dispatch, Level, field},
 };
 
 use std::{future::Future, pin::Pin};

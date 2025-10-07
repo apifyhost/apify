@@ -111,7 +111,7 @@ macro_rules! create_step {
     };
 
     ($handler:ident(rx)) => {
-       #[unsafe(no_mangle)]
+        #[unsafe(no_mangle)]
         pub extern "C" fn plugin(setup: $crate::structs::ModuleSetup) {
             let dispatch = setup.dispatch.clone();
             $crate::tracing::dispatcher::with_default(&dispatch, || {

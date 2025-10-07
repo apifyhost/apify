@@ -10,7 +10,7 @@ use sdk::prelude::*;
 create_step!(jwt(setup));
 
 /// JWT module entry point
-pub async fn jwt(setup: pluginsetup) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+pub async fn jwt(setup: ModuleSetup) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let rx = module_channel!(setup);
 
     // Parse JWT configuration from 'with' parameters

@@ -2,14 +2,14 @@ mod consumer;
 mod produce;
 mod setup;
 use lapin::{Connection, ConnectionProperties};
-use sdk::prelude::*;
 use produce::producer;
+use sdk::prelude::*;
 use setup::Config;
 
 create_main!(start_server(setup));
 
 pub async fn start_server(
-    setup: pluginsetup,
+    setup: ModuleSetup,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     log::debug!("AMQP start_server called");
     let config = Config::try_from(&setup.with).map_err(|e| format!("{:?}", e))?;

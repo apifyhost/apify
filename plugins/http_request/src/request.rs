@@ -1,6 +1,6 @@
 use crate::input::Input;
+use reqwest::{Client, Method, header};
 use sdk::prelude::*;
-use reqwest::{header, Client, Method};
 use std::collections::HashMap;
 
 #[derive(Debug)]

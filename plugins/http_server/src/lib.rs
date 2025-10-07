@@ -8,8 +8,8 @@ mod setup;
 use hyper::{server::conn::http1, service::service_fn};
 use hyper_util::rt::TokioIo;
 use middleware::TracingMiddleware;
-use sdk::{prelude::*, tokio::net::TcpListener};
 use resolver::proxy;
+use sdk::{prelude::*, tokio::net::TcpListener};
 use settings::Settings;
 use setup::Config;
 use std::{net::SocketAddr, sync::Arc};
@@ -18,7 +18,7 @@ mod openapi_tests;
 create_main!(start_server(setup));
 
 pub async fn start_server(
-    setup: pluginsetup,
+    setup: ModuleSetup,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if !setup.is_main() {
         log::debug!("This module is not the main module, exiting");

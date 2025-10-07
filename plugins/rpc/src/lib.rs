@@ -11,7 +11,7 @@ use setup::Config;
 create_main!(start_rpc_module(setup));
 
 pub async fn start_rpc_module(
-    setup: pluginsetup,
+    setup: ModuleSetup,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let config = Config::try_from(&setup.with).map_err(|e| format!("{:?}", e))?;
 

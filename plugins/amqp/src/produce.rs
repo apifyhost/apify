@@ -1,8 +1,8 @@
+use lapin::BasicProperties;
 use lapin::options::BasicPublishOptions;
 use lapin::protocol::basic::AMQPProperties;
 use lapin::publisher_confirm::Confirmation;
 use lapin::types::{AMQPValue, ShortString};
-use lapin::BasicProperties;
 use sdk::prelude::*;
 
 use crate::setup::Config;

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use sdk::prelude::*;
-use tokio_postgres::{types::Type, Row};
+use tokio_postgres::{Row, types::Type};
 
 #[derive(Debug, Clone, ToValue)]
 pub struct QueryResult {

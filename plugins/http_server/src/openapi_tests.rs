@@ -196,9 +196,11 @@ mod tests {
             result.errors[0].error_type,
             ValidationErrorType::InvalidRequestBody
         );
-        assert!(result.errors[0]
-            .message
-            .contains("Request body is required"));
+        assert!(
+            result.errors[0]
+                .message
+                .contains("Request body is required")
+        );
     }
 
     #[test]
@@ -1126,9 +1128,11 @@ mod tests {
             result.errors[0].error_type,
             ValidationErrorType::MethodNotAllowed
         );
-        assert!(result.errors[0]
-            .message
-            .contains("Method DELETE not allowed"));
+        assert!(
+            result.errors[0]
+                .message
+                .contains("Method DELETE not allowed")
+        );
     }
 
     #[test]

@@ -13,7 +13,9 @@ pub struct CorsConfig {
 impl From<Value> for CorsConfig {
     fn from(value: Value) -> Self {
         let origins = if let Some(origins) = value.get("origins").and_then(|v| v.as_array()) {
-            let parsed_origins: Vec<String> = origins.values.iter()
+            let parsed_origins: Vec<String> = origins
+                .values
+                .iter()
                 .map(|v| v.to_string())
                 .filter(|s| !s.is_empty())
                 .collect();
@@ -27,41 +29,67 @@ impl From<Value> for CorsConfig {
         };
 
         let methods = if let Some(methods) = value.get("methods").and_then(|v| v.as_array()) {
-            let parsed_methods: Vec<String> = methods.values.iter()
+            let parsed_methods: Vec<String> = methods
+                .values
+                .iter()
                 .map(|v| v.to_string().to_uppercase())
                 .filter(|s| !s.is_empty())
                 .collect();
             if !parsed_methods.is_empty() {
                 parsed_methods
             } else {
-                vec!["GET".to_string(), "POST".to_string(), "PUT".to_string(), 
-                     "PATCH".to_string(), "DELETE".to_string(), "OPTIONS".to_string()]
+                vec![
+                    "GET".to_string(),
+                    "POST".to_string(),
+                    "PUT".to_string(),
+                    "PATCH".to_string(),
+                    "DELETE".to_string(),
+                    "OPTIONS".to_string(),
+                ]
             }
         } else {
-            vec!["GET".to_string(), "POST".to_string(), "PUT".to_string(), 
-                 "PATCH".to_string(), "DELETE".to_string(), "OPTIONS".to_string()]
+            vec![
+                "GET".to_string(),
+                "POST".to_string(),
+                "PUT".to_string(),
+                "PATCH".to_string(),
+                "DELETE".to_string(),
+                "OPTIONS".to_string(),
+            ]
         };
 
         let headers = if let Some(headers) = value.get("headers").and_then(|v| v.as_array()) {
-            let parsed_headers: Vec<String> = headers.values.iter()
+            let parsed_headers: Vec<String> = headers
+                .values
+                .iter()
                 .map(|v| v.to_string())
                 .filter(|s| !s.is_empty())
                 .collect();
             if !parsed_headers.is_empty() {
                 parsed_headers
             } else {
-                vec!["Content-Type".to_string(), "Authorization".to_string(), "X-Requested-With".to_string()]
+                vec![
+                    "Content-Type".to_string(),
+                    "Authorization".to_string(),
+                    "X-Requested-With".to_string(),
+                ]
             }
         } else {
-            vec!["Content-Type".to_string(), "Authorization".to_string(), "X-Requested-With".to_string()]
+            vec![
+                "Content-Type".to_string(),
+                "Authorization".to_string(),
+                "X-Requested-With".to_string(),
+            ]
         };
 
-        let credentials = value.get("credentials")
+        let credentials = value
+            .get("credentials")
             .and_then(|v| v.as_bool())
             .map(|b| *b)
             .unwrap_or(true);
 
-        let max_age = value.get("max_age")
+        let max_age = value
+            .get("max_age")
             .and_then(|v| v.to_u64())
             .unwrap_or(86400) as u32;
 
@@ -127,10 +155,15 @@ impl From<Value> for Config {
         }
 
         // Load CORS configuration only if present
-        let cors = value.get("cors").map(|cors_value| {
-            CorsConfig::from(cors_value.clone())
-        });
+        let cors = value
+            .get("cors")
+            .map(|cors_value| CorsConfig::from(cors_value.clone()));
 
-        Config { port, host, router, cors }
+        Config {
+            port,
+            host,
+            router,
+            cors,
+        }
     }
 }
