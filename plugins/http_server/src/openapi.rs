@@ -450,8 +450,8 @@ impl OpenAPIValidator {
             }
         }) {
             // Parse the reference path (e.g., "#/components/schemas/NewUser")
-            if ref_str.starts_with("#/") {
-                let path_parts: Vec<&str> = ref_str[2..].split('/').collect();
+            if let Some(stripped) = ref_str.strip_prefix("#/") {
+                let path_parts: Vec<&str> = stripped.split('/').collect();
 
                 // Navigate through the spec to find the referenced schema
                 let mut current = &Value::Object(self.spec.clone());
@@ -945,7 +945,7 @@ impl OpenAPIValidator {
     fn validate_query_parameters(
         &self,
         _query_params: &HashMap<String, String>,
-        _errors: &mut Vec<ValidationError>,
+        _errors: &mut [ValidationError],
     ) {
         // Basic query parameter validation
         // In a full implementation, we would validate against the OpenAPI parameter definitions

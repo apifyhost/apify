@@ -4,6 +4,7 @@ use sdk::prelude::*;
 use std::collections::HashMap;
 
 #[derive(Debug)]
+#[allow(clippy::enum_variant_names)]
 pub enum Error {
     RequestError(reqwest::Error),
     HeaderError(header::InvalidHeaderName),
