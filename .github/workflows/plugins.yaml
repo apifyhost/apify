@@ -30,7 +30,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run plugins script
-        run: ./scripts/build-plugins.sh
+        run: ./shell/build-plugins.sh
 
       - name: Upload Mac plugins
         uses: actions/upload-artifact@v4
@@ -57,7 +57,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Run plugins script
-        run: TARGET=x86_64-unknown-linux-gnu ./scripts/plugins.sh
+        run: TARGET=x86_64-unknown-linux-gnu ./shell/build-plugins.sh
 
       - name: Upload Linux amd64 plugins
         uses: actions/upload-artifact@v4
@@ -84,7 +84,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Run plugins script
-        run: TARGET=aarch64-unknown-linux-gnu ./scripts/plugins.sh
+        run: TARGET=aarch64-unknown-linux-gnu ./shell/build-plugins.sh
 
       - name: Upload Linux aarch64 plugins
         uses: actions/upload-artifact@v4
