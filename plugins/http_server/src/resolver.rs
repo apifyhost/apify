@@ -11,7 +11,7 @@ use std::{collections::HashMap, convert::Infallible};
 macro_rules! to_span_format {
     ($target:expr, $key:expr) => {{
         let key = $key.as_str().to_lowercase();
-        format!($target, key).as_str()
+        format!($target, key)
     }};
 }
 
@@ -52,7 +52,7 @@ pub async fn proxy(
         cors_response.headers.iter().for_each(|(key, value)| {
             context
                 .span
-                .record(to_span_format!("http.response.header.{}", key), value);
+                .record(&*to_span_format!("http.response.header.{}", key), value);
         });
 
         return Ok(cors_response.build());
@@ -209,7 +209,7 @@ pub async fn proxy(
         error_handler.headers.iter().for_each(|(key, value)| {
             context
                 .span
-                .record(to_span_format!("http.response.header.{}", key), value);
+                .record(&*to_span_format!("http.response.header.{}", key), value);
         });
 
         return Ok(error_handler.build());
@@ -238,7 +238,7 @@ pub async fn proxy(
 
     let data = data_map.to_value();
 
-    let response_value = sender_plugin!(
+    let response_value = sender_package!(
         context.span.clone(),
         context.dispatch.clone(),
         context.id,
@@ -269,7 +269,7 @@ pub async fn proxy(
     response.headers.iter().for_each(|(key, value)| {
         context
             .span
-            .record(to_span_format!("http.response.header.{}", key), value);
+            .record(&*to_span_format!("http.response.header.{}", key), value);
     });
 
     Ok(response.build())
@@ -345,7 +345,7 @@ async fn resolve_headers(
                     let authorization = resolve_authorization(val_str, authorization_span_mode);
                     span.record("http.request.header.authorization", authorization);
                 } else {
-                    span.record(to_span_format!("http.request.header.{}", key), val_str);
+                    span.record(&*to_span_format!("http.request.header.{}", key), val_str);
                 }
 
                 Some((key.as_str().to_string(), val_str.to_string()))
