@@ -47,7 +47,7 @@ where
     fn call(&self, mut req: Request<Incoming>) -> Self::Future {
         if req.method() == hyper::Method::GET && req.uri().path() == "/health" {
             let fut: <S as Service<Request<Incoming>>>::Future = self.inner.call(req);
-            return Box::pin(async move { fut.await });
+            return Box::pin(fut);
         }
 
         sdk::tracing::dispatcher::with_default(&self.dispatch.clone(), || {
@@ -142,7 +142,7 @@ where
 
             let fut: <S as Service<Request<Incoming>>>::Future = self.inner.call(req);
 
-            Box::pin(async move { fut.await })
+            Box::pin(fut)
         })
     }
 }

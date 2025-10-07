@@ -77,7 +77,7 @@ impl OpenAPIValidator {
             // For JSON input, apply backslash normalization if needed
             let target: String = target.to_string().replace("\\", "\\\\");
             let value = Value::json_to_value(&target)
-                .map_err(|e| format!("Failed to parse OpenAPI spec JSON: {:?}", e))?;
+                .map_err(|e| format!("Failed to parse OpenAPI spec JSON: {e:?}"))?;
             Ok((value, target))
         } else {
             // For YAML input, don't double-escape backslashes as YAML parser handles them correctly
@@ -91,7 +91,7 @@ impl OpenAPIValidator {
         content: &str,
         config: ValidationConfig,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        log::debug!("Loading OpenAPI spec from content: {}", content);
+        log::debug!("Loading OpenAPI spec from content: {content}");
         let (spec, spec_json) = Self::json_to_value(content)?;
 
         let route_patterns = Self::build_route_patterns_from_json(&spec_json)?;
@@ -331,7 +331,7 @@ impl OpenAPIValidator {
             path_params: HashMap::new(),
             errors: vec![ValidationError {
                 error_type: ValidationErrorType::RouteNotFound,
-                message: format!("Route not found: {}", path),
+                message: format!("Route not found: {path}"),
                 field: None,
             }],
             status_code: 404,
@@ -346,8 +346,7 @@ impl OpenAPIValidator {
             .and_then(|path_item| path_item.get(method.to_lowercase()))
             .and_then(|operation| operation.get("requestBody"))
             .and_then(|req_body| req_body.get("required"))
-            .and_then(|required| required.as_bool())
-            .map(|b| *b)
+            .and_then(|required| required.as_bool()).copied()
             .unwrap_or(false) // Default: body is not required
     }
 
@@ -461,7 +460,7 @@ impl OpenAPIValidator {
                         current = next;
                     } else {
                         // Reference not found, return original schema
-                        log::warn!("Schema reference '{}' not found", ref_str);
+                        log::warn!("Schema reference '{ref_str}' not found");
                         return schema.clone();
                     }
                 }
@@ -470,7 +469,7 @@ impl OpenAPIValidator {
                 current.clone()
             } else {
                 // External reference - not supported, return original
-                log::warn!("External schema reference '{}' not supported", ref_str);
+                log::warn!("External schema reference '{ref_str}' not supported");
                 schema.clone()
             }
         } else {
@@ -561,7 +560,7 @@ impl OpenAPIValidator {
                     // Field is missing and required
                     errors.push(ValidationError {
                         error_type: ValidationErrorType::MissingRequiredField,
-                        message: format!("Missing required field: {}", prop_name),
+                        message: format!("Missing required field: {prop_name}"),
                         field: Some(prop_name.to_string()),
                     });
                 }
@@ -576,8 +575,7 @@ impl OpenAPIValidator {
                         errors.push(ValidationError {
                             error_type: ValidationErrorType::InvalidFieldValue,
                             message: format!(
-                                "Additional property '{}' is not allowed",
-                                field_name_str
+                                "Additional property '{field_name_str}' is not allowed"
                             ),
                             field: Some(field_name_str),
                         });
@@ -598,7 +596,7 @@ impl OpenAPIValidator {
         let Value::String(string_val) = value else {
             errors.push(ValidationError {
                 error_type: ValidationErrorType::InvalidFieldType,
-                message: format!("Field '{}' must be a string", field_name),
+                message: format!("Field '{field_name}' must be a string"),
                 field: Some(field_name.to_string()),
             });
             return;
@@ -622,13 +620,11 @@ impl OpenAPIValidator {
             if effective_length < min_len as usize {
                 let message = if min_len > 0 && str_val.trim().is_empty() {
                     format!(
-                        "Field '{}' cannot be empty or contain only whitespace",
-                        field_name
+                        "Field '{field_name}' cannot be empty or contain only whitespace"
                     )
                 } else {
                     format!(
-                        "Field '{}' must be at least {} characters long",
-                        field_name, min_len
+                        "Field '{field_name}' must be at least {min_len} characters long"
                     )
                 };
                 errors.push(ValidationError {
@@ -649,8 +645,7 @@ impl OpenAPIValidator {
                 errors.push(ValidationError {
                     error_type: ValidationErrorType::InvalidFieldValue,
                     message: format!(
-                        "Field '{}' must be at most {} characters long",
-                        field_name, max_len
+                        "Field '{field_name}' must be at most {max_len} characters long"
                     ),
                     field: Some(field_name.to_string()),
                 });
@@ -678,26 +673,19 @@ impl OpenAPIValidator {
             }
 
             log::debug!(
-                "Pattern before unescaping: '{}', after: '{}'",
-                pattern,
-                unescaped_pattern
+                "Pattern before unescaping: '{pattern}', after: '{unescaped_pattern}'"
             );
 
             match Regex::new(&unescaped_pattern) {
                 Ok(regex) => {
                     log::debug!(
-                        "Validating field '{}' with value '{}' against pattern '{}'",
-                        field_name,
-                        str_val,
-                        unescaped_pattern
+                        "Validating field '{field_name}' with value '{str_val}' against pattern '{unescaped_pattern}'"
                     );
                     if !regex.is_match(str_val) {
                         log::debug!(
-                            "Pattern match failed for '{}' with pattern '{}'",
-                            str_val,
-                            unescaped_pattern
+                            "Pattern match failed for '{str_val}' with pattern '{unescaped_pattern}'"
                         );
-                        let message = format!("Field '{}' format is invalid", field_name);
+                        let message = format!("Field '{field_name}' format is invalid");
                         errors.push(ValidationError {
                             error_type: ValidationErrorType::InvalidFieldValue,
                             message,
@@ -705,23 +693,18 @@ impl OpenAPIValidator {
                         });
                     } else {
                         log::debug!(
-                            "Pattern match successful for '{}' with pattern '{}'",
-                            str_val,
-                            unescaped_pattern
+                            "Pattern match successful for '{str_val}' with pattern '{unescaped_pattern}'"
                         );
                     }
                 }
                 Err(regex_err) => {
                     // If regex is invalid, log the error and treat as validation failure
                     log::warn!(
-                        "Invalid regex pattern '{}' for field '{}': {}",
-                        pattern,
-                        field_name,
-                        regex_err
+                        "Invalid regex pattern '{pattern}' for field '{field_name}': {regex_err}"
                     );
                     errors.push(ValidationError {
                         error_type: ValidationErrorType::InvalidFieldValue,
-                        message: format!("Field '{}' has invalid validation pattern", field_name),
+                        message: format!("Field '{field_name}' has invalid validation pattern"),
                         field: Some(field_name.to_string()),
                     });
                 }
@@ -741,16 +724,16 @@ impl OpenAPIValidator {
         let Value::Number(number) = value else {
             errors.push(ValidationError {
                 error_type: ValidationErrorType::InvalidFieldType,
-                message: format!("Field '{}' must be a number", field_name),
+                message: format!("Field '{field_name}' must be a number"),
                 field: Some(field_name.to_string()),
             });
             return;
         };
 
         // Check if schema specifies integer type and value is not an integer
-        if let Some(type_str) = schema.get("type").and_then(|t| match t {
-            Value::String(s) => Some(s.as_str().to_string()),
-            _ => Some(t.to_string()),
+        if let Some(type_str) = schema.get("type").map(|t| match t {
+            Value::String(s) => s.as_str().to_string(),
+            _ => t.to_string(),
         }) {
             if type_str == "integer" {
                 // For integer type, check if the number is actually an integer
@@ -758,12 +741,11 @@ impl OpenAPIValidator {
                     Some(val) => val,
                     None => {
                         log::warn!(
-                            "Failed to convert number value for field '{}' to f64",
-                            field_name
+                            "Failed to convert number value for field '{field_name}' to f64"
                         );
                         errors.push(ValidationError {
                             error_type: ValidationErrorType::InvalidFieldValue,
-                            message: format!("Field '{}' has invalid numeric value", field_name),
+                            message: format!("Field '{field_name}' has invalid numeric value"),
                             field: Some(field_name.to_string()),
                         });
                         return;
@@ -775,8 +757,7 @@ impl OpenAPIValidator {
                     errors.push(ValidationError {
                         error_type: ValidationErrorType::InvalidFieldType,
                         message: format!(
-                            "Field '{}' must be an integer (no decimal places)",
-                            field_name
+                            "Field '{field_name}' must be an integer (no decimal places)"
                         ),
                         field: Some(field_name.to_string()),
                     });
@@ -791,12 +772,11 @@ impl OpenAPIValidator {
             None => {
                 // If conversion fails, log and return error
                 log::warn!(
-                    "Failed to convert number value for field '{}' to f64",
-                    field_name
+                    "Failed to convert number value for field '{field_name}' to f64"
                 );
                 errors.push(ValidationError {
                     error_type: ValidationErrorType::InvalidFieldValue,
-                    message: format!("Field '{}' has invalid numeric value", field_name),
+                    message: format!("Field '{field_name}' has invalid numeric value"),
                     field: Some(field_name.to_string()),
                 });
                 return;
@@ -810,7 +790,7 @@ impl OpenAPIValidator {
                     if num_val < min {
                         errors.push(ValidationError {
                             error_type: ValidationErrorType::InvalidFieldValue,
-                            message: format!("Field '{}' must be at least {}", field_name, min),
+                            message: format!("Field '{field_name}' must be at least {min}"),
                             field: Some(field_name.to_string()),
                         });
                     }
@@ -825,7 +805,7 @@ impl OpenAPIValidator {
                     if num_val > max {
                         errors.push(ValidationError {
                             error_type: ValidationErrorType::InvalidFieldValue,
-                            message: format!("Field '{}' must be at most {}", field_name, max),
+                            message: format!("Field '{field_name}' must be at most {max}"),
                             field: Some(field_name.to_string()),
                         });
                     }
@@ -849,7 +829,7 @@ impl OpenAPIValidator {
             _ => {
                 errors.push(ValidationError {
                     error_type: ValidationErrorType::InvalidFieldType,
-                    message: format!("Field '{}' must be a boolean", field_name),
+                    message: format!("Field '{field_name}' must be a boolean"),
                     field: Some(field_name.to_string()),
                 });
             }
@@ -867,7 +847,7 @@ impl OpenAPIValidator {
         let Value::Array(arr) = value else {
             errors.push(ValidationError {
                 error_type: ValidationErrorType::InvalidFieldType,
-                message: format!("Field '{}' must be an array", field_name),
+                message: format!("Field '{field_name}' must be an array"),
                 field: Some(field_name.to_string()),
             });
             return;
@@ -890,10 +870,9 @@ impl OpenAPIValidator {
                                 errors.push(ValidationError {
                                     error_type: ValidationErrorType::InvalidFieldType,
                                     message: format!(
-                                        "Array item at index {} must be a string",
-                                        index
+                                        "Array item at index {index} must be a string"
                                     ),
-                                    field: Some(format!("{}[{}]", field_name, index)),
+                                    field: Some(format!("{field_name}[{index}]")),
                                 });
                             }
                         }
@@ -902,10 +881,9 @@ impl OpenAPIValidator {
                                 errors.push(ValidationError {
                                     error_type: ValidationErrorType::InvalidFieldType,
                                     message: format!(
-                                        "Array item at index {} must be a number",
-                                        index
+                                        "Array item at index {index} must be a number"
                                     ),
-                                    field: Some(format!("{}[{}]", field_name, index)),
+                                    field: Some(format!("{field_name}[{index}]")),
                                 });
                             }
                         }
@@ -914,10 +892,9 @@ impl OpenAPIValidator {
                                 errors.push(ValidationError {
                                     error_type: ValidationErrorType::InvalidFieldType,
                                     message: format!(
-                                        "Array item at index {} must be a boolean",
-                                        index
+                                        "Array item at index {index} must be a boolean"
                                     ),
-                                    field: Some(format!("{}[{}]", field_name, index)),
+                                    field: Some(format!("{field_name}[{index}]")),
                                 });
                             }
                         }
@@ -939,8 +916,7 @@ impl OpenAPIValidator {
                 errors.push(ValidationError {
                     error_type: ValidationErrorType::InvalidFieldValue,
                     message: format!(
-                        "Field '{}' must have at least {} items",
-                        field_name, min_items
+                        "Field '{field_name}' must have at least {min_items} items"
                     ),
                     field: Some(field_name.to_string()),
                 });
@@ -957,8 +933,7 @@ impl OpenAPIValidator {
                 errors.push(ValidationError {
                     error_type: ValidationErrorType::InvalidFieldValue,
                     message: format!(
-                        "Field '{}' must have at most {} items",
-                        field_name, max_items
+                        "Field '{field_name}' must have at most {max_items} items"
                     ),
                     field: Some(field_name.to_string()),
                 });
@@ -1095,7 +1070,7 @@ mod tests {
             result
                 .errors
                 .iter()
-                .any(|e| e.field.as_ref().map_or(false, |f| f == "name"))
+                .any(|e| e.field.as_ref().is_some_and(|f| f == "name"))
         );
 
         // Test that pattern validation works generically
@@ -1117,7 +1092,7 @@ mod tests {
             result
                 .errors
                 .iter()
-                .any(|e| e.field.as_ref().map_or(false, |f| f == "email"))
+                .any(|e| e.field.as_ref().is_some_and(|f| f == "email"))
         );
     }
 }

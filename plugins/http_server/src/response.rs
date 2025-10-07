@@ -25,7 +25,7 @@ impl ResponseHandler {
         match response_builder.body(Full::new(Bytes::from(self.body.clone()))) {
             Ok(response) => response,
             Err(e) => {
-                log::error!("Error creating response: {:?}", e);
+                log::error!("Error creating response: {e:?}");
                 Response::builder()
                     .status(500)
                     .body(Full::new(Bytes::from(
@@ -59,8 +59,7 @@ impl ResponseHandler {
             }
         } else {
             cors_config
-                .origins
-                .get(0)
+                .origins.first()
                 .unwrap_or(&"*".to_string())
                 .clone()
         };

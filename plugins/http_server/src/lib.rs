@@ -25,7 +25,7 @@ pub async fn start_server(
         match setup.setup_sender.send(None) {
             Ok(_) => {}
             Err(e) => {
-                return Err(format!("{:?}", e).into());
+                return Err(format!("{e:?}").into());
             }
         };
         return Ok(());
@@ -37,7 +37,7 @@ pub async fn start_server(
         match setup.setup_sender.send(None) {
             Ok(_) => {}
             Err(e) => {
-                return Err(format!("{:?}", e).into());
+                return Err(format!("{e:?}").into());
             }
         };
         return Ok(());
@@ -94,7 +94,7 @@ pub async fn start_server(
                 .serve_connection(io, middleware)
                 .await
             {
-                log::debug!("Error serving connection: {}", e);
+                log::debug!("Error serving connection: {e}");
             }
         });
     }

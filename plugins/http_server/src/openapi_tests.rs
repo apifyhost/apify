@@ -332,8 +332,7 @@ mod tests {
 
             assert!(
                 !result.is_valid,
-                "Email '{}' should be invalid but was accepted",
-                email
+                "Email '{email}' should be invalid but was accepted"
             );
             assert_eq!(result.status_code, 400);
 
@@ -376,8 +375,7 @@ mod tests {
 
             assert!(
                 !result.is_valid,
-                "PUT: Email '{}' should be invalid but was accepted",
-                email
+                "PUT: Email '{email}' should be invalid but was accepted"
             );
             assert_eq!(result.status_code, 400);
 
@@ -416,8 +414,7 @@ mod tests {
 
             assert!(
                 !result.is_valid,
-                "PATCH: Email '{}' should be invalid but was accepted",
-                email
+                "PATCH: Email '{email}' should be invalid but was accepted"
             );
             assert_eq!(result.status_code, 400);
 

@@ -84,8 +84,7 @@ impl From<Value> for CorsConfig {
 
         let credentials = value
             .get("credentials")
-            .and_then(|v| v.as_bool())
-            .map(|b| *b)
+            .and_then(|v| v.as_bool()).copied()
             .unwrap_or(true);
 
         let max_age = value
@@ -148,7 +147,7 @@ impl From<Value> for Config {
 
         // Try to load OpenAPI validator
         if let Ok(Some(validator)) = OpenAPIValidator::from_value(value.clone()).map_err(|e| {
-            log::error!("Failed to load OpenAPI validator: {:?}", e);
+            log::error!("Failed to load OpenAPI validator: {e:?}");
         }) {
             router.openapi_validator = Some(validator);
             log::info!("OpenAPI validator loaded successfully");

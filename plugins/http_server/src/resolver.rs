@@ -134,11 +134,10 @@ pub async fn proxy(
 
             if !is_accepted_content_type {
                 let accepted_types_str = accepted_content_types.join(", ");
-                let error_message = format!("Content-Type must be one of: {}", accepted_types_str);
+                let error_message = format!("Content-Type must be one of: {accepted_types_str}");
 
                 let error_response_json = format!(
-                    r#"{{"error":"Validation failed","details":[{{"type":"InvalidRequestBody","message":"{}","field":"content-type"}}]}}"#,
-                    error_message
+                    r#"{{"error":"Validation failed","details":[{{"type":"InvalidRequestBody","message":"{error_message}","field":"content-type"}}]}}"#
                 );
                 let error_body_size = error_response_json.len();
 
@@ -171,7 +170,7 @@ pub async fn proxy(
 
     context
         .span
-        .record("otel.name", format!("{} {}", method, path));
+        .record("otel.name", format!("{method} {path}"));
     context.span.record("http.request.body.size", body_size);
     context.span.record("http.request.size", request_size);
     context.span.record("http.request.method", &method);
@@ -293,12 +292,14 @@ async fn resolve_body(req: Request<hyper::body::Incoming>) -> Value {
     let body_bytes: Bytes = match req.into_body().collect().await {
         Ok(full_body) => full_body.to_bytes(),
         Err(e) => {
-            log::debug!("Error reading request body: {:?}", e);
+            log::debug!("Error reading request body: {e:?}");
             Bytes::new()
         }
     };
 
-    let body = match std::str::from_utf8(&body_bytes) {
+    
+
+    match std::str::from_utf8(&body_bytes) {
         Ok(s) => {
             let s = s.trim().to_string();
             if s.starts_with('{') || s.starts_with('[') {
@@ -308,12 +309,10 @@ async fn resolve_body(req: Request<hyper::body::Incoming>) -> Value {
             }
         }
         Err(e) => {
-            log::debug!("Error parsing request body: {:?}", e);
+            log::debug!("Error parsing request body: {e:?}");
             Value::Undefined
         }
-    };
-
-    body
+    }
 }
 
 fn resolve_authorization(authorization: &str, mode: &AuthorizationSpanMode) -> String {
@@ -351,7 +350,7 @@ async fn resolve_headers(
                 Some((key.as_str().to_string(), val_str.to_string()))
             }
             Err(e) => {
-                log::debug!("Header value is not a valid UTF-8 string: {:?}", e);
+                log::debug!("Header value is not a valid UTF-8 string: {e:?}");
                 None
             }
         })
