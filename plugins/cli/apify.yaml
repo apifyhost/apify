@@ -1,7 +1,6 @@
 name: cli
 description: "Command line interface for APIFY"
 version: 0.0.1
-author: Philippe Assis <codephilippe@gmail.com>
 repository: https://github.com/apifyhost/apify
 license: MIT
 type: main

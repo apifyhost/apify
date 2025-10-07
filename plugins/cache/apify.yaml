@@ -52,7 +52,6 @@ description: |
   ```
 
 version: 0.1.0
-author: Philippe Assis <codephilippe@gmail.com>
 repository: https://github.com/apifyhost/apify
 license: MIT
 type: step
