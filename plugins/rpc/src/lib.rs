@@ -55,14 +55,14 @@ async fn handle_rpc_client(
 
     log::debug!("RPC client handler started");
 
-    for package in rx {
-        log::debug!("Received RPC client request: {:?}", package);
+    for plugin in rx {
+        log::debug!("Received RPC client request: {:?}", plugin);
 
         let config = config.clone();
         let client = RpcClient::new(config);
 
         tokio::task::spawn(async move {
-            let result = match package.input {
+            let result = match plugin.input {
                 Some(input) => match input.get("action") {
                     Some(Value::String(action)) => match action.as_str() {
                         "health" => client.health_check().await,
@@ -81,14 +81,14 @@ async fn handle_rpc_client(
             match result {
                 Ok(response) => {
                     log::debug!("RPC client response: {:?}", response);
-                    sender_safe!(package.sender, response.into());
+                    sender_safe!(plugin.sender, response.into());
                 }
                 Err(e) => {
                     log::error!("RPC client error: {}", e);
                     let error_response =
                         format!("{{\"error\": \"{}\", \"success\": false}}", e.to_string())
                             .to_value();
-                    sender_safe!(package.sender, error_response.into());
+                    sender_safe!(plugin.sender, error_response.into());
                 }
             }
         });

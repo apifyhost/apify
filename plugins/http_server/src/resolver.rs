@@ -238,7 +238,7 @@ pub async fn proxy(
 
     let data = data_map.to_value();
 
-    let response_value = sender_package!(
+    let response_value = sender_plugin!(
         context.span.clone(),
         context.dispatch.clone(),
         context.id,

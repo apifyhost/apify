@@ -74,14 +74,14 @@ pub async fn producer(
     };
     let conn = lapin::Connection::connect(&uri, lapin::ConnectionProperties::default()).await?;
 
-    for package in rx {
-        log::debug!("Received package");
+    for plugin in rx {
+        log::debug!("Received plugin: {:?}", plugin);
 
-        let input = match package.input {
+        let input = match plugin.input {
             Some(input) => Input::from(&input),
             None => {
                 let response = ProducerResponse::from_error("No input provided");
-                let _ = package.sender.send(response.to_value().into());
+                let _ = plugin.sender.send(response.to_value().into());
                 continue;
             }
         };
@@ -102,7 +102,7 @@ pub async fn producer(
                 Err(e) => {
                     let response =
                         ProducerResponse::from_error(&format!("Failed to recreate channel: {}", e));
-                    let _ = package.sender.send(response.to_value().into());
+                    let _ = plugin.sender.send(response.to_value().into());
                     continue;
                 }
             }
@@ -124,13 +124,13 @@ pub async fn producer(
                 Err(e) => {
                     let response =
                         ProducerResponse::from_error(&format!("Publish confirmation error: {}", e));
-                    let _ = package.sender.send(response.to_value().into());
+                    let _ = plugin.sender.send(response.to_value().into());
                     continue;
                 }
             },
             Err(e) => {
                 let response = ProducerResponse::from_error(&format!("Publish error: {}", e));
-                let _ = package.sender.send(response.to_value().into());
+                let _ = plugin.sender.send(response.to_value().into());
                 continue;
             }
         };
@@ -153,7 +153,7 @@ pub async fn producer(
             }
         };
 
-        let _ = package.sender.send(
+        let _ = plugin.sender.send(
             ProducerResponse {
                 success,
                 error_message,

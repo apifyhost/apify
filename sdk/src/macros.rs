@@ -1,18 +1,18 @@
 #[macro_export]
 macro_rules! listen {
     ($rx:expr, $resolve:expr) => {{
-        for package in $rx {
+        for plugin in $rx {
             $crate::tokio::spawn(async move {
-                $resolve(package).await;
+                $resolve(plugin).await;
             });
         }
     }};
     ($rx:expr, $resolve:expr, $( $arg:ident ),+ $(,)? ) => {{
-        for package in $rx {
+        for plugin in $rx {
             $( let $arg = $arg.clone(); )+
 
             $crate::tokio::spawn(async move {
-                $resolve(package, $( $arg ),+ ).await;
+                $resolve(plugin, $( $arg ),+ ).await;
             });
         }
     }};
@@ -48,11 +48,11 @@ macro_rules! sender_safe {
 }
 
 #[macro_export]
-macro_rules! sender_package {
+macro_rules! sender_plugin {
     ($id:expr, $sender:expr, $data:expr) => {{
         let (tx, rx) = $crate::tokio::sync::oneshot::channel::<$crate::valu3::value::Value>();
 
-        let package = $crate::structs::Package {
+        let plugin = $crate::structs::Plugin {
             response: Some(tx),
             request_data: $data,
             origin: $id,
@@ -60,14 +60,14 @@ macro_rules! sender_package {
             dispatch: None,
         };
 
-        sender_safe!($sender, package);
+        sender_safe!($sender, plugin);
 
         rx
     }};
     ($span:expr, $dispatch:expr, $id:expr, $sender:expr, $data:expr) => {{
         let (tx, rx) = $crate::tokio::sync::oneshot::channel::<$crate::valu3::value::Value>();
 
-        let package = $crate::structs::Package {
+        let plugin = $crate::structs::Plugin {
             response: Some(tx),
             request_data: $data,
             origin: $id,
@@ -75,7 +75,7 @@ macro_rules! sender_package {
             dispatch: Some($dispatch),
         };
 
-        sender_safe!($sender, package);
+        sender_safe!($sender, plugin);
 
         rx
     }};

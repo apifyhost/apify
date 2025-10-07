@@ -3,9 +3,9 @@ use sdk::prelude::*;
 create_step!(echo(rx));
 
 pub async fn echo(rx: ModuleReceiver) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    listen!(rx, move |package: ModulePackage| async {
-        let input = package.input().unwrap_or(Value::Null);
-        sender_safe!(package.sender, input.into());
+    listen!(rx, move |plugin: ModulePackage| async {
+        let input = plugin.input().unwrap_or(Value::Null);
+        sender_safe!(plugin.sender, input.into());
     });
 
     Ok(())
@@ -24,14 +24,14 @@ mod tests {
         let (result_tx, result_rx) = oneshot::channel();
 
         // Criar pacote com input string
-        let package = ModulePackage {
+        let plugin = ModulePackage {
             input: Some(Value::from("test message")),
             payload: None,
             sender: result_tx,
         };
 
         // Enviar pacote
-        tx.send(package).unwrap();
+        tx.send(plugin).unwrap();
         drop(tx);
 
         // Executar echo em background
@@ -53,14 +53,14 @@ mod tests {
         let (result_tx, result_rx) = oneshot::channel();
 
         // Criar pacote sem input
-        let package = ModulePackage {
+        let plugin = ModulePackage {
             input: None,
             payload: None,
             sender: result_tx,
         };
 
         // Enviar pacote
-        tx.send(package).unwrap();
+        tx.send(plugin).unwrap();
         drop(tx);
 
         // Executar echo em background
@@ -84,14 +84,14 @@ mod tests {
         let input = Value::from(vec!["item1", "item2", "item3"]);
 
         // Criar pacote com input array
-        let package = ModulePackage {
+        let plugin = ModulePackage {
             input: Some(input.clone()),
             payload: None,
             sender: result_tx,
         };
 
         // Enviar pacote
-        tx.send(package).unwrap();
+        tx.send(plugin).unwrap();
         drop(tx);
 
         // Executar echo em background

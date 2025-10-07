@@ -8,7 +8,7 @@ pub mod envs;
 pub struct Settings {
     pub script_main_absolute_path: String,
     pub only_download_modules: bool,
-    pub package_path: Option<String>,
+    pub plugin_path: Option<String>,
     pub no_run: bool,
     pub download: bool,
     pub print_yaml: bool,
@@ -17,14 +17,14 @@ pub struct Settings {
     pub var_main: Option<String>,
 
     // envs
-    pub package_consumer_count: i32,
+    pub plugin_consumer_count: i32,
     #[cfg(target_env = "gnu")]
     pub min_allocated_memory: usize,
     #[cfg(target_env = "gnu")]
     pub garbage_collection: bool,
     #[cfg(target_env = "gnu")]
     pub garbage_collection_interval: u64,
-    pub default_package_repository_url: String,
+    pub default_plugin_repository_url: String,
 }
 
 impl Settings {
@@ -48,16 +48,16 @@ impl Settings {
         let settings = Self {
             script_main_absolute_path,
             only_download_modules: cli.only_download_modules,
-            package_path: cli.package_path,
+            plugin_path: cli.plugin_path,
             no_run: cli.no_run,
-            package_consumer_count: envs.package_consumer_count,
+            plugin_consumer_count: envs.plugin_consumer_count,
             #[cfg(target_env = "gnu")]
             min_allocated_memory: envs.min_allocated_memory,
             #[cfg(target_env = "gnu")]
             garbage_collection: envs.garbage_collection,
             #[cfg(target_env = "gnu")]
             garbage_collection_interval: envs.garbage_collection_interval,
-            default_package_repository_url: envs.default_package_repository_url,
+            default_plugin_repository_url: envs.default_plugin_repository_url,
             download: cli.download,
             print_yaml: cli.print_yaml,
             test: cli.test,

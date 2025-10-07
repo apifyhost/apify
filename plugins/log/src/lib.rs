@@ -38,8 +38,8 @@ impl From<&Value> for Log {
 pub async fn log(rx: ModuleReceiver) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     log::debug!("Log module started, waiting for messages");
 
-    listen!(rx, move |package: ModulePackage| async {
-        let value = package.input().unwrap_or(Value::Null);
+    listen!(rx, move |plugin: ModulePackage| async {
+        let value = plugin.input().unwrap_or(Value::Null);
         log::debug!("Log module received input: {:?}", value);
 
         let log_value = Log::from(&value);
@@ -52,8 +52,8 @@ pub async fn log(rx: ModuleReceiver) -> Result<(), Box<dyn std::error::Error + S
             LogLevel::Error => log::error!("{}", log_value.message),
         }
 
-        let payload = package.payload().unwrap_or(Value::Null);
-        sender_safe!(package.sender, payload.into());
+        let payload = plugin.payload().unwrap_or(Value::Null);
+        sender_safe!(plugin.sender, payload.into());
     });
 
     Ok(())

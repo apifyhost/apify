@@ -18,18 +18,18 @@ pub async fn postgres(setup: pluginsetup) -> Result<(), Box<dyn std::error::Erro
 
     let mut handles = Vec::new();
 
-    for package in rx {
+    for plugin in rx {
         let pool = pool.clone();
         let config = config.clone();
 
         let handle = tokio::spawn(async move {
-            let input = match Input::try_from((package.input, &config)) {
+            let input = match Input::try_from((plugin.input, &config)) {
                 Ok(input) => input,
                 Err(e) => {
                     let response =
                         ModuleResponse::from_error(format!("Failed to parse input: {}", e));
 
-                    sender_safe!(package.sender, response.into());
+                    sender_safe!(plugin.sender, response.into());
                     return;
                 }
             };
@@ -42,7 +42,7 @@ pub async fn postgres(setup: pluginsetup) -> Result<(), Box<dyn std::error::Erro
                         e
                     ));
 
-                    sender_safe!(package.sender, response.into());
+                    sender_safe!(plugin.sender, response.into());
                     return;
                 }
             };
@@ -57,7 +57,7 @@ pub async fn postgres(setup: pluginsetup) -> Result<(), Box<dyn std::error::Erro
                                 e
                             ));
 
-                            sender_safe!(package.sender, response.into());
+                            sender_safe!(plugin.sender, response.into());
                             return;
                         }
                     }
@@ -70,7 +70,7 @@ pub async fn postgres(setup: pluginsetup) -> Result<(), Box<dyn std::error::Erro
                                 e
                             ));
 
-                            sender_safe!(package.sender, response.into());
+                            sender_safe!(plugin.sender, response.into());
                             return;
                         }
                     }
@@ -86,13 +86,13 @@ pub async fn postgres(setup: pluginsetup) -> Result<(), Box<dyn std::error::Erro
                     Ok(rows) => {
                         let result = QueryResult::from(rows);
 
-                        sender_safe!(package.sender, result.to_value().into());
+                        sender_safe!(plugin.sender, result.to_value().into());
                     }
                     Err(e) => {
                         let response =
                             ModuleResponse::from_error(format!("Query execution failed: {}", e));
 
-                        sender_safe!(package.sender, response.into());
+                        sender_safe!(plugin.sender, response.into());
                         return;
                     }
                 };
@@ -100,12 +100,12 @@ pub async fn postgres(setup: pluginsetup) -> Result<(), Box<dyn std::error::Erro
                 match client.batch_execute(&input.query).await {
                     Ok(_) => {
                         let response = "OK".to_value().into();
-                        sender_safe!(package.sender, response);
+                        sender_safe!(plugin.sender, response);
                     }
                     Err(e) => {
                         let response =
                             ModuleResponse::from_error(format!("Batch execution failed: {}", e));
-                        sender_safe!(package.sender, response.into());
+                        sender_safe!(plugin.sender, response.into());
                     }
                 }
             }

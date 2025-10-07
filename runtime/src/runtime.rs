@@ -7,7 +7,7 @@ use flow::phs::{Script, ScriptError, build_engine};
 use flow::{Context, Flow};
 use futures::future::join_all;
 use log::{debug, error, info};
-use sdk::structs::Package;
+use sdk::structs::Plugin;
 use sdk::tokio;
 use sdk::{
     prelude::Value,
@@ -45,7 +45,7 @@ impl Runtime {
         loader: Loader,
         dispatch: Dispatch,
         settings: Settings,
-        tx_main_package: channel::Sender<Package>,
+        tx_main_plugin: channel::Sender<Plugin>,
     ) -> Result<Modules, RuntimeError> {
         let mut modules = Modules::default();
         let engine = build_engine(None);
@@ -61,7 +61,7 @@ impl Runtime {
 
             // Se --var-main foi especificado, não permitir que módulos principais sejam executados
             let main_sender = if loader_main_id == id as i32 && settings.var_main.is_none() {
-                Some(tx_main_package.clone())
+                Some(tx_main_plugin.clone())
             } else {
                 None
             };
@@ -124,7 +124,7 @@ impl Runtime {
     }
 
     async fn listener(
-        rx_main_package: channel::Receiver<Package>,
+        rx_main_plugin: channel::Receiver<Plugin>,
         steps: Value,
         modules: Modules,
         settings: Settings,
@@ -142,22 +142,22 @@ impl Runtime {
         let mut handles = Vec::new();
         let default_context = default_context.clone();
 
-        for _i in 0..settings.package_consumer_count {
-            let rx_main_pkg = rx_main_package.clone();
+        for _i in 0..settings.plugin_consumer_count {
+            let rx_main_plugin = rx_main_plugin.clone();
             let flow = flow.clone();
             let default_context = default_context.clone();
 
             let handle = tokio::task::spawn_blocking(move || {
-                for mut main_package in rx_main_pkg {
+                for mut main_plugin in rx_main_plugin {
                     let flow = flow.clone();
-                    let parent = match main_package.span.clone() {
+                    let parent = match main_plugin.span.clone() {
                         Some(span) => span,
                         None => {
                             error!("Span not found in main module");
                             continue;
                         }
                     };
-                    let dispatch = match main_package.dispatch.clone() {
+                    let dispatch = match main_plugin.dispatch.clone() {
                         Some(dispatch) => dispatch,
                         None => {
                             error!("Dispatch not found in main module");
@@ -166,7 +166,7 @@ impl Runtime {
                     };
 
                     let mut context = {
-                        let data = main_package.get_data().cloned().unwrap_or(Value::Null);
+                        let data = main_plugin.get_data().cloned().unwrap_or(Value::Null);
                         if let Some(mut context) = default_context.clone() {
                             context.set_main(data);
                             context
@@ -184,7 +184,7 @@ impl Runtime {
                                 match flow.execute(&mut context).await {
                                     Ok(result) => {
                                         let result_value = result.unwrap_or(Value::Undefined);
-                                        main_package.send(result_value);
+                                        main_plugin.send(result_value);
                                     }
                                     Err(err) => {
                                         error!("Runtime Error Execute Steps: {err:?}");
@@ -212,7 +212,7 @@ impl Runtime {
         // -------------------------
         // Create the channels
         // -------------------------
-        let (tx_main_package, rx_main_package) = channel::unbounded::<Package>();
+        let (tx_main_plugin, rx_main_plugin) = channel::unbounded::<Plugin>();
 
         let no_main = loader.main == -1 || settings.var_main.is_some();
         let steps = loader.get_steps();
@@ -220,7 +220,7 @@ impl Runtime {
             loader,
             dispatch.clone(),
             settings.clone(),
-            tx_main_package.clone(),
+            tx_main_plugin.clone(),
         )
         .await?;
 
@@ -250,7 +250,7 @@ impl Runtime {
             };
 
             // Enviar um pacote com os dados do --var-main para iniciar os steps
-            let package = Package {
+            let plugin = Plugin {
                 response: None,
                 request_data,
                 origin: 0,
@@ -258,19 +258,19 @@ impl Runtime {
                 dispatch: Some(dispatch.clone()),
             };
 
-            if let Err(err) = tx_main_package.send(package) {
-                error!("Failed to send package: {err:?}");
+            if let Err(err) = tx_main_plugin.send(plugin) {
+                error!("Failed to send plugin: {err:?}");
                 return Err(RuntimeError::FlowExecutionError(
-                    "Failed to send package".to_string(),
+                    "Failed to send plugin".to_string(),
                 ));
             }
 
             if settings.var_main.is_some() {
-                info!("Using --var-main to simulate main module output");
+                info!("Using --var-main to simulate main plugin output");
             }
         }
 
-        drop(tx_main_package);
+        drop(tx_main_plugin);
 
         #[cfg(target_env = "gnu")]
         if settings.garbage_collection {
@@ -289,7 +289,7 @@ impl Runtime {
         // -------------------------
         // Create the flow
         // -------------------------
-        Self::listener(rx_main_package, steps, modules, settings, None)
+        Self::listener(rx_main_plugin, steps, modules, settings, None)
             .await
             .map_err(|err| {
                 error!("Runtime Error: {err:?}");
@@ -300,8 +300,8 @@ impl Runtime {
     }
 
     pub async fn run_script(
-        tx_main_package: channel::Sender<Package>,
-        rx_main_package: channel::Receiver<Package>,
+        tx_main_plugin: channel::Sender<Plugin>,
+        rx_main_plugin: channel::Receiver<Plugin>,
         loader: Loader,
         dispatch: Dispatch,
         settings: Settings,
@@ -313,11 +313,11 @@ impl Runtime {
             loader,
             dispatch.clone(),
             settings.clone(),
-            tx_main_package.clone(),
+            tx_main_plugin.clone(),
         )
         .await?;
 
-        Self::listener(rx_main_package, steps, modules, settings, Some(context))
+        Self::listener(rx_main_plugin, steps, modules, settings, Some(context))
             .await
             .map_err(|err| {
                 error!("Runtime Error: {err:?}");

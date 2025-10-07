@@ -10,7 +10,7 @@ pub enum Error {
 pub struct Cli {
     pub main_target: Option<String>,
     pub only_download_modules: bool,
-    pub package_path: Option<String>,
+    pub plugin_path: Option<String>,
     pub no_run: bool,
     pub download: bool,
     pub print_yaml: bool,
@@ -48,9 +48,9 @@ impl Cli {
                     .default_value("true"),
             )
             .arg(
-                Arg::new("package")
-                    .long("package")
-                    .help("Path to the package file"),
+                Arg::new("plugin")
+                    .long("plugin")
+                    .help("Path to the plugin file"),
             )
             .arg(
                 Arg::new("no_run")
@@ -98,7 +98,7 @@ impl Cli {
         let main = matches.get_one::<String>("main_path").cloned();
 
         let install = *matches.get_one::<bool>("install").unwrap_or(&false);
-        let package_path = matches.get_one::<String>("package").map(|s| s.to_string());
+        let plugin_path = matches.get_one::<String>("plugin").map(|s| s.to_string());
 
         let no_run = *matches.get_one::<bool>("no_run").unwrap_or(&false);
 
@@ -117,7 +117,7 @@ impl Cli {
         Ok(Cli {
             main_target: main,
             only_download_modules: install,
-            package_path,
+            plugin_path,
             no_run,
             download,
             print_yaml,

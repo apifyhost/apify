@@ -293,9 +293,9 @@ O módulo Echo é implementado de forma minimalista:
 
 ```rust
 pub async fn echo(rx: ModuleReceiver) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    listen!(rx, move |package: ModulePackage| async {
-        let input = package.input().unwrap_or(Value::Null);
-        sender_safe!(package.sender, input.into());
+    listen!(rx, move |plugin: ModulePackage| async {
+        let input = plugin.input().unwrap_or(Value::Null);
+        sender_safe!(plugin.sender, input.into());
     });
     
     Ok(())

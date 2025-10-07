@@ -37,12 +37,12 @@ pub async fn cache_handler(
     // Initialize statistics
     let stats = Arc::new(Mutex::new(CacheStats::new()));
 
-    for package in rx {
+    for plugin in rx {
         let cache = cache.clone();
         let stats = stats.clone();
 
         // Parse input based on action
-        let input = match CacheInput::try_from(package.input.clone()) {
+        let input = match CacheInput::try_from(plugin.input.clone()) {
             Ok(input) => input,
             Err(e) => {
                 log::error!("Invalid cache input: {}", e);
@@ -51,7 +51,7 @@ pub async fn cache_handler(
                     ("error", format!("Invalid input: {}", e).to_value()),
                 ])
                 .to_value();
-                sender_safe!(package.sender, response.into());
+                sender_safe!(plugin.sender, response.into());
                 continue;
             }
         };
@@ -93,7 +93,7 @@ pub async fn cache_handler(
         match result {
             Ok(response_value) => {
                 log::debug!("Cache operation successful");
-                sender_safe!(package.sender, response_value.into());
+                sender_safe!(plugin.sender, response_value.into());
             }
             Err(e) => {
                 log::error!("Cache operation failed: {}", e);
@@ -102,7 +102,7 @@ pub async fn cache_handler(
                     ("error", e.to_string().to_value()),
                 ])
                 .to_value();
-                sender_safe!(package.sender, response.into());
+                sender_safe!(plugin.sender, response.into());
             }
         }
     }

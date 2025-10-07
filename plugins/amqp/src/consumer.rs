@@ -156,7 +156,7 @@ pub async fn consumer(
                     log::debug!("Received message (retry {}/{}): {:?}", retry_count, config.max_retry, data);
 
                     let response_value =
-                        sender_package!(span.clone(), dispatch.clone(), id, sender, Some(data))
+                        sender_plugin!(span.clone(), dispatch.clone(), id, sender, Some(data))
                             .await
                             .unwrap_or(Value::Null);
 

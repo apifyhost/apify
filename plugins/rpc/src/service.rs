@@ -33,7 +33,7 @@ pub trait APIFYRpc {
 
 #[derive(Clone)]
 pub struct APIFYRpcServer {
-    #[allow(dead_code)] // Used in tracing and sender_package! macro
+    #[allow(dead_code)] // Used in tracing and sender_plugin! macro
     pub dispatch: Dispatch,
     pub service_name: String,
     pub main_sender: MainRuntimeSender,
@@ -64,7 +64,7 @@ impl APIFYRpc for APIFYRpcServer {
                 span_enter!(span);
 
                 Box::pin(async move {
-                    let response_value = sender_package!(
+                    let response_value = sender_plugin!(
                         span.clone(),
                         self.dispatch.clone(),
                         self.id.clone(),

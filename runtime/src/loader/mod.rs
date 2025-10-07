@@ -176,9 +176,9 @@ impl Loader {
         })
     }
 
-    pub async fn download(&self, default_package_repository_url: &str) -> Result<(), Error> {
-        if !Path::new("packages").exists() {
-            std::fs::create_dir("packages").map_err(Error::FileCreateError)?;
+    pub async fn download(&self, default_plugin_repository_url: &str) -> Result<(), Error> {
+        if !Path::new("plugins").exists() {
+            std::fs::create_dir("plugins").map_err(Error::FileCreateError)?;
         }
 
         info!("Downloading modules...");
@@ -198,7 +198,7 @@ impl Loader {
                 continue;
             }
 
-            let module_so_path = format!("packages/{}/module.{}", module.module, MODULE_EXTENSION);
+            let module_so_path = format!("plugins/{}/module.{}", module.module, MODULE_EXTENSION);
             if Path::new(&module_so_path).exists() {
                 info!(
                     "Module {} ({}) already exists at {}, skipping download",
@@ -210,12 +210,12 @@ impl Loader {
             let base_url = match &module.repository {
                 Some(repo) => repo.clone(),
                 None => format!(
-                    "{}/refs/heads/main/packages/{}",
-                    if repo_regex.is_match(default_package_repository_url) {
-                        default_package_repository_url.to_string()
+                    "{}/refs/heads/main/plugins/{}",
+                    if repo_regex.is_match(default_plugin_repository_url) {
+                        default_plugin_repository_url.to_string()
                     } else {
                         format!(
-                            "https://raw.githubusercontent.com/{default_package_repository_url}"
+                            "https://raw.githubusercontent.com/{default_plugin_repository_url}"
                         )
                     },
                     module
@@ -281,9 +281,9 @@ impl Loader {
 
         let tarball_name = format!("{module}-{version}-{RUNTIME_ARCH}.tar.gz");
         let target_url = format!("{}/{}", base_url.trim_end_matches('/'), tarball_name);
-        let target_path = format!("packages/{module}/{tarball_name}");
+        let target_path = format!("plugins/{module}/{tarball_name}");
 
-        if Path::new(&format!("packages/{module}/module.{MODULE_EXTENSION}")).exists() {
+        if Path::new(&format!("plugins/{module}/module.{MODULE_EXTENSION}")).exists() {
             return Ok(());
         }
 
@@ -310,13 +310,13 @@ impl Loader {
         let decompressor = GzDecoder::new(tar_gz);
         let mut archive = Archive::new(decompressor);
         archive
-            .unpack(format!("packages/{module}"))
+            .unpack(format!("plugins/{module}"))
             .map_err(Error::CopyError)?;
 
         // Remove o tar.gz após extração
         std::fs::remove_file(&target_path).map_err(Error::FileCreateError)?;
 
-        info!("Module extracted to packages/{module}");
+        info!("Module extracted to plugins/{module}");
 
         Ok(())
     }
@@ -347,7 +347,7 @@ pub fn load_module(
     let target = {
         let module_relative_path = match local_path {
             Some(local_path) => local_path,
-            None => format!("packages/{module_name}"),
+            None => format!("plugins/{module_name}"),
         };
 
         let target = Loader::find_module_path(&module_relative_path)?;

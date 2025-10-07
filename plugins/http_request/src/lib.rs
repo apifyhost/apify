@@ -48,8 +48,8 @@ pub async fn http_request(
     Ok(())
 }
 
-pub async fn resolve(package: ModulePackage, default_user_agent: Option<String>, client: Client) {
-    let response = match package.input() {
+pub async fn resolve(plugin: ModulePackage, default_user_agent: Option<String>, client: Client) {
+    let response = match plugin.input() {
         Some(value) => {
             let input = Input::new(value, &default_user_agent);
             match request::request(input, client).await {
@@ -79,5 +79,5 @@ pub async fn resolve(package: ModulePackage, default_user_agent: Option<String>,
     }
     .to_value();
 
-    sender_safe!(package.sender, response.into());
+    sender_safe!(plugin.sender, response.into());
 }

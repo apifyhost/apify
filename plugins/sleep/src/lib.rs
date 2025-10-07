@@ -25,8 +25,8 @@ impl From<&Value> for Sleep {
 }
 
 pub async fn sleep(rx: ModuleReceiver) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    listen!(rx, move |package: ModulePackage| async {
-        let sleep = match package.input() {
+    listen!(rx, move |plugin: ModulePackage| async {
+        let sleep = match plugin.input() {
             Some(value) => Sleep::from(&value),
             _ => Sleep { time: 0 },
         };
@@ -38,8 +38,8 @@ pub async fn sleep(rx: ModuleReceiver) -> Result<(), Box<dyn std::error::Error +
             log::debug!("No sleep time provided, skipping sleep");
         }
 
-        let payload = package.payload().unwrap_or(Value::Null);
-        sender_safe!(package.sender, payload.into());
+        let payload = plugin.payload().unwrap_or(Value::Null);
+        sender_safe!(plugin.sender, payload.into());
     });
 
     Ok(())

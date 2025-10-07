@@ -15,7 +15,7 @@ pub struct RequestContext {
 }
 
 pub async fn resolve(context: RequestContext) -> Result<Value, Infallible> {
-    let response_value = sender_package!(
+    let response_value = sender_plugin!(
         context.span.clone(),
         context.dispatch.clone(),
         context.id,

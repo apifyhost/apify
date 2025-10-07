@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, process::Command};
 
 #[derive(Debug)]
-pub struct Package {
+pub struct Plugin {
     pub module_dir: PathBuf,
 }
 
@@ -19,17 +19,17 @@ struct ModuleMetadata {
     author: String,
 }
 
-impl Package {
+impl Plugin {
     pub fn run(&self) -> Result<()> {
-        let archive_name = self.create_package().with_context(|| {
-            format!("Failed to create package in {}", self.module_dir.display())
+        let archive_name = self.create_plugin().with_context(|| {
+            format!("Failed to create plugin in {}", self.module_dir.display())
         })?;
 
-        info!("Package created: {archive_name}");
+        info!("Plugin created: {archive_name}");
         Ok(())
     }
 
-    fn create_package(&self) -> Result<String> {
+    fn create_plugin(&self) -> Result<String> {
         let release_dir = PathBuf::from("target/release");
 
         info!(
@@ -139,10 +139,10 @@ impl Package {
             .context("Failed to create archive")?;
 
         if !status.success() {
-            bail!("Failed to generate package: {archive_name}");
+            bail!("Failed to generate plugin: {archive_name}");
         }
 
-        info!("Success! Package created: {archive_name} 🎉");
+        info!("Success! Plugin created: {archive_name} 🎉");
 
         info!("Cleaning up temporary directory: {}", temp_dir.display());
         fs::remove_dir_all(&temp_dir).with_context(|| {
@@ -156,7 +156,7 @@ impl Package {
     }
 }
 
-impl TryFrom<String> for Package {
+impl TryFrom<String> for Plugin {
     type Error = anyhow::Error;
 
     fn try_from(path: String) -> Result<Self, Self::Error> {
@@ -169,6 +169,6 @@ impl TryFrom<String> for Package {
             "Initializing Publish struct for directory: {}",
             module_dir.display()
         );
-        Ok(Package { module_dir })
+        Ok(Plugin { module_dir })
     }
 }

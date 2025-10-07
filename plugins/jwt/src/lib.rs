@@ -26,14 +26,14 @@ pub async fn jwt(setup: pluginsetup) -> Result<(), Box<dyn std::error::Error + S
 
     let jwt_handler = JwtHandler::new(config);
 
-    for package in rx {
+    for plugin in rx {
         let jwt_handler = jwt_handler.clone();
 
-        let input = match JwtInput::try_from(package.input.clone()) {
+        let input = match JwtInput::try_from(plugin.input.clone()) {
             Ok(input) => input,
             Err(e) => {
                 let response = ModuleResponse::from_error(format!("Invalid input: {}", e));
-                sender_safe!(package.sender, response.into());
+                sender_safe!(plugin.sender, response.into());
                 continue;
             }
         };
@@ -51,12 +51,12 @@ pub async fn jwt(setup: pluginsetup) -> Result<(), Box<dyn std::error::Error + S
         match result {
             Ok(response_value) => {
                 log::debug!("JWT operation successful: {:?}", response_value);
-                sender_safe!(package.sender, response_value.into());
+                sender_safe!(plugin.sender, response_value.into());
             }
             Err(e) => {
                 log::error!("JWT operation failed: {}", e);
                 let response = ModuleResponse::from_error(format!("JWT operation failed: {}", e));
-                sender_safe!(package.sender, response.into());
+                sender_safe!(plugin.sender, response.into());
             }
         }
     }

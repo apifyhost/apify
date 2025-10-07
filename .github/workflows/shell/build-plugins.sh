@@ -59,7 +59,7 @@ if ! command -v yq &> /dev/null; then
 fi
 
 
-package_module() {
+package_plugin() {
     MODULE_DIR="$1"
 
     cd "$MODULE_DIR"
@@ -139,13 +139,13 @@ package_module() {
     RENAMED_ARCHIVE="${NAME}-${VERSION}${OS_SUFFIX}.tar.gz"
     mv "$MODULE_DIR/$ARCHIVE_NAME" "./plugins/$RENAMED_ARCHIVE"
 
-    echo "✅ Module packaged: $RENAMED_ARCHIVE"
+    echo "✅ Plugin packaged: $RENAMED_ARCHIVE"
 }
 
 for dir in ./plugins/*/; do
     if [ -d "$dir" ]; then
-        echo "🚀 Processing module: $dir"
-        package_module "$dir"
+        echo "🚀 Processing plugin: $dir"
+        package_plugin "$dir"
     fi
 done
 
