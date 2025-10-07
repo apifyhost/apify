@@ -40,10 +40,10 @@ pub async fn log(rx: ModuleReceiver) -> Result<(), Box<dyn std::error::Error + S
 
     listen!(rx, move |plugin: ModulePackage| async {
         let value = plugin.input().unwrap_or(Value::Null);
-        log::debug!("Log module received input: {:?}", value);
+        log::debug!("Log module received input: {value:?}");
 
         let log_value = Log::from(&value);
-        log::debug!("Parsed log: {:?}", log_value);
+        log::debug!("Parsed log: {log_value:?}");
 
         match log_value.level {
             LogLevel::Info => log::info!("{}", log_value.message),

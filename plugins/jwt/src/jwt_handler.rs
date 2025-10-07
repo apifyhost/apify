@@ -45,13 +45,11 @@ impl JwtHandler {
         expires_in: Option<u64>,
     ) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
         log::debug!(
-            "Creating JWT token with data: {:?}, expires_in: {:?}",
-            data,
-            expires_in
+            "Creating JWT token with data: {data:?}, expires_in: {expires_in:?}"
         );
         let now = Utc::now();
         let exp = now + chrono::Duration::seconds(expires_in.unwrap_or(DEFAULT_EXPIRES_IN) as i64);
-        log::debug!("Token expiration time: {}", exp);
+        log::debug!("Token expiration time: {exp}");
         // Convert data to a HashMap<String, serde_json::Value>
         let data_map = match data {
             Some(Value::Object(map)) => {
@@ -81,11 +79,11 @@ impl JwtHandler {
             data: data_map,
         };
 
-        log::debug!("Creating JWT with claims: {:?}", claims);
+        log::debug!("Creating JWT with claims: {claims:?}");
 
         let header = Header::new(Algorithm::HS256);
         let token = encode(&header, &claims, &self.encoding_key)
-            .map_err(|e| format!("Failed to encode JWT: {}", e))?;
+            .map_err(|e| format!("Failed to encode JWT: {e}"))?;
 
         log::debug!("JWT token created successfully");
 
@@ -103,10 +101,10 @@ impl JwtHandler {
         &self,
         token: String,
     ) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
-        log::debug!("Verifying JWT token with value: {}", token);
+        log::debug!("Verifying JWT token with value: {token}");
 
         let current_timestamp = Utc::now().timestamp();
-        log::debug!("Current timestamp: {}", current_timestamp);
+        log::debug!("Current timestamp: {current_timestamp}");
 
         let mut validation = Validation::new(Algorithm::HS256);
         validation.validate_exp = true;
@@ -180,7 +178,7 @@ impl JwtHandler {
                 Ok(result)
             }
             Err(err) => {
-                log::warn!("JWT token verification failed: {}", err);
+                log::warn!("JWT token verification failed: {err}");
 
                 let (expired, error_msg) = match err.kind() {
                     jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
@@ -192,7 +190,7 @@ impl JwtHandler {
                     jsonwebtoken::errors::ErrorKind::InvalidToken => {
                         (false, "Invalid token format".to_string())
                     }
-                    _ => (false, format!("Token validation failed: {}", err)),
+                    _ => (false, format!("Token validation failed: {err}")),
                 };
 
                 let result = HashMap::from([

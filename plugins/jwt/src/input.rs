@@ -53,8 +53,7 @@ impl TryFrom<Option<Value>> for JwtInput {
                 Ok(JwtInput::Verify { token })
             }
             _ => Err(format!(
-                "Invalid action '{}'. Must be 'create' or 'verify'",
-                action
+                "Invalid action '{action}'. Must be 'create' or 'verify'"
             )),
         }
     }

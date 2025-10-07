@@ -20,13 +20,13 @@ pub async fn start_rpc_server(
         dispatch: dispatch.clone(),
         service_name: config.service_name.clone(),
         main_sender: main_sender.clone(),
-        id: id.clone(),
+        id: id,
     };
 
     let mut listener = tarpc::serde_transport::tcp::listen(&server_addr, Json::default).await?;
     listener.config_mut().max_frame_length(usize::MAX);
 
-    log::info!("RPC server listening on {}", server_addr);
+    log::info!("RPC server listening on {server_addr}");
 
     listener
         .filter_map(|r| async move {
@@ -36,7 +36,7 @@ pub async fn start_rpc_server(
                     Some(transport)
                 }
                 Err(e) => {
-                    log::warn!("Failed to establish RPC connection: {}", e);
+                    log::warn!("Failed to establish RPC connection: {e}");
                     None
                 }
             }

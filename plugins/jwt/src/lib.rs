@@ -17,12 +17,12 @@ pub async fn jwt(setup: ModuleSetup) -> Result<(), Box<dyn std::error::Error + S
     let config = match JwtConfig::try_from(setup.with) {
         Ok(config) => config,
         Err(e) => {
-            log::debug!("JWT module configuration error: {}", e);
+            log::debug!("JWT module configuration error: {e}");
             return Err(e.into());
         }
     };
 
-    log::debug!("JWT module started with config: {:?}", config);
+    log::debug!("JWT module started with config: {config:?}");
 
     let jwt_handler = JwtHandler::new(config);
 
@@ -32,13 +32,13 @@ pub async fn jwt(setup: ModuleSetup) -> Result<(), Box<dyn std::error::Error + S
         let input = match JwtInput::try_from(plugin.input.clone()) {
             Ok(input) => input,
             Err(e) => {
-                let response = ModuleResponse::from_error(format!("Invalid input: {}", e));
-                sender_safe!(plugin.sender, response.into());
+                let response = ModuleResponse::from_error(format!("Invalid input: {e}"));
+                sender_safe!(plugin.sender, response);
                 continue;
             }
         };
 
-        log::debug!("JWT module received input: {:?}", input);
+        log::debug!("JWT module received input: {input:?}");
 
         // Process based on action
         let result = match input {
@@ -50,13 +50,13 @@ pub async fn jwt(setup: ModuleSetup) -> Result<(), Box<dyn std::error::Error + S
 
         match result {
             Ok(response_value) => {
-                log::debug!("JWT operation successful: {:?}", response_value);
+                log::debug!("JWT operation successful: {response_value:?}");
                 sender_safe!(plugin.sender, response_value.into());
             }
             Err(e) => {
-                log::error!("JWT operation failed: {}", e);
-                let response = ModuleResponse::from_error(format!("JWT operation failed: {}", e));
-                sender_safe!(plugin.sender, response.into());
+                log::error!("JWT operation failed: {e}");
+                let response = ModuleResponse::from_error(format!("JWT operation failed: {e}"));
+                sender_safe!(plugin.sender, response);
             }
         }
     }

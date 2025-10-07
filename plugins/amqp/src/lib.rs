@@ -12,15 +12,15 @@ pub async fn start_server(
     setup: ModuleSetup,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     log::debug!("AMQP start_server called");
-    let config = Config::try_from(&setup.with).map_err(|e| format!("{:?}", e))?;
-    log::debug!("Config created successfully: {:?}", config);
+    let config = Config::try_from(&setup.with).map_err(|e| format!("{e:?}"))?;
+    log::debug!("Config created successfully: {config:?}");
 
     let uri: String = match config.uri.clone() {
         Some(uri) => uri,
         None => config.to_connection_string(),
     };
 
-    log::debug!("Connecting to RabbitMQ at {}", uri);
+    log::debug!("Connecting to RabbitMQ at {uri}");
 
     let conn = Connection::connect(&uri, ConnectionProperties::default()).await?;
 
@@ -38,7 +38,7 @@ pub async fn start_server(
                 return Err("Main sender is None".into());
             }
         };
-        let id = setup.id.clone();
+        let id = setup.id;
         let config = config.clone();
         tokio::task::spawn(async move {
             let _ = consumer::consumer(id, main_sender, config.clone(), channel, dispatch).await;

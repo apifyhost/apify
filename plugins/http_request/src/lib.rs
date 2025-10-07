@@ -38,7 +38,7 @@ pub async fn http_request(
     {
         Ok(client) => client,
         Err(e) => {
-            log::error!("Error creating client: {:?}", e);
+            log::error!("Error creating client: {e:?}");
             return Err(Box::new(e));
         }
     };
@@ -60,12 +60,12 @@ pub async fn resolve(plugin: ModulePackage, default_user_agent: Option<String>, 
                     ("message", "Request successful".to_value()),
                 ]),
                 Err(e) => {
-                    log::error!("Error: {:?}", e);
+                    log::error!("Error: {e:?}");
                     HashMap::from([
                         ("response", Value::Undefined),
                         ("is_success", false.to_value()),
                         ("is_error", true.to_value()),
-                        ("message", format!("{:?}", e).to_value()),
+                        ("message", format!("{e:?}").to_value()),
                     ])
                 }
             }

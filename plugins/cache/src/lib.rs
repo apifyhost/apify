@@ -22,7 +22,7 @@ pub async fn cache_handler(
 
     // Parse cache configuration from 'with' parameters
     let config = CacheConfig::try_from(&setup.with)?;
-    log::debug!("Cache module started with config: {:?}", config);
+    log::debug!("Cache module started with config: {config:?}");
 
     // Initialize cache instance
     let cache = if let Some(default_ttl) = config.default_ttl {
@@ -45,10 +45,10 @@ pub async fn cache_handler(
         let input = match CacheInput::try_from(plugin.input.clone()) {
             Ok(input) => input,
             Err(e) => {
-                log::error!("Invalid cache input: {}", e);
+                log::error!("Invalid cache input: {e}");
                 let response = std::collections::HashMap::from([
                     ("success", false.to_value()),
-                    ("error", format!("Invalid input: {}", e).to_value()),
+                    ("error", format!("Invalid input: {e}").to_value()),
                 ])
                 .to_value();
                 sender_safe!(plugin.sender, response.into());
@@ -56,7 +56,7 @@ pub async fn cache_handler(
             }
         };
 
-        log::debug!("Cache module received input: {:?}", input);
+        log::debug!("Cache module received input: {input:?}");
 
         // Process based on action
         let result = match input {
@@ -96,7 +96,7 @@ pub async fn cache_handler(
                 sender_safe!(plugin.sender, response_value.into());
             }
             Err(e) => {
-                log::error!("Cache operation failed: {}", e);
+                log::error!("Cache operation failed: {e}");
                 let response = std::collections::HashMap::from([
                     ("success", false.to_value()),
                     ("error", e.to_string().to_value()),
@@ -120,10 +120,10 @@ async fn handle_set(
 ) -> Result<Value, String> {
     let mut cache_guard = cache
         .lock()
-        .map_err(|e| format!("Cache lock error: {}", e))?;
+        .map_err(|e| format!("Cache lock error: {e}"))?;
 
     // Convert sdk Value to quickleaf Value
-    let quickleaf_value = quickleaf::valu3::value::Value::from(value.clone());
+    let quickleaf_value = value.clone();
 
     if let Some(ttl_secs) = ttl {
         cache_guard.insert_with_ttl(&key, quickleaf_value, Duration::from_secs(ttl_secs));
@@ -136,7 +136,7 @@ async fn handle_set(
         stats_guard.record_set();
     }
 
-    log::debug!("Set key '{}' with value: {:?}", key, value);
+    log::debug!("Set key '{key}' with value: {value:?}");
 
     Ok(std::collections::HashMap::from([
         ("success", true.to_value()),
@@ -154,7 +154,7 @@ async fn handle_get(
 ) -> Result<Value, String> {
     let mut cache_guard = cache
         .lock()
-        .map_err(|e| format!("Cache lock error: {}", e))?;
+        .map_err(|e| format!("Cache lock error: {e}"))?;
 
     match cache_guard.get(&key) {
         Some(value) => {
@@ -163,7 +163,7 @@ async fn handle_get(
                 stats_guard.record_hit();
             }
 
-            log::debug!("Cache hit for key '{}'", key);
+            log::debug!("Cache hit for key '{key}'");
 
             Ok(std::collections::HashMap::from([
                 ("success", true.to_value()),
@@ -179,7 +179,7 @@ async fn handle_get(
                 stats_guard.record_miss();
             }
 
-            log::debug!("Cache miss for key '{}'", key);
+            log::debug!("Cache miss for key '{key}'");
 
             Ok(std::collections::HashMap::from([
                 ("success", true.to_value()),
@@ -200,7 +200,7 @@ async fn handle_remove(
 ) -> Result<Value, String> {
     let mut cache_guard = cache
         .lock()
-        .map_err(|e| format!("Cache lock error: {}", e))?;
+        .map_err(|e| format!("Cache lock error: {e}"))?;
 
     match cache_guard.remove(&key) {
         Ok(()) => {
@@ -209,7 +209,7 @@ async fn handle_remove(
                 stats_guard.record_remove();
             }
 
-            log::debug!("Removed key '{}'", key);
+            log::debug!("Removed key '{key}'");
 
             Ok(std::collections::HashMap::from([
                 ("success", true.to_value()),
@@ -219,7 +219,7 @@ async fn handle_remove(
             .to_value())
         }
         Err(_) => {
-            log::debug!("Key '{}' not found for removal", key);
+            log::debug!("Key '{key}' not found for removal");
 
             Ok(std::collections::HashMap::from([
                 ("success", true.to_value()),
@@ -239,7 +239,7 @@ async fn handle_clear(
 ) -> Result<Value, String> {
     let mut cache_guard = cache
         .lock()
-        .map_err(|e| format!("Cache lock error: {}", e))?;
+        .map_err(|e| format!("Cache lock error: {e}"))?;
 
     let previous_size = cache_guard.len();
     cache_guard.clear();
@@ -249,7 +249,7 @@ async fn handle_clear(
         stats_guard.record_clear(previous_size);
     }
 
-    log::debug!("Cleared cache, removed {} items", previous_size);
+    log::debug!("Cleared cache, removed {previous_size} items");
 
     Ok(std::collections::HashMap::from([
         ("success", true.to_value()),
@@ -267,7 +267,7 @@ async fn handle_exists(
 ) -> Result<Value, String> {
     let mut cache_guard = cache
         .lock()
-        .map_err(|e| format!("Cache lock error: {}", e))?;
+        .map_err(|e| format!("Cache lock error: {e}"))?;
 
     let exists = cache_guard.contains_key(&key);
 
@@ -280,7 +280,7 @@ async fn handle_exists(
         }
     }
 
-    log::debug!("Key '{}' exists: {}", key, exists);
+    log::debug!("Key '{key}' exists: {exists}");
 
     Ok(std::collections::HashMap::from([
         ("success", true.to_value()),
@@ -303,7 +303,7 @@ async fn handle_list(
 ) -> Result<Value, String> {
     let mut cache_guard = cache
         .lock()
-        .map_err(|e| format!("Cache lock error: {}", e))?;
+        .map_err(|e| format!("Cache lock error: {e}"))?;
 
     // Determine filter
     let filter = match filter_type.as_str() {
@@ -343,7 +343,7 @@ async fn handle_list(
     // Get items from cache
     let items = cache_guard
         .list(list_props)
-        .map_err(|e| format!("List operation failed: {:?}", e))?;
+        .map_err(|e| format!("List operation failed: {e:?}"))?;
 
     // Apply pagination
     let total_count = items.len();
@@ -389,11 +389,11 @@ async fn handle_list(
 async fn handle_cleanup(cache: CacheInstance) -> Result<Value, String> {
     let mut cache_guard = cache
         .lock()
-        .map_err(|e| format!("Cache lock error: {}", e))?;
+        .map_err(|e| format!("Cache lock error: {e}"))?;
 
     let cleaned_count = cache_guard.cleanup_expired();
 
-    log::debug!("Cleaned up {} expired items", cleaned_count);
+    log::debug!("Cleaned up {cleaned_count} expired items");
 
     Ok(std::collections::HashMap::from([
         ("success", true.to_value()),
@@ -409,10 +409,10 @@ async fn handle_stats(
 ) -> Result<Value, String> {
     let cache_guard = cache
         .lock()
-        .map_err(|e| format!("Cache lock error: {}", e))?;
+        .map_err(|e| format!("Cache lock error: {e}"))?;
     let stats_guard = stats
         .lock()
-        .map_err(|e| format!("Stats lock error: {}", e))?;
+        .map_err(|e| format!("Stats lock error: {e}"))?;
 
     let current_size = cache_guard.len();
     let capacity = cache_guard.capacity();
@@ -420,10 +420,7 @@ async fn handle_stats(
     let estimated_memory = estimate_memory_usage(current_size, capacity);
 
     log::debug!(
-        "Cache stats - Size: {}, Capacity: {}, Hit rate: {:.2}%",
-        current_size,
-        capacity,
-        hit_rate
+        "Cache stats - Size: {current_size}, Capacity: {capacity}, Hit rate: {hit_rate:.2}%"
     );
 
     let stats_map = std::collections::HashMap::from([

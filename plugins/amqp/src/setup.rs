@@ -17,7 +17,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::RoutingKey => write!(f, "routing_key is required"),
-            Self::GenericError(msg) => write!(f, "Generic error: {}", msg),
+            Self::GenericError(msg) => write!(f, "Generic error: {msg}"),
         }
     }
 }
@@ -90,13 +90,13 @@ impl TryFrom<&Value> for Config {
             .map(|s| s.as_string());
 
         let (username, password, host, port, vhost) = if let Some(uri_str) = &uri {
-            log::debug!("Using URI from config: {}", uri_str);
+            log::debug!("Using URI from config: {uri_str}");
 
             if uri_str.starts_with("amqp://") {
                 match url::Url::parse(uri_str) {
                     Ok(parsed) => {
                         let host = parsed.host_str().unwrap_or("localhost").to_string();
-                        let port = parsed.port().map(|p| p as u16);
+                        let port = parsed.port();
                         let username = if !parsed.username().is_empty() {
                             parsed.username().to_string()
                         } else {
@@ -107,7 +107,7 @@ impl TryFrom<&Value> for Config {
                         (username, password, host, port, vhost)
                     }
                     Err(e) => {
-                        log::warn!("Failed to parse AMQP URI: {} ({})", uri_str, e);
+                        log::warn!("Failed to parse AMQP URI: {uri_str} ({e})");
                         (
                             "guest".to_string(),
                             "guest".to_string(),
@@ -177,8 +177,8 @@ impl TryFrom<&Value> for Config {
             match import_definition(&host, management_port, &username, &password, definition) {
                 Ok(_) => log::debug!("Definition import completed successfully"),
                 Err(e) => {
-                    log::debug!("Definition import failed: {}", e);
-                    panic!("Error importing definition: {}", e);
+                    log::debug!("Definition import failed: {e}");
+                    panic!("Error importing definition: {e}");
                 }
             }
         } else {
@@ -228,8 +228,7 @@ fn import_definition(
                             .unwrap_or("".to_string());
 
                         let url = format!(
-                            "http://{}:{}/api/vhosts/{}",
-                            host, management_port, vhost_name
+                            "http://{host}:{management_port}/api/vhosts/{vhost_name}"
                         );
                         let response = client
                             .put(&url)
@@ -471,7 +470,7 @@ fn import_definition(
                             urlencoding::encode(&destination)
                         );
 
-                        log::debug!("Creating binding with URL: {}", url);
+                        log::debug!("Creating binding with URL: {url}");
 
                         let arguments = binding_obj
                             .get("arguments")
@@ -484,7 +483,7 @@ fn import_definition(
                             "arguments": arguments
                         });
 
-                        log::debug!("Binding request body: {}", body);
+                        log::debug!("Binding request body: {body}");
 
                         let response = client
                             .post(&url)
@@ -501,21 +500,16 @@ fn import_definition(
                                         "Unable to read response body".to_string()
                                     });
                                     log::debug!(
-                                        "Binding creation failed with status {}: {}",
-                                        status,
-                                        body_text
+                                        "Binding creation failed with status {status}: {body_text}"
                                     );
                                 } else {
                                     log::debug!(
-                                        "Created binding '{}' -> '{}': {}",
-                                        source,
-                                        destination,
-                                        status
+                                        "Created binding '{source}' -> '{destination}': {status}"
                                     );
                                 }
                             }
                             Err(e) => {
-                                log::debug!("Error creating binding: {}", e);
+                                log::debug!("Error creating binding: {e}");
                                 return Err(e.into());
                             }
                         }

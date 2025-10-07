@@ -13,9 +13,9 @@ create_main!(start_rpc_module(setup));
 pub async fn start_rpc_module(
     setup: ModuleSetup,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let config = Config::try_from(&setup.with).map_err(|e| format!("{:?}", e))?;
+    let config = Config::try_from(&setup.with).map_err(|e| format!("{e:?}"))?;
 
-    log::debug!("Starting RPC module with config: {:?}", config);
+    log::debug!("Starting RPC module with config: {config:?}");
 
     if setup.is_main() {
         log::info!("Starting RPC server as main module");
@@ -27,12 +27,12 @@ pub async fn start_rpc_module(
                 return Err("Main sender is None".into());
             }
         };
-        let id = setup.id.clone();
+        let id = setup.id;
 
         // Start RPC server in background
         tokio::task::spawn(async move {
             if let Err(e) = start_rpc_server(config_clone, dispatch, main_sender, id).await {
-                log::error!("RPC server error: {}", e);
+                log::error!("RPC server error: {e}");
             }
         });
     }
@@ -51,12 +51,12 @@ async fn handle_rpc_client(
     let (tx, rx) = channel::unbounded::<ModulePackage>();
     setup_sender
         .send(Some(tx))
-        .map_err(|e| format!("{:?}", e))?;
+        .map_err(|e| format!("{e:?}"))?;
 
     log::debug!("RPC client handler started");
 
     for plugin in rx {
-        log::debug!("Received RPC client request: {:?}", plugin);
+        log::debug!("Received RPC client request: {plugin:?}");
 
         let config = config.clone();
         let client = RpcClient::new(config);
@@ -73,20 +73,20 @@ async fn handle_rpc_client(
                 },
                 None => {
                     let error_msg = "No input provided";
-                    log::error!("RPC client error: {}", error_msg);
-                    Ok(format!("{{\"error\": \"{}\", \"success\": false}}", error_msg).to_value())
+                    log::error!("RPC client error: {error_msg}");
+                    Ok(format!("{{\"error\": \"{error_msg}\", \"success\": false}}").to_value())
                 }
             };
 
             match result {
                 Ok(response) => {
-                    log::debug!("RPC client response: {:?}", response);
+                    log::debug!("RPC client response: {response:?}");
                     sender_safe!(plugin.sender, response.into());
                 }
                 Err(e) => {
-                    log::error!("RPC client error: {}", e);
+                    log::error!("RPC client error: {e}");
                     let error_response =
-                        format!("{{\"error\": \"{}\", \"success\": false}}", e.to_string())
+                        format!("{{\"error\": \"{}\", \"success\": false}}", e)
                             .to_value();
                     sender_safe!(plugin.sender, error_response.into());
                 }

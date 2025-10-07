@@ -27,9 +27,9 @@ pub async fn postgres(setup: ModuleSetup) -> Result<(), Box<dyn std::error::Erro
                 Ok(input) => input,
                 Err(e) => {
                     let response =
-                        ModuleResponse::from_error(format!("Failed to parse input: {}", e));
+                        ModuleResponse::from_error(format!("Failed to parse input: {e}"));
 
-                    sender_safe!(plugin.sender, response.into());
+                    sender_safe!(plugin.sender, response);
                     return;
                 }
             };
@@ -38,11 +38,10 @@ pub async fn postgres(setup: ModuleSetup) -> Result<(), Box<dyn std::error::Erro
                 Ok(client) => client,
                 Err(e) => {
                     let response = ModuleResponse::from_error(format!(
-                        "Failed to get client from pool: {}",
-                        e
+                        "Failed to get client from pool: {e}"
                     ));
 
-                    sender_safe!(plugin.sender, response.into());
+                    sender_safe!(plugin.sender, response);
                     return;
                 }
             };
@@ -53,11 +52,10 @@ pub async fn postgres(setup: ModuleSetup) -> Result<(), Box<dyn std::error::Erro
                         Ok(stmt) => stmt,
                         Err(e) => {
                             let response = ModuleResponse::from_error(format!(
-                                "Failed to prepare statement: {}",
-                                e
+                                "Failed to prepare statement: {e}"
                             ));
 
-                            sender_safe!(plugin.sender, response.into());
+                            sender_safe!(plugin.sender, response);
                             return;
                         }
                     }
@@ -66,11 +64,10 @@ pub async fn postgres(setup: ModuleSetup) -> Result<(), Box<dyn std::error::Erro
                         Ok(stmt) => stmt,
                         Err(e) => {
                             let response = ModuleResponse::from_error(format!(
-                                "Failed to prepare statement: {}",
-                                e
+                                "Failed to prepare statement: {e}"
                             ));
 
-                            sender_safe!(plugin.sender, response.into());
+                            sender_safe!(plugin.sender, response);
                             return;
                         }
                     }
@@ -90,12 +87,11 @@ pub async fn postgres(setup: ModuleSetup) -> Result<(), Box<dyn std::error::Erro
                     }
                     Err(e) => {
                         let response =
-                            ModuleResponse::from_error(format!("Query execution failed: {}", e));
+                            ModuleResponse::from_error(format!("Query execution failed: {e}"));
 
-                        sender_safe!(plugin.sender, response.into());
-                        return;
+                        sender_safe!(plugin.sender, response);
                     }
-                };
+                }
             } else {
                 match client.batch_execute(&input.query).await {
                     Ok(_) => {
@@ -104,8 +100,8 @@ pub async fn postgres(setup: ModuleSetup) -> Result<(), Box<dyn std::error::Erro
                     }
                     Err(e) => {
                         let response =
-                            ModuleResponse::from_error(format!("Batch execution failed: {}", e));
-                        sender_safe!(plugin.sender, response.into());
+                            ModuleResponse::from_error(format!("Batch execution failed: {e}"));
+                        sender_safe!(plugin.sender, response);
                     }
                 }
             }
@@ -116,7 +112,7 @@ pub async fn postgres(setup: ModuleSetup) -> Result<(), Box<dyn std::error::Erro
 
     for handle in handles {
         if let Err(e) = handle.await {
-            eprintln!("Error in task: {:?}", e);
+            eprintln!("Error in task: {e:?}");
         }
     }
 

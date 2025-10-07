@@ -74,7 +74,7 @@ pub async fn cli(setup: ModuleSetup) -> Result<(), Box<dyn std::error::Error + S
         } else {
             span.record("process.exit.code", 0);
             let value = response.unwrap();
-            println!("{}", value);
+            println!("{value}");
         }
 
         Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())

@@ -71,7 +71,7 @@ impl Args {
             let long = item.get("long").map(Value::to_string);
             let short = item.get("short").map(Value::to_string);
             let help = item.get("help").map(Value::to_string).unwrap_or_default();
-            let default = item.get("default").map(Value::to_string).map(String::from);
+            let default = item.get("default").map(Value::to_string);
             let required_flag = *item
                 .get("required")
                 .and_then(Value::as_bool)
@@ -105,16 +105,16 @@ impl Args {
         let mut valid_flags: HashSet<String> = HashSet::new();
         for arg in &arg_defs {
             if let Some(l) = &arg.long {
-                valid_flags.insert(format!("--{}", l));
+                valid_flags.insert(format!("--{l}"));
             }
             if let Some(s) = &arg.short {
-                valid_flags.insert(format!("-{}", s));
+                valid_flags.insert(format!("-{s}"));
             }
         }
 
         let mut error = Vec::new();
         if !additional_args {
-            for (_, raw) in raw_args.iter().enumerate() {
+            for raw in raw_args.iter() {
                 if raw.starts_with('-') {
                     // Se for "--flag=valor", considera apenas a flag
                     let flag = raw.split('=').next().unwrap_or(raw);
@@ -124,8 +124,7 @@ impl Args {
                         && flag != "-h"
                     {
                         error.push(format!(
-                            "Unknown flag: {}. Use --help to see the available flags.",
-                            flag
+                            "Unknown flag: {flag}. Use --help to see the available flags."
                         ));
                     }
                 }
@@ -136,7 +135,7 @@ impl Args {
             let mut found: Option<String> = None;
 
             if let Some(long_flag) = &arg_def.long {
-                let flag = format!("--{}", long_flag);
+                let flag = format!("--{long_flag}");
                 if let Some(pos) = raw_args.iter().position(|a| a == &flag) {
                     if arg_def.input_type == InputType::Boolean {
                         let next = raw_args.get(pos + 1);
@@ -153,7 +152,7 @@ impl Args {
 
             if found.is_none() {
                 if let Some(short_flag) = &arg_def.short {
-                    let flag = format!("-{}", short_flag);
+                    let flag = format!("-{short_flag}");
                     if let Some(pos) = raw_args.iter().position(|a| a == &flag) {
                         if arg_def.input_type == InputType::Boolean {
                             let next = raw_args.get(pos + 1);
@@ -206,7 +205,8 @@ impl Args {
                         }
                     },
                     InputType::Boolean => {
-                        let v = match value_str.as_str() {
+                        
+                        match value_str.as_str() {
                             "" => Value::Boolean(true),
                             "true" | "1" => Value::Boolean(true),
                             "false" | "0" => Value::Boolean(false),
@@ -217,8 +217,7 @@ impl Args {
                                 ));
                                 Value::Null
                             }
-                        };
-                        v
+                        }
                     }
                 };
                 parsed_args.insert(arg_def.name.clone(), value);
@@ -253,33 +252,33 @@ impl Args {
         );
 
         if let Some(version) = self.app_data.version {
-            println!("       {}: {}", "Version", version);
+            println!("       Version: {}", version);
         }
 
         if let Some(description) = self.app_data.description {
-            println!("       {}: {}", "Description", description);
+            println!("       Description: {}", description);
         }
 
         if let Some(license) = self.app_data.license {
-            println!("       {}: {}", "License", license);
+            println!("       License: {}", license);
         }
 
         if let Some(author) = self.app_data.author {
-            println!("       {}: {}", "Author", author);
+            println!("       Author: {}", author);
         }
 
         if let Some(homepage) = self.app_data.homepage {
-            println!("       {}: {}", "Homepage", homepage);
+            println!("       Homepage: {}", homepage);
         }
 
         if let Some(repository) = self.app_data.repository {
-            println!("       {}: {}", "Repository", repository);
+            println!("       Repository: {}", repository);
         }
 
-        println!("");
+        println!();
 
         if let Some(extra) = extra {
-            println!("{}", extra);
+            println!("{extra}");
         }
 
         let mut arguments = Vec::new();
@@ -303,22 +302,22 @@ impl Args {
                 let mut option = String::new();
 
                 if !long.is_empty() {
-                    option.push_str(&format!("--{}", long));
+                    option.push_str(&format!("--{long}"));
                 }
 
                 if !short.is_empty() {
-                    option.push_str(&format!(", -{}", short));
+                    option.push_str(&format!(", -{short}"));
                 }
 
                 option.push_str(format!(" {} {} {}", name.bold(), required, default).as_str());
-                options.push(format!("{} {}", option, help));
+                options.push(format!("{option} {help}"));
             }
         }
 
         if !arguments.is_empty() {
             println!("{}:", "Arguments".bold().underline());
             for arg in arguments {
-                println!("  {}", arg);
+                println!("  {arg}");
             }
             println!();
         }
@@ -326,7 +325,7 @@ impl Args {
         if !options.is_empty() {
             println!("{}:", "Options".bold().underline());
             for opt in options {
-                println!("  {}", opt);
+                println!("  {opt}");
             }
             println!();
         }

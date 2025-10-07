@@ -143,8 +143,7 @@ impl TryFrom<Option<Value>> for CacheInput {
             "cleanup" => Ok(CacheInput::Cleanup),
             "stats" => Ok(CacheInput::Stats),
             _ => Err(format!(
-                "Invalid action '{}'. Must be one of: set, get, remove, clear, exists, list, cleanup, stats",
-                action
+                "Invalid action '{action}'. Must be one of: set, get, remove, clear, exists, list, cleanup, stats"
             )),
         }
     }

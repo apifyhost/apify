@@ -3,17 +3,11 @@ use serde::{Deserialize, Serialize};
 
 /// JWT module configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct JwtConfig {
     pub secret: String,
 }
 
-impl Default for JwtConfig {
-    fn default() -> Self {
-        Self {
-            secret: String::new(),
-        }
-    }
-}
 
 impl TryFrom<Value> for JwtConfig {
     type Error = String;

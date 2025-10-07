@@ -48,7 +48,7 @@ impl APIFYRpc for APIFYRpcServer {
             request.params
         );
 
-        log::debug!("Sending RPC request to steps: {:?}", request);
+        log::debug!("Sending RPC request to steps: {request:?}");
 
         // Execute the request through the APIFY pipeline system
         // This integrates with the steps defined in the YAML configuration
@@ -66,20 +66,20 @@ impl APIFYRpc for APIFYRpcServer {
                 let response_value = sender_plugin!(
                     span.clone(),
                     self.dispatch.clone(),
-                    self.id.clone(),
+                    self.id,
                     self.main_sender.clone(),
                     Some(request.to_value())
                 )
                 .await
                 .unwrap_or(Value::Null);
 
-                log::debug!("Received response from steps: {:?}", response_value);
+                log::debug!("Received response from steps: {response_value:?}");
                 response_value
             })
         })
         .await;
 
-        log::debug!("Final response from steps: {:?}", response_value);
+        log::debug!("Final response from steps: {response_value:?}");
 
         let response = RpcResponse {
             result: response_value.to_value(),
@@ -87,7 +87,7 @@ impl APIFYRpc for APIFYRpcServer {
             headers: HashMap::new(),
         };
 
-        log::debug!("RPC response: {:?}", response);
+        log::debug!("RPC response: {response:?}");
         response
     }
 

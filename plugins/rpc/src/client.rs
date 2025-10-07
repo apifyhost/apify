@@ -47,7 +47,7 @@ impl RpcClient {
                     None
                 }
             })
-            .unwrap_or_else(HashMap::new);
+            .unwrap_or_default();
 
         let request = RpcRequest {
             method,
@@ -55,14 +55,14 @@ impl RpcClient {
             headers,
         };
 
-        log::debug!("Sending RPC request: {:?}", request);
+        log::debug!("Sending RPC request: {request:?}");
 
         let mut ctx = context::current();
         ctx.deadline = Instant::now() + Duration::from_millis(self.config.timeout_ms);
 
         let response = client.call(ctx, request).await?;
 
-        log::debug!("Received RPC response: {:?}", response);
+        log::debug!("Received RPC response: {response:?}");
 
         Ok(response.to_value())
     }

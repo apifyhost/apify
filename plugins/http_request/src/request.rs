@@ -14,9 +14,9 @@ pub enum Error {
 impl From<Error> for Value {
     fn from(error: Error) -> Self {
         match error {
-            Error::RequestError(e) => format!("Request error: {}", e).to_value(),
-            Error::HeaderError(e) => format!("Header error: {}", e).to_value(),
-            Error::HeaderValueError(e) => format!("Header value error: {}", e).to_value(),
+            Error::RequestError(e) => format!("Request error: {e}").to_value(),
+            Error::HeaderError(e) => format!("Header error: {e}").to_value(),
+            Error::HeaderValueError(e) => format!("Header value error: {e}").to_value(),
             Error::ValueError(e) => format!(
                 "Value error: {}",
                 match e {

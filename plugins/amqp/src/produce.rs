@@ -63,7 +63,7 @@ pub async fn producer(
     let (tx, rx) = channel::unbounded::<ModulePackage>();
     setup_sender
         .send(Some(tx))
-        .map_err(|e| format!("{:?}", e))?;
+        .map_err(|e| format!("{e:?}"))?;
 
     log::debug!("Producer started");
 
@@ -75,7 +75,7 @@ pub async fn producer(
     let conn = lapin::Connection::connect(&uri, lapin::ConnectionProperties::default()).await?;
 
     for plugin in rx {
-        log::debug!("Received plugin: {:?}", plugin);
+        log::debug!("Received plugin: {plugin:?}");
 
         let input = match plugin.input {
             Some(input) => Input::from(&input),
@@ -101,7 +101,7 @@ pub async fn producer(
                 }
                 Err(e) => {
                     let response =
-                        ProducerResponse::from_error(&format!("Failed to recreate channel: {}", e));
+                        ProducerResponse::from_error(&format!("Failed to recreate channel: {e}"));
                     let _ = plugin.sender.send(response.to_value().into());
                     continue;
                 }
@@ -123,13 +123,13 @@ pub async fn producer(
                 Ok(confirm) => confirm,
                 Err(e) => {
                     let response =
-                        ProducerResponse::from_error(&format!("Publish confirmation error: {}", e));
+                        ProducerResponse::from_error(&format!("Publish confirmation error: {e}"));
                     let _ = plugin.sender.send(response.to_value().into());
                     continue;
                 }
             },
             Err(e) => {
-                let response = ProducerResponse::from_error(&format!("Publish error: {}", e));
+                let response = ProducerResponse::from_error(&format!("Publish error: {e}"));
                 let _ = plugin.sender.send(response.to_value().into());
                 continue;
             }
@@ -143,12 +143,12 @@ pub async fn producer(
                 (true, None)
             }
             Confirmation::Ack(msg) => {
-                log::debug!("Ack: {:?}", msg);
+                log::debug!("Ack: {msg:?}");
                 (true, None)
             }
             Confirmation::Nack(msg) => {
-                let err = format!("Nack: {:?}", msg);
-                log::debug!("{}", err);
+                let err = format!("Nack: {msg:?}");
+                log::debug!("{err}");
                 (false, Some(err))
             }
         };

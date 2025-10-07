@@ -34,7 +34,7 @@ async fn check_dlq_configured(config: &Config) -> bool {
                         if let Some(arguments) = queue_info.get("arguments") {
                             if let Some(dle) = arguments.get("x-dead-letter-exchange") {
                                 if !dle.is_null() && dle.as_str().unwrap_or("").trim() != "" {
-                                    log::debug!("DLQ configured: x-dead-letter-exchange = {}", dle);
+                                    log::debug!("DLQ configured: x-dead-letter-exchange = {dle}");
                                     return true;
                                 }
                             }
@@ -43,7 +43,7 @@ async fn check_dlq_configured(config: &Config) -> bool {
                         false
                     }
                     Err(e) => {
-                        log::warn!("Failed to parse queue info: {}", e);
+                        log::warn!("Failed to parse queue info: {e}");
                         false
                     }
                 }
@@ -53,7 +53,7 @@ async fn check_dlq_configured(config: &Config) -> bool {
             }
         }
         Err(e) => {
-            log::warn!("Failed to connect to RabbitMQ Management API: {}", e);
+            log::warn!("Failed to connect to RabbitMQ Management API: {e}");
             false
         }
     }
@@ -132,7 +132,7 @@ pub async fn consumer(
 
                 Box::pin(async move {
                     let sender = (*main_sender).clone();
-                    let id = (*id).clone();
+                    let id = *id;
 
                     let delivery = match delivery {
                         Ok(Some(delivery)) => delivery,
@@ -148,7 +148,7 @@ pub async fn consumer(
                         .to_value();
 
                     span.record("messaging.message.payload_size_bytes", delivery.data.len());
-                    span.record("messaging.message.conversation_id", &id.to_string());
+                    span.record("messaging.message.conversation_id", id.to_string());
 
                     // Obter contagem de tentativas do header (se existir)
                     let retry_count = delivery.properties.headers()
@@ -164,7 +164,7 @@ pub async fn consumer(
                             .await
                             .unwrap_or(Value::Null);
 
-                    log::debug!("Response: {:?}", response_value);
+                    log::debug!("Response: {response_value:?}");
 
                     let should_ack = match response_value {
                         Value::Null => true,
@@ -179,7 +179,7 @@ pub async fn consumer(
                                 log::debug!("Message acknowledged successfully");
                             }
                             Err(e) => {
-                                log::error!("Failed to ack message: {}", e);
+                                log::error!("Failed to ack message: {e}");
                             }
                         }
                     } else {
@@ -203,7 +203,7 @@ pub async fn consumer(
                                     let _ = delivery.ack(BasicAckOptions::default()).await;
                                 }
                                 Err(e) => {
-                                    log::error!("Failed to requeue message: {}", e);
+                                    log::error!("Failed to requeue message: {e}");
                                     // Em caso de erro no requeue, manter mensagem na fila
                                     let _ = delivery.nack(BasicNackOptions {
                                         multiple: false,
@@ -226,10 +226,10 @@ pub async fn consumer(
                                     requeue: false, // false = vai para DLQ
                                 }).await {
                                     Ok(_) => {
-                                        log::warn!("Message rejected (NACK) after {} retries - sent to DLQ", retry_count);
+                                        log::warn!("Message rejected (NACK) after {retry_count} retries - sent to DLQ");
                                     }
                                     Err(e) => {
-                                        log::error!("Failed to nack message to DLQ: {}", e);
+                                        log::error!("Failed to nack message to DLQ: {e}");
                                     }
                                 }
                             } else {
@@ -246,7 +246,7 @@ pub async fn consumer(
                                         log::warn!("Message requeued - will continue processing until DLQ is properly configured");
                                     }
                                     Err(e) => {
-                                        log::error!("Failed to requeue message: {}", e);
+                                        log::error!("Failed to requeue message: {e}");
                                     }
                                 }
                             }
@@ -254,10 +254,10 @@ pub async fn consumer(
                             // DLQ desabilitada - descartar mensagem
                             match delivery.ack(BasicAckOptions::default()).await {
                                 Ok(_) => {
-                                    log::warn!("DLQ disabled - discarding message after {} retries", retry_count);
+                                    log::warn!("DLQ disabled - discarding message after {retry_count} retries");
                                 }
                                 Err(e) => {
-                                    log::error!("Failed to ack message for discard: {}", e);
+                                    log::error!("Failed to ack message for discard: {e}");
                                 }
                             }
                         }
