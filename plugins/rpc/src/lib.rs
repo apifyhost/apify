@@ -49,9 +49,7 @@ async fn handle_rpc_client(
     config: Config,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (tx, rx) = channel::unbounded::<ModulePackage>();
-    setup_sender
-        .send(Some(tx))
-        .map_err(|e| format!("{e:?}"))?;
+    setup_sender.send(Some(tx)).map_err(|e| format!("{e:?}"))?;
 
     log::debug!("RPC client handler started");
 
@@ -86,8 +84,7 @@ async fn handle_rpc_client(
                 Err(e) => {
                     log::error!("RPC client error: {e}");
                     let error_response =
-                        format!("{{\"error\": \"{e}\", \"success\": false}}")
-                            .to_value();
+                        format!("{{\"error\": \"{e}\", \"success\": false}}").to_value();
                     sender_safe!(plugin.sender, error_response.into());
                 }
             }

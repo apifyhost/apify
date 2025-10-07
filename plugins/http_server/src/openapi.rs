@@ -346,7 +346,8 @@ impl OpenAPIValidator {
             .and_then(|path_item| path_item.get(method.to_lowercase()))
             .and_then(|operation| operation.get("requestBody"))
             .and_then(|req_body| req_body.get("required"))
-            .and_then(|required| required.as_bool()).copied()
+            .and_then(|required| required.as_bool())
+            .copied()
             .unwrap_or(false) // Default: body is not required
     }
 
@@ -619,13 +620,9 @@ impl OpenAPIValidator {
 
             if effective_length < min_len as usize {
                 let message = if min_len > 0 && str_val.trim().is_empty() {
-                    format!(
-                        "Field '{field_name}' cannot be empty or contain only whitespace"
-                    )
+                    format!("Field '{field_name}' cannot be empty or contain only whitespace")
                 } else {
-                    format!(
-                        "Field '{field_name}' must be at least {min_len} characters long"
-                    )
+                    format!("Field '{field_name}' must be at least {min_len} characters long")
                 };
                 errors.push(ValidationError {
                     error_type: ValidationErrorType::InvalidFieldValue,
@@ -672,9 +669,7 @@ impl OpenAPIValidator {
                 unescaped_pattern = unescaped_pattern.replace("\\\\", "\\");
             }
 
-            log::debug!(
-                "Pattern before unescaping: '{pattern}', after: '{unescaped_pattern}'"
-            );
+            log::debug!("Pattern before unescaping: '{pattern}', after: '{unescaped_pattern}'");
 
             match Regex::new(&unescaped_pattern) {
                 Ok(regex) => {
@@ -771,9 +766,7 @@ impl OpenAPIValidator {
             Some(val) => val,
             None => {
                 // If conversion fails, log and return error
-                log::warn!(
-                    "Failed to convert number value for field '{field_name}' to f64"
-                );
+                log::warn!("Failed to convert number value for field '{field_name}' to f64");
                 errors.push(ValidationError {
                     error_type: ValidationErrorType::InvalidFieldValue,
                     message: format!("Field '{field_name}' has invalid numeric value"),
@@ -915,9 +908,7 @@ impl OpenAPIValidator {
             if arr.len() < min_items as usize {
                 errors.push(ValidationError {
                     error_type: ValidationErrorType::InvalidFieldValue,
-                    message: format!(
-                        "Field '{field_name}' must have at least {min_items} items"
-                    ),
+                    message: format!("Field '{field_name}' must have at least {min_items} items"),
                     field: Some(field_name.to_string()),
                 });
             }
@@ -932,9 +923,7 @@ impl OpenAPIValidator {
             if arr.len() > max_items as usize {
                 errors.push(ValidationError {
                     error_type: ValidationErrorType::InvalidFieldValue,
-                    message: format!(
-                        "Field '{field_name}' must have at most {max_items} items"
-                    ),
+                    message: format!("Field '{field_name}' must have at most {max_items} items"),
                     field: Some(field_name.to_string()),
                 });
             }

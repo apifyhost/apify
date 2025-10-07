@@ -18,7 +18,8 @@ impl TryFrom<(Option<Value>, &PostgresConfig)> for Input {
         let value = value.ok_or_else(|| "Input value is None".to_string())?;
 
         let query = value
-            .get("query").map(|v| v.to_string())
+            .get("query")
+            .map(|v| v.to_string())
             .ok_or_else(|| "Query not found or not a string".to_string())?
             .to_string();
 

@@ -168,9 +168,7 @@ pub async fn proxy(
     let body = resolve_body(req);
     let query_params = resolve_query_params(&query);
 
-    context
-        .span
-        .record("otel.name", format!("{method} {path}"));
+    context.span.record("otel.name", format!("{method} {path}"));
     context.span.record("http.request.body.size", body_size);
     context.span.record("http.request.size", request_size);
     context.span.record("http.request.method", &method);
@@ -296,8 +294,6 @@ async fn resolve_body(req: Request<hyper::body::Incoming>) -> Value {
             Bytes::new()
         }
     };
-
-    
 
     match std::str::from_utf8(&body_bytes) {
         Ok(s) => {

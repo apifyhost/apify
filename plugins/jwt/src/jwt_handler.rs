@@ -44,9 +44,7 @@ impl JwtHandler {
         data: Option<Value>,
         expires_in: Option<u64>,
     ) -> Result<Value, Box<dyn std::error::Error + Send + Sync>> {
-        log::debug!(
-            "Creating JWT token with data: {data:?}, expires_in: {expires_in:?}"
-        );
+        log::debug!("Creating JWT token with data: {data:?}, expires_in: {expires_in:?}");
         let now = Utc::now();
         let exp = now + chrono::Duration::seconds(expires_in.unwrap_or(DEFAULT_EXPIRES_IN) as i64);
         log::debug!("Token expiration time: {exp}");

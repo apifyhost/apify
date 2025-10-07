@@ -61,9 +61,7 @@ pub async fn producer(
     mut channel: lapin::Channel,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (tx, rx) = channel::unbounded::<ModulePackage>();
-    setup_sender
-        .send(Some(tx))
-        .map_err(|e| format!("{e:?}"))?;
+    setup_sender.send(Some(tx)).map_err(|e| format!("{e:?}"))?;
 
     log::debug!("Producer started");
 

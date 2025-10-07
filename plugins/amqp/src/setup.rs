@@ -227,9 +227,8 @@ fn import_definition(
                             .map(|s| s.as_string())
                             .unwrap_or("".to_string());
 
-                        let url = format!(
-                            "http://{host}:{management_port}/api/vhosts/{vhost_name}"
-                        );
+                        let url =
+                            format!("http://{host}:{management_port}/api/vhosts/{vhost_name}");
                         let response = client
                             .put(&url)
                             .basic_auth(username, Some(password))

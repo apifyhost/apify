@@ -84,7 +84,8 @@ impl From<Value> for CorsConfig {
 
         let credentials = value
             .get("credentials")
-            .and_then(|v| v.as_bool()).copied()
+            .and_then(|v| v.as_bool())
+            .copied()
             .unwrap_or(true);
 
         let max_age = value

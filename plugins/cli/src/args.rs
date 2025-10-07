@@ -204,21 +204,16 @@ impl Args {
                             Value::Null
                         }
                     },
-                    InputType::Boolean => {
-                        
-                        match value_str.as_str() {
-                            "" => Value::Boolean(true),
-                            "true" | "1" => Value::Boolean(true),
-                            "false" | "0" => Value::Boolean(false),
-                            _ => {
-                                error.push(format!(
-                                    "Invalid value for {}: {}",
-                                    arg_def.name, value_str
-                                ));
-                                Value::Null
-                            }
+                    InputType::Boolean => match value_str.as_str() {
+                        "" => Value::Boolean(true),
+                        "true" | "1" => Value::Boolean(true),
+                        "false" | "0" => Value::Boolean(false),
+                        _ => {
+                            error
+                                .push(format!("Invalid value for {}: {}", arg_def.name, value_str));
+                            Value::Null
                         }
-                    }
+                    },
                 };
                 parsed_args.insert(arg_def.name.clone(), value);
             }

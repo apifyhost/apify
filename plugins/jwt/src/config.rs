@@ -2,12 +2,10 @@ use sdk::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// JWT module configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct JwtConfig {
     pub secret: String,
 }
-
 
 impl TryFrom<Value> for JwtConfig {
     type Error = String;

@@ -37,9 +37,8 @@ pub async fn postgres(setup: ModuleSetup) -> Result<(), Box<dyn std::error::Erro
             let client = match pool.get().await {
                 Ok(client) => client,
                 Err(e) => {
-                    let response = ModuleResponse::from_error(format!(
-                        "Failed to get client from pool: {e}"
-                    ));
+                    let response =
+                        ModuleResponse::from_error(format!("Failed to get client from pool: {e}"));
 
                     sender_safe!(plugin.sender, response);
                     return;

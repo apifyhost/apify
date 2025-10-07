@@ -118,9 +118,7 @@ async fn handle_set(
     value: Value,
     ttl: Option<u64>,
 ) -> Result<Value, String> {
-    let mut cache_guard = cache
-        .lock()
-        .map_err(|e| format!("Cache lock error: {e}"))?;
+    let mut cache_guard = cache.lock().map_err(|e| format!("Cache lock error: {e}"))?;
 
     // Convert sdk Value to quickleaf Value
     let quickleaf_value = value.clone();
@@ -152,9 +150,7 @@ async fn handle_get(
     stats: Arc<Mutex<CacheStats>>,
     key: String,
 ) -> Result<Value, String> {
-    let mut cache_guard = cache
-        .lock()
-        .map_err(|e| format!("Cache lock error: {e}"))?;
+    let mut cache_guard = cache.lock().map_err(|e| format!("Cache lock error: {e}"))?;
 
     match cache_guard.get(&key) {
         Some(value) => {
@@ -198,9 +194,7 @@ async fn handle_remove(
     stats: Arc<Mutex<CacheStats>>,
     key: String,
 ) -> Result<Value, String> {
-    let mut cache_guard = cache
-        .lock()
-        .map_err(|e| format!("Cache lock error: {e}"))?;
+    let mut cache_guard = cache.lock().map_err(|e| format!("Cache lock error: {e}"))?;
 
     match cache_guard.remove(&key) {
         Ok(()) => {
@@ -237,9 +231,7 @@ async fn handle_clear(
     cache: CacheInstance,
     stats: Arc<Mutex<CacheStats>>,
 ) -> Result<Value, String> {
-    let mut cache_guard = cache
-        .lock()
-        .map_err(|e| format!("Cache lock error: {e}"))?;
+    let mut cache_guard = cache.lock().map_err(|e| format!("Cache lock error: {e}"))?;
 
     let previous_size = cache_guard.len();
     cache_guard.clear();
@@ -265,9 +257,7 @@ async fn handle_exists(
     stats: Arc<Mutex<CacheStats>>,
     key: String,
 ) -> Result<Value, String> {
-    let mut cache_guard = cache
-        .lock()
-        .map_err(|e| format!("Cache lock error: {e}"))?;
+    let mut cache_guard = cache.lock().map_err(|e| format!("Cache lock error: {e}"))?;
 
     let exists = cache_guard.contains_key(&key);
 
@@ -302,9 +292,7 @@ async fn handle_list(
     limit: Option<u64>,
     offset: u64,
 ) -> Result<Value, String> {
-    let mut cache_guard = cache
-        .lock()
-        .map_err(|e| format!("Cache lock error: {e}"))?;
+    let mut cache_guard = cache.lock().map_err(|e| format!("Cache lock error: {e}"))?;
 
     // Determine filter
     let filter = match filter_type.as_str() {
@@ -388,9 +376,7 @@ async fn handle_list(
 
 /// Handle cleanup action
 async fn handle_cleanup(cache: CacheInstance) -> Result<Value, String> {
-    let mut cache_guard = cache
-        .lock()
-        .map_err(|e| format!("Cache lock error: {e}"))?;
+    let mut cache_guard = cache.lock().map_err(|e| format!("Cache lock error: {e}"))?;
 
     let cleaned_count = cache_guard.cleanup_expired();
 
@@ -408,12 +394,8 @@ async fn handle_stats(
     cache: CacheInstance,
     stats: Arc<Mutex<CacheStats>>,
 ) -> Result<Value, String> {
-    let cache_guard = cache
-        .lock()
-        .map_err(|e| format!("Cache lock error: {e}"))?;
-    let stats_guard = stats
-        .lock()
-        .map_err(|e| format!("Stats lock error: {e}"))?;
+    let cache_guard = cache.lock().map_err(|e| format!("Cache lock error: {e}"))?;
+    let stats_guard = stats.lock().map_err(|e| format!("Stats lock error: {e}"))?;
 
     let current_size = cache_guard.len();
     let capacity = cache_guard.capacity();

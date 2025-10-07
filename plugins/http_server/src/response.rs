@@ -59,7 +59,8 @@ impl ResponseHandler {
             }
         } else {
             cors_config
-                .origins.first()
+                .origins
+                .first()
                 .unwrap_or(&"*".to_string())
                 .clone()
         };
