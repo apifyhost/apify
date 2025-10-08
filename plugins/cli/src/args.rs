@@ -136,18 +136,19 @@ impl Args {
 
             if let Some(long_flag) = &arg_def.long {
                 let flag = format!("--{long_flag}");
-                if let Some(pos) = raw_args.iter().position(|a| a == &flag) {
-                    if arg_def.input_type == InputType::Boolean {
+                if let Some(pos) = raw_args.iter().position(|a| a == &flag)
+                    && arg_def.input_type == InputType::Boolean {
                         let next = raw_args.get(pos + 1);
-                        if next.is_none() || next.unwrap().starts_with('-') {
-                            found = Some("".to_string());
+                        if let Some(ref next_str) = next {
+                            if !next_str.starts_with('-') {
+                                found = Some(next_str.to_string());
+                            } else {
+                                found = Some("".to_string());
+                            }
                         } else {
-                            found = Some(next.unwrap().to_string());
+                            found = raw_args.get(pos + 1).cloned();
                         }
-                    } else {
-                        found = raw_args.get(pos + 1).cloned();
                     }
-                }
             }
 
             if found.is_none()
@@ -156,10 +157,14 @@ impl Args {
                     if let Some(pos) = raw_args.iter().position(|a| a == &flag) {
                         if arg_def.input_type == InputType::Boolean {
                             let next = raw_args.get(pos + 1);
-                            if next.is_none() || next.unwrap().starts_with('-') {
-                                found = Some("".to_string());
+                            if let Some(ref next_str) = next {
+                                if !next_str.starts_with('-') {
+                                    found = Some(next_str.to_string());
+                                } else {
+                                    found = Some("".to_string());
+                                }
                             } else {
-                                found = Some(next.unwrap().to_string());
+                                found = raw_args.get(pos + 1).cloned();
                             }
                         } else {
                             found = raw_args.get(pos + 1).cloned();
