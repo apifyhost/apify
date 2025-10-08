@@ -369,13 +369,11 @@ impl OpenAPIValidator {
                         field: Some("body".to_string()),
                     });
                 }
-                println!("Request body is null or undefined");
                 // If body is not required, null/undefined is valid
             }
             Value::Object(obj) => {
                 // Body is present, validate its structure
                 self.validate_object_schema_with_route(obj, errors, method, route_pattern);
-                println!("Request body is a valid object: {:?}", obj);
             }
             Value::String(s) if s.trim().is_empty() => {
                 // Empty string body - check if required
@@ -386,7 +384,6 @@ impl OpenAPIValidator {
                         field: Some("body".to_string()),
                     });
                 }
-                println!("Request body is an empty string");
             }
             _ => {
                 // Body has some other type - usually invalid for JSON APIs
