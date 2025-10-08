@@ -18,7 +18,7 @@ permissions:
   checks: read
 
 jobs:
-  build_linux_amd64:
+  build:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -51,21 +51,67 @@ jobs:
       - name: Upload Linux amd64 plugins
         uses: actions/upload-artifact@v4
         with:
-          name: linux-amd64-plugins
+          name: ${{ matrix.target }}
           path: ./plugins-target
           retention-days: 1
-  
+
+  release:
+    needs: 
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Create raw directory
+        run: mkdir -p raw
+
+      - name: Download Mac plugins
+        uses: actions/download-artifact@v4
+        with:
+          name: x86_64-apple-darwin
+          path: x86_64-apple-darwin
+
+      - name: Download Mac aarch64 plugins
+        uses: actions/download-artifact@v4
+        with:
+          name: aarch64-apple-darwin
+          path: aarch64-apple-darwin
+
+      - name: Download Linux plugins
+        uses: actions/download-artifact@v4
+        with:
+          name: x86_64-unknown-linux-gnu
+          path: x86_64-unknown-linux-gnu
+
+      - name: Download Linux aarch64 plugins
+        uses: actions/download-artifact@v4
+        with:
+          name: aarch64-unknown-linux-gnu
+          path: aarch64-unknown-linux-gnu
+
+      - name: Move artifacts to raw directory
+        run: |
+          cp aarch64-apple-darwin/*.tar.gz raw/ || true
+          cp x86_64-apple-darwin/*.tar.gz raw/ || true
+          cp x86_64-unknown-linux-gnu/*.tar.gz raw/ || true
+          cp aarch64-unknown-linux-gnu/*.tar.gz raw/ || true
+
+      - name: Run resolver script
+        run: ./scripts/resolver-plugins-dir.sh
       - name: Setup Git for plugins repo
         run: |
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "actions@github.com"
-
       - name: Update plugins repository
         env:
           GH_TOKEN: ${{ secrets.GH_PLUGINS_PAT  }}
         run: |
+          ls -l raw
           gh repo clone apifyhost/apify-plugins
-          cp -R plugins-target/* apify-plugins/plugins/
+          cp -R raw/* apify-plugins/plugins/
           cd apify-plugins
           git checkout -b update-plugins-${{ github.run_id }}
           git add .
