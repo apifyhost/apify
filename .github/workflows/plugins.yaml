@@ -99,8 +99,6 @@ jobs:
           cp x86_64-unknown-linux-gnu/*.tar.gz raw/ || true
           cp aarch64-unknown-linux-gnu/*.tar.gz raw/ || true
 
-      - name: Run resolver script
-        run: ./scripts/resolver-plugins-dir.sh
       - name: Setup Git for plugins repo
         run: |
           git config --global user.name "GitHub Actions Bot"
@@ -110,8 +108,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PLUGINS_PAT  }}
         run: |
           ls -l raw
+          VERSION=${GITHUB_REF##*/}
+          if [[ "$VERSION" = "refs/heads/main" || "$VERSION" = "merge" ]]; then
+            VERSION="latest"
+          fi
+          echo "Using version: $VERSION"
+          gh auth login --with-token <<< "$GH_TOKEN"
           gh repo clone apifyhost/apify-plugins
-          cp -R raw/* apify-plugins/plugins/
+          mkdir -p apify-plugins/plugins/${VERSION}
+          cp -R raw/* apify-plugins/plugins/${VERSION}/
           cd apify-plugins
           git checkout -b update-plugins-${{ github.run_id }}
           git add .
