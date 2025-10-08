@@ -105,7 +105,7 @@ jobs:
           git config --global user.email "actions@github.com"
       - name: Update plugins repository
         env:
-          GH_TOKEN: ${{ secrets.GH_PLUGINS_PAT  }}
+          GH_TOKEN: ${{ secrets.PLUGINS_TOKEN  }}
         run: |
           ls -l raw
           VERSION=${GITHUB_REF##*/}
