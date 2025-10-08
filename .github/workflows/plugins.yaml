@@ -122,5 +122,5 @@ jobs:
           git add .
           git commit -m "Update plugins from workflow run ${{ github.run_id }}" || echo "No changes to commit"
           # gh repo push origin update-plugins-${{ github.run_id }}
-          git push --set-upstream origin update-packages-${{ github.run_id }}
+          git push --set-upstream origin update-plugins-${{ github.run_id }}
           gh pr create --title "Update plugins from workflow run ${{ github.run_id }}" --body "Automated plugin update from workflow run." --base main --head update-plugins-${{ github.run_id }}
