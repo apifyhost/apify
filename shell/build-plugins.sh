@@ -34,6 +34,12 @@ if [[ -z "$OS_SUFFIX" || -z "$TARGET" || -z "$MODULE_EXTENSION" ]]; then
       if [[ -z "$OS_SUFFIX" ]]; then OS_SUFFIX="-linux-aarch64"; fi
       if [[ -z "$TARGET" ]]; then TARGET="aarch64-unknown-linux-gnu"; fi
       MODULE_EXTENSION="so"
+
+      export CC_aarch64_unknown_linux_gnu="aarch64-linux-gnu-gcc-12"
+      export CXX_aarch64_unknown_linux_gnu="aarch64-linux-gnu-g++-12"
+      export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER="aarch64-linux-gnu-gcc-12"
+      export CFLAGS_aarch64_unknown_linux_gnu="-march=armv8.2-a+crypto"
+
       echo "🐧 Detected Linux aarch64 platform"
     else
       echo "⚠️ Unknown Linux architecture: $ARCH"
