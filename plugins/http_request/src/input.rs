@@ -58,17 +58,16 @@ impl Input {
 
         let body = value.get("body").map(|v| v.to_string());
 
-        if let Some(body) = &body {
-            if body.starts_with('{')
-                && body.ends_with('}')
-                && headers.get("Content-Type").is_none()
-                && headers.get("content-type").is_none()
-            {
-                headers.insert(
-                    "content-type",
-                    header::HeaderValue::from_static("application/json"),
-                );
-            }
+        if let Some(body) = &body
+            && body.starts_with('{')
+            && body.ends_with('}')
+            && headers.get("Content-Type").is_none()
+            && headers.get("content-type").is_none()
+        {
+            headers.insert(
+                "content-type",
+                header::HeaderValue::from_static("application/json"),
+            );
         }
 
         Input {
