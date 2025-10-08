@@ -150,8 +150,8 @@ impl Args {
                 }
             }
 
-            if found.is_none() {
-                if let Some(short_flag) = &arg_def.short {
+            if found.is_none()
+                && let Some(short_flag) = &arg_def.short {
                     let flag = format!("-{short_flag}");
                     if let Some(pos) = raw_args.iter().position(|a| a == &flag) {
                         if arg_def.input_type == InputType::Boolean {
@@ -166,11 +166,10 @@ impl Args {
                         }
                     }
                 }
-            }
 
-            if found.is_none() {
-                if let Some(idx) = arg_def.index {
-                    if raw_args.len() > idx {
+            if found.is_none()
+                && let Some(idx) = arg_def.index
+                    && raw_args.len() > idx {
                         let value = raw_args[idx].clone();
                         if value.starts_with('-') {
                             error.push(format!(
@@ -181,8 +180,6 @@ impl Args {
                             found = Some(value);
                         }
                     }
-                }
-            }
 
             if found.is_none() {
                 found = arg_def.default.clone();

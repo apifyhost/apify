@@ -371,8 +371,8 @@ fn validate_request_and_extract_params(
         .map(|route| route.to_value());
 
     // If validation failed, return error response
-    if let Some(validation) = &validation_result.validation_result {
-        if !validation.is_valid {
+    if let Some(validation) = &validation_result.validation_result
+        && !validation.is_valid {
             let error_details: Vec<Value> = validation
                 .errors
                 .iter()
@@ -407,7 +407,6 @@ fn validate_request_and_extract_params(
 
             return (path_params, original_path, Some(error_response));
         }
-    }
 
     (path_params, original_path, None)
 }

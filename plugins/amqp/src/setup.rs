@@ -217,8 +217,8 @@ fn import_definition(
         let client = reqwest::blocking::Client::new();
 
         // Import vhosts
-        if let Some(vhosts) = obj.get("vhosts") {
-            if let Some(vhosts_array) = vhosts.as_array() {
+        if let Some(vhosts) = obj.get("vhosts")
+            && let Some(vhosts_array) = vhosts.as_array() {
                 for vhost in vhosts_array.values.iter() {
                     if let Some(vhost_obj) = vhost.as_object() {
                         let vhost_name = vhost_obj
@@ -240,11 +240,10 @@ fn import_definition(
                     }
                 }
             }
-        }
 
         // Import exchanges
-        if let Some(exchanges) = obj.get("exchanges") {
-            if let Some(exchanges_array) = exchanges.as_array() {
+        if let Some(exchanges) = obj.get("exchanges")
+            && let Some(exchanges_array) = exchanges.as_array() {
                 for exchange in exchanges_array.values.iter() {
                     if let Some(exchange_obj) = exchange.as_object() {
                         let exchange_name = exchange_obj
@@ -320,11 +319,10 @@ fn import_definition(
                     }
                 }
             }
-        }
 
         // Import queues
-        if let Some(queues) = obj.get("queues") {
-            if let Some(queues_array) = queues.as_array() {
+        if let Some(queues) = obj.get("queues")
+            && let Some(queues_array) = queues.as_array() {
                 for queue in queues_array.values.iter() {
                     if let Some(queue_obj) = queue.as_object() {
                         let queue_name = queue_obj
@@ -429,11 +427,10 @@ fn import_definition(
                     }
                 }
             }
-        }
 
         // Import bindings
-        if let Some(bindings) = obj.get("bindings") {
-            if let Some(bindings_array) = bindings.as_array() {
+        if let Some(bindings) = obj.get("bindings")
+            && let Some(bindings_array) = bindings.as_array() {
                 for binding in bindings_array.values.iter() {
                     if let Some(binding_obj) = binding.as_object() {
                         let source = binding_obj
@@ -515,7 +512,6 @@ fn import_definition(
                     }
                 }
             }
-        }
     } else {
         log::debug!("Definition is not an object, skipping import");
     }

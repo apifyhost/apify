@@ -31,14 +31,12 @@ async fn check_dlq_configured(config: &Config) -> bool {
                 match response.json::<serde_json::Value>().await {
                     Ok(queue_info) => {
                         // Verificar se há x-dead-letter-exchange configurado
-                        if let Some(arguments) = queue_info.get("arguments") {
-                            if let Some(dle) = arguments.get("x-dead-letter-exchange") {
-                                if !dle.is_null() && dle.as_str().unwrap_or("").trim() != "" {
+                        if let Some(arguments) = queue_info.get("arguments")
+                            && let Some(dle) = arguments.get("x-dead-letter-exchange")
+                                && !dle.is_null() && dle.as_str().unwrap_or("").trim() != "" {
                                     log::debug!("DLQ configured: x-dead-letter-exchange = {dle}");
                                     return true;
                                 }
-                            }
-                        }
                         log::debug!("DLQ not configured: no x-dead-letter-exchange found");
                         false
                     }
