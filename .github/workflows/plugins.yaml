@@ -18,46 +18,35 @@ permissions:
   checks: read
 
 jobs:
-  build_darwin:
-    runs-on: macos-latest
-    env:
-      OS_SUFFIX: -darwin-aarch64
-      TARGET: aarch64-apple-darwin
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Run plugins script
-        run: ./shell/build-plugins.sh
-
-      - name: Upload Mac plugins
-        uses: actions/upload-artifact@v4
-        with:
-          name: darwin-plugins
-          path: ./plugins-target
-          retention-days: 1
-
   build_linux_amd64:
-    runs-on: ubuntu-latest
-    env:
-      OS_SUFFIX: -linux-amd64
-      TARGET: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, use_cross: false }
+          - { os: ubuntu-latest, target: aarch64-unknown-linux-gnu, use_cross: true }
+          - { os: macos-latest,  target: x86_64-apple-darwin, use_cross: true }
+          - { os: macos-latest,  target: aarch64-apple-darwin, use_cross: false }
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          fetch-depth: 0
-    
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+          targets: ${{ matrix.target }}
 
-      - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Install cross
+        if: matrix.use_cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
 
-      - name: Run plugins script
-        run: TARGET=x86_64-unknown-linux-gnu ./shell/build-plugins.sh
+      - name: Build
+        env:
+          TARGET: ${{ matrix.target }}
+          CROSS: ${{ matrix.use_cross }}
+          OS: ${{ matrix.os }}
+        run: ./shell/build-plugins.sh
 
       - name: Upload Linux amd64 plugins
         uses: actions/upload-artifact@v4
@@ -66,80 +55,6 @@ jobs:
           path: ./plugins-target
           retention-days: 1
   
-  build_linux_aarch64:
-    runs-on: ubuntu-latest
-    env:
-      OS_SUFFIX: -linux-aarch64
-      TARGET: aarch64-unknown-linux-gnu
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Install dependencies
-        run: |
-          sudo add-apt-repository ppa:ubuntu-toolchain-r/test
-          sudo apt-get update && sudo apt-get install -y jq gcc-12-aarch64-linux-gnu g++-12-aarch64-linux-gnu
-
-      - name: Run plugins script
-        run: TARGET=aarch64-unknown-linux-gnu ./shell/build-plugins.sh
-
-      - name: Upload Linux aarch64 plugins
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-aarch64-plugins
-          path: ./plugins-target
-          retention-days: 1
-
-  deploy:
-    needs: 
-      - build_darwin
-      - build_linux_amd64
-      - build_linux_aarch64
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y jq
-
-      - name: Create raw directory
-        run: mkdir -p raw
-
-      - name: Download Mac plugins
-        uses: actions/download-artifact@v4
-        with:
-          name: darwin-plugins
-          path: darwin-plugins
-
-      - name: Download Ubuntu plugins
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-amd64-plugins
-          path: linux-amd64-plugins
-
-      - name: Download Linux musl plugins
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-aarch64-plugins
-          path: linux-aarch64-plugins
-
-      - name: Move artifacts to raw directory
-        run: |
-          cp darwin-plugins/*.tar.gz raw/ || true
-          cp linux-amd64-plugins/*.tar.gz raw/ || true
-          cp linux-aarch64-plugins/*.tar.gz raw/ || true
-
-      - name: Run resolver script
-        run: ./scripts/resolver-plugins-dir.sh
-
       - name: Setup Git for plugins repo
         run: |
           git config --global user.name "GitHub Actions Bot"

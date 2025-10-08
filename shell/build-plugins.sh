@@ -2,53 +2,9 @@
 
 set -e
 
-cargo install cross
-
-# Detect operating system or target
-# Define OS_SUFFIX, TARGET e MODULE_EXTENSION dinamicamente
-if [[ -z "$OS_SUFFIX" || -z "$TARGET" || -z "$MODULE_EXTENSION" ]]; then
-  if [[ -z "$OS_SUFFIX" ]]; then OS_SUFFIX=""; fi
-  if [[ -z "$TARGET" ]]; then TARGET=""; fi
-  if [[ -z "$MODULE_EXTENSION" ]]; then MODULE_EXTENSION=""; fi
-
-  if [[ "$OSTYPE" == "darwin"* ]]; then
-    if [[ -z "$OS_SUFFIX" ]]; then OS_SUFFIX="-darwin"; fi
-    if [[ -z "$TARGET" ]]; then TARGET="x86_64-apple-darwin"; fi
-    if [[ "$(uname -m)" == "arm64" ]]; then
-        OS_SUFFIX="-darwin-aarch64"
-        TARGET="aarch64-apple-darwin"
-    elif [[ "$(uname -m)" == "x86_64" ]]; then
-        OS_SUFFIX="-darwin-x86_64"
-        TARGET="x86_64-apple-darwin"
-    fi
-    MODULE_EXTENSION="dylib"
-    echo "🍎 Detected macOS platform"
-  elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    ARCH=$(uname -m)
-    if [[ "$ARCH" == "x86_64" ]]; then
-      if [[ -z "$OS_SUFFIX" ]]; then OS_SUFFIX="-linux-amd64"; fi
-      if [[ -z "$TARGET" ]]; then TARGET="x86_64-unknown-linux-gnu"; fi
-      MODULE_EXTENSION="so"
-      echo "🐧 Detected Linux amd64 platform"
-    elif [[ "$ARCH" == "aarch64" ]]; then
-      if [[ -z "$OS_SUFFIX" ]]; then OS_SUFFIX="-linux-aarch64"; fi
-      if [[ -z "$TARGET" ]]; then TARGET="aarch64-unknown-linux-gnu"; fi
-      MODULE_EXTENSION="so"
-
-      export CC_aarch64_unknown_linux_gnu="aarch64-linux-gnu-gcc-12"
-      export CXX_aarch64_unknown_linux_gnu="aarch64-linux-gnu-g++-12"
-      export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER="aarch64-linux-gnu-gcc-12"
-      export CFLAGS_aarch64_unknown_linux_gnu="-march=armv8.2-a+crypto"
-
-      echo "🐧 Detected Linux aarch64 platform"
-    else
-      echo "⚠️ Unknown Linux architecture: $ARCH"
-      exit 1
-    fi
-  else
-    echo "⚠️ Unknown OSTYPE: $OSTYPE"
-    exit 1
-  fi
+MODULE_EXTENSION="so"
+if [[ "$OS" == "macos-latest" ]]; then
+  MODULE_EXTENSION="dylib"
 fi
 
 if [ ! -d "./plugins-target" ]; then
@@ -63,7 +19,6 @@ if ! command -v yq &> /dev/null; then
   echo "yq not found. Please install yq (https://github.com/mikefarah/yq)"
   exit 1
 fi
-
 
 package_plugin() {
     MODULE_DIR="$1"
@@ -94,7 +49,6 @@ package_plugin() {
     echo "  license: $LICENSE"
     echo "  author: $AUTHOR"
 
-    # Validações
     if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-a-zA-Z0-9\.]+)?(\+[a-zA-Z0-9\.]+)?$ ]]; then
       echo "❌ Invalid version format: $VERSION"
       exit 1
@@ -117,7 +71,12 @@ package_plugin() {
     fi
 
     echo "⚙️ Building module..."
-    cross build --target "$TARGET" --release --locked
+
+    if [[ "$CROSS" == "true" ]]; then
+      cross build --target "$TARGET" --release --locked
+    else
+      cargo build --target "$TARGET" --release --locked
+    fi
 
     TMP_DIR=".tmp/${NAME}"
     mkdir -p "$TMP_DIR"
@@ -142,7 +101,7 @@ package_plugin() {
 
     cd - > /dev/null
 
-    RENAMED_ARCHIVE="${NAME}-${VERSION}${OS_SUFFIX}.tar.gz"
+    RENAMED_ARCHIVE="${NAME}-${VERSION}-${TARGET}.tar.gz"
     mv "$MODULE_DIR/$ARCHIVE_NAME" "./plugins-target/$RENAMED_ARCHIVE"
 
     echo "✅ Plugin packaged: $RENAMED_ARCHIVE"
