@@ -218,300 +218,303 @@ fn import_definition(
 
         // Import vhosts
         if let Some(vhosts) = obj.get("vhosts")
-            && let Some(vhosts_array) = vhosts.as_array() {
-                for vhost in vhosts_array.values.iter() {
-                    if let Some(vhost_obj) = vhost.as_object() {
-                        let vhost_name = vhost_obj
-                            .get("name")
-                            .and_then(|v| v.as_string_b())
-                            .map(|s| s.as_string())
-                            .unwrap_or("".to_string());
+            && let Some(vhosts_array) = vhosts.as_array()
+        {
+            for vhost in vhosts_array.values.iter() {
+                if let Some(vhost_obj) = vhost.as_object() {
+                    let vhost_name = vhost_obj
+                        .get("name")
+                        .and_then(|v| v.as_string_b())
+                        .map(|s| s.as_string())
+                        .unwrap_or("".to_string());
 
-                        let url =
-                            format!("http://{host}:{management_port}/api/vhosts/{vhost_name}");
-                        let response = client
-                            .put(&url)
-                            .basic_auth(username, Some(password))
-                            .header("Content-Type", "application/json")
-                            .json(&serde_json::json!({}))
-                            .send()?;
+                    let url = format!("http://{host}:{management_port}/api/vhosts/{vhost_name}");
+                    let response = client
+                        .put(&url)
+                        .basic_auth(username, Some(password))
+                        .header("Content-Type", "application/json")
+                        .json(&serde_json::json!({}))
+                        .send()?;
 
-                        log::debug!("Created vhost '{}': {}", vhost_name, response.status());
-                    }
+                    log::debug!("Created vhost '{}': {}", vhost_name, response.status());
                 }
             }
+        }
 
         // Import exchanges
         if let Some(exchanges) = obj.get("exchanges")
-            && let Some(exchanges_array) = exchanges.as_array() {
-                for exchange in exchanges_array.values.iter() {
-                    if let Some(exchange_obj) = exchange.as_object() {
-                        let exchange_name = exchange_obj
-                            .get("name")
-                            .and_then(|v| v.as_string_b())
-                            .map(|s| s.as_string())
-                            .unwrap_or("".to_string());
+            && let Some(exchanges_array) = exchanges.as_array()
+        {
+            for exchange in exchanges_array.values.iter() {
+                if let Some(exchange_obj) = exchange.as_object() {
+                    let exchange_name = exchange_obj
+                        .get("name")
+                        .and_then(|v| v.as_string_b())
+                        .map(|s| s.as_string())
+                        .unwrap_or("".to_string());
 
-                        let vhost = exchange_obj
-                            .get("vhost")
-                            .and_then(|v| v.as_string_b())
-                            .map(|s| s.as_string())
-                            .unwrap_or("/".to_string());
+                    let vhost = exchange_obj
+                        .get("vhost")
+                        .and_then(|v| v.as_string_b())
+                        .map(|s| s.as_string())
+                        .unwrap_or("/".to_string());
 
-                        let exchange_type = exchange_obj
-                            .get("type")
-                            .and_then(|v| v.as_string_b())
-                            .map(|s| s.as_string())
-                            .unwrap_or("direct".to_string());
+                    let exchange_type = exchange_obj
+                        .get("type")
+                        .and_then(|v| v.as_string_b())
+                        .map(|s| s.as_string())
+                        .unwrap_or("direct".to_string());
 
-                        let durable = exchange_obj
-                            .get("durable")
-                            .and_then(|v| v.as_bool())
-                            .copied()
-                            .unwrap_or(true);
+                    let durable = exchange_obj
+                        .get("durable")
+                        .and_then(|v| v.as_bool())
+                        .copied()
+                        .unwrap_or(true);
 
-                        let auto_delete = exchange_obj
-                            .get("auto_delete")
-                            .and_then(|v| v.as_bool())
-                            .copied()
-                            .unwrap_or(false);
+                    let auto_delete = exchange_obj
+                        .get("auto_delete")
+                        .and_then(|v| v.as_bool())
+                        .copied()
+                        .unwrap_or(false);
 
-                        let internal = exchange_obj
-                            .get("internal")
-                            .and_then(|v| v.as_bool())
-                            .copied()
-                            .unwrap_or(false);
+                    let internal = exchange_obj
+                        .get("internal")
+                        .and_then(|v| v.as_bool())
+                        .copied()
+                        .unwrap_or(false);
 
-                        let url = format!(
-                            "http://{}:{}/api/exchanges/{}/{}",
-                            host,
-                            management_port,
-                            urlencoding::encode(&vhost),
-                            urlencoding::encode(&exchange_name)
-                        );
+                    let url = format!(
+                        "http://{}:{}/api/exchanges/{}/{}",
+                        host,
+                        management_port,
+                        urlencoding::encode(&vhost),
+                        urlencoding::encode(&exchange_name)
+                    );
 
-                        let arguments = exchange_obj
-                            .get("arguments")
-                            .and_then(|v| v.as_object())
-                            .map(|_| serde_json::json!({}))
-                            .unwrap_or(serde_json::json!({}));
+                    let arguments = exchange_obj
+                        .get("arguments")
+                        .and_then(|v| v.as_object())
+                        .map(|_| serde_json::json!({}))
+                        .unwrap_or(serde_json::json!({}));
 
-                        let body = serde_json::json!({
-                            "type": exchange_type,
-                            "durable": durable,
-                            "auto_delete": auto_delete,
-                            "internal": internal,
-                            "arguments": arguments
-                        });
+                    let body = serde_json::json!({
+                        "type": exchange_type,
+                        "durable": durable,
+                        "auto_delete": auto_delete,
+                        "internal": internal,
+                        "arguments": arguments
+                    });
 
-                        let response = client
-                            .put(&url)
-                            .basic_auth(username, Some(password))
-                            .header("Content-Type", "application/json")
-                            .json(&body)
-                            .send()?;
+                    let response = client
+                        .put(&url)
+                        .basic_auth(username, Some(password))
+                        .header("Content-Type", "application/json")
+                        .json(&body)
+                        .send()?;
 
-                        log::debug!(
-                            "Created exchange '{}': {}",
-                            exchange_name,
-                            response.status()
-                        );
-                    }
+                    log::debug!(
+                        "Created exchange '{}': {}",
+                        exchange_name,
+                        response.status()
+                    );
                 }
             }
+        }
 
         // Import queues
         if let Some(queues) = obj.get("queues")
-            && let Some(queues_array) = queues.as_array() {
-                for queue in queues_array.values.iter() {
-                    if let Some(queue_obj) = queue.as_object() {
-                        let queue_name = queue_obj
-                            .get("name")
-                            .and_then(|v| v.as_string_b())
-                            .map(|s| s.as_string())
-                            .unwrap_or("".to_string());
+            && let Some(queues_array) = queues.as_array()
+        {
+            for queue in queues_array.values.iter() {
+                if let Some(queue_obj) = queue.as_object() {
+                    let queue_name = queue_obj
+                        .get("name")
+                        .and_then(|v| v.as_string_b())
+                        .map(|s| s.as_string())
+                        .unwrap_or("".to_string());
 
-                        let vhost = queue_obj
-                            .get("vhost")
-                            .and_then(|v| v.as_string_b())
-                            .map(|s| s.as_string())
-                            .unwrap_or("/".to_string());
+                    let vhost = queue_obj
+                        .get("vhost")
+                        .and_then(|v| v.as_string_b())
+                        .map(|s| s.as_string())
+                        .unwrap_or("/".to_string());
 
-                        let durable = queue_obj
-                            .get("durable")
-                            .and_then(|v| v.as_bool())
-                            .copied()
-                            .unwrap_or(true);
+                    let durable = queue_obj
+                        .get("durable")
+                        .and_then(|v| v.as_bool())
+                        .copied()
+                        .unwrap_or(true);
 
-                        let auto_delete = queue_obj
-                            .get("auto_delete")
-                            .and_then(|v| v.as_bool())
-                            .copied()
-                            .unwrap_or(false);
+                    let auto_delete = queue_obj
+                        .get("auto_delete")
+                        .and_then(|v| v.as_bool())
+                        .copied()
+                        .unwrap_or(false);
 
-                        let url = format!(
-                            "http://{}:{}/api/queues/{}/{}",
-                            host,
-                            management_port,
-                            urlencoding::encode(&vhost),
-                            urlencoding::encode(&queue_name)
-                        );
+                    let url = format!(
+                        "http://{}:{}/api/queues/{}/{}",
+                        host,
+                        management_port,
+                        urlencoding::encode(&vhost),
+                        urlencoding::encode(&queue_name)
+                    );
 
-                        let arguments = queue_obj
-                            .get("arguments")
-                            .and_then(|v| v.as_object())
-                            .map(|obj| {
-                                let mut args_map = serde_json::Map::new();
-                                for (key, value) in obj.iter() {
-                                    let key_str = key.to_string();
-                                    match value {
-                                        Value::String(s) => {
+                    let arguments = queue_obj
+                        .get("arguments")
+                        .and_then(|v| v.as_object())
+                        .map(|obj| {
+                            let mut args_map = serde_json::Map::new();
+                            for (key, value) in obj.iter() {
+                                let key_str = key.to_string();
+                                match value {
+                                    Value::String(s) => {
+                                        args_map.insert(
+                                            key_str,
+                                            serde_json::Value::String(s.as_string()),
+                                        );
+                                    }
+                                    Value::Number(n) => {
+                                        if let Some(i) = n.get_i64() {
                                             args_map.insert(
                                                 key_str,
-                                                serde_json::Value::String(s.as_string()),
+                                                serde_json::Value::Number(
+                                                    serde_json::Number::from(i),
+                                                ),
                                             );
-                                        }
-                                        Value::Number(n) => {
-                                            if let Some(i) = n.get_i64() {
-                                                args_map.insert(
-                                                    key_str,
-                                                    serde_json::Value::Number(
-                                                        serde_json::Number::from(i),
-                                                    ),
-                                                );
-                                            } else if let Some(f) = n.get_f64() {
-                                                args_map.insert(
-                                                    key_str,
-                                                    serde_json::Value::Number(
-                                                        serde_json::Number::from_f64(f)
-                                                            .unwrap_or(serde_json::Number::from(0)),
-                                                    ),
-                                                );
-                                            } else {
-                                                // fallback para outros tipos numéricos
-                                                args_map.insert(
-                                                    key_str,
-                                                    serde_json::Value::String(n.to_string()),
-                                                );
-                                            }
-                                        }
-                                        Value::Boolean(b) => {
-                                            args_map.insert(key_str, serde_json::Value::Bool(*b));
-                                        }
-                                        _ => {
+                                        } else if let Some(f) = n.get_f64() {
                                             args_map.insert(
                                                 key_str,
-                                                serde_json::Value::String(value.to_string()),
+                                                serde_json::Value::Number(
+                                                    serde_json::Number::from_f64(f)
+                                                        .unwrap_or(serde_json::Number::from(0)),
+                                                ),
+                                            );
+                                        } else {
+                                            // fallback para outros tipos numéricos
+                                            args_map.insert(
+                                                key_str,
+                                                serde_json::Value::String(n.to_string()),
                                             );
                                         }
                                     }
+                                    Value::Boolean(b) => {
+                                        args_map.insert(key_str, serde_json::Value::Bool(*b));
+                                    }
+                                    _ => {
+                                        args_map.insert(
+                                            key_str,
+                                            serde_json::Value::String(value.to_string()),
+                                        );
+                                    }
                                 }
-                                serde_json::Value::Object(args_map)
-                            })
-                            .unwrap_or(serde_json::json!({}));
+                            }
+                            serde_json::Value::Object(args_map)
+                        })
+                        .unwrap_or(serde_json::json!({}));
 
-                        let body = serde_json::json!({
-                            "durable": durable,
-                            "auto_delete": auto_delete,
-                            "arguments": arguments
-                        });
+                    let body = serde_json::json!({
+                        "durable": durable,
+                        "auto_delete": auto_delete,
+                        "arguments": arguments
+                    });
 
-                        let response = client
-                            .put(&url)
-                            .basic_auth(username, Some(password))
-                            .header("Content-Type", "application/json")
-                            .json(&body)
-                            .send()?;
+                    let response = client
+                        .put(&url)
+                        .basic_auth(username, Some(password))
+                        .header("Content-Type", "application/json")
+                        .json(&body)
+                        .send()?;
 
-                        log::debug!("Created queue '{}': {}", queue_name, response.status());
-                    }
+                    log::debug!("Created queue '{}': {}", queue_name, response.status());
                 }
             }
+        }
 
         // Import bindings
         if let Some(bindings) = obj.get("bindings")
-            && let Some(bindings_array) = bindings.as_array() {
-                for binding in bindings_array.values.iter() {
-                    if let Some(binding_obj) = binding.as_object() {
-                        let source = binding_obj
-                            .get("source")
-                            .and_then(|v| v.as_string_b())
-                            .map(|s| s.as_string())
-                            .unwrap_or("".to_string());
+            && let Some(bindings_array) = bindings.as_array()
+        {
+            for binding in bindings_array.values.iter() {
+                if let Some(binding_obj) = binding.as_object() {
+                    let source = binding_obj
+                        .get("source")
+                        .and_then(|v| v.as_string_b())
+                        .map(|s| s.as_string())
+                        .unwrap_or("".to_string());
 
-                        let destination = binding_obj
-                            .get("destination")
-                            .and_then(|v| v.as_string_b())
-                            .map(|s| s.as_string())
-                            .unwrap_or("".to_string());
+                    let destination = binding_obj
+                        .get("destination")
+                        .and_then(|v| v.as_string_b())
+                        .map(|s| s.as_string())
+                        .unwrap_or("".to_string());
 
-                        let vhost = binding_obj
-                            .get("vhost")
-                            .and_then(|v| v.as_string_b())
-                            .map(|s| s.as_string())
-                            .unwrap_or("/".to_string());
+                    let vhost = binding_obj
+                        .get("vhost")
+                        .and_then(|v| v.as_string_b())
+                        .map(|s| s.as_string())
+                        .unwrap_or("/".to_string());
 
-                        let routing_key = binding_obj
-                            .get("routing_key")
-                            .and_then(|v| v.as_string_b())
-                            .map(|s| s.as_string())
-                            .unwrap_or("".to_string());
+                    let routing_key = binding_obj
+                        .get("routing_key")
+                        .and_then(|v| v.as_string_b())
+                        .map(|s| s.as_string())
+                        .unwrap_or("".to_string());
 
-                        let url = format!(
-                            "http://{}:{}/api/bindings/{}/e/{}/q/{}",
-                            host,
-                            management_port,
-                            urlencoding::encode(&vhost),
-                            urlencoding::encode(&source),
-                            urlencoding::encode(&destination)
-                        );
+                    let url = format!(
+                        "http://{}:{}/api/bindings/{}/e/{}/q/{}",
+                        host,
+                        management_port,
+                        urlencoding::encode(&vhost),
+                        urlencoding::encode(&source),
+                        urlencoding::encode(&destination)
+                    );
 
-                        log::debug!("Creating binding with URL: {url}");
+                    log::debug!("Creating binding with URL: {url}");
 
-                        let arguments = binding_obj
-                            .get("arguments")
-                            .and_then(|v| v.as_object())
-                            .map(|_| serde_json::json!({}))
-                            .unwrap_or(serde_json::json!({}));
+                    let arguments = binding_obj
+                        .get("arguments")
+                        .and_then(|v| v.as_object())
+                        .map(|_| serde_json::json!({}))
+                        .unwrap_or(serde_json::json!({}));
 
-                        let body = serde_json::json!({
-                            "routing_key": routing_key,
-                            "arguments": arguments
-                        });
+                    let body = serde_json::json!({
+                        "routing_key": routing_key,
+                        "arguments": arguments
+                    });
 
-                        log::debug!("Binding request body: {body}");
+                    log::debug!("Binding request body: {body}");
 
-                        let response = client
-                            .post(&url)
-                            .basic_auth(username, Some(password))
-                            .header("Content-Type", "application/json")
-                            .json(&body)
-                            .send();
+                    let response = client
+                        .post(&url)
+                        .basic_auth(username, Some(password))
+                        .header("Content-Type", "application/json")
+                        .json(&body)
+                        .send();
 
-                        match response {
-                            Ok(resp) => {
-                                let status = resp.status();
-                                if !status.is_success() {
-                                    let body_text = resp.text().unwrap_or_else(|_| {
-                                        "Unable to read response body".to_string()
-                                    });
-                                    log::debug!(
-                                        "Binding creation failed with status {status}: {body_text}"
-                                    );
-                                } else {
-                                    log::debug!(
-                                        "Created binding '{source}' -> '{destination}': {status}"
-                                    );
-                                }
+                    match response {
+                        Ok(resp) => {
+                            let status = resp.status();
+                            if !status.is_success() {
+                                let body_text = resp
+                                    .text()
+                                    .unwrap_or_else(|_| "Unable to read response body".to_string());
+                                log::debug!(
+                                    "Binding creation failed with status {status}: {body_text}"
+                                );
+                            } else {
+                                log::debug!(
+                                    "Created binding '{source}' -> '{destination}': {status}"
+                                );
                             }
-                            Err(e) => {
-                                log::debug!("Error creating binding: {e}");
-                                return Err(e.into());
-                            }
+                        }
+                        Err(e) => {
+                            log::debug!("Error creating binding: {e}");
+                            return Err(e.into());
                         }
                     }
                 }
             }
+        }
     } else {
         log::debug!("Definition is not an object, skipping import");
     }

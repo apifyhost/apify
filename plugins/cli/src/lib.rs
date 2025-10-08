@@ -67,15 +67,9 @@ pub async fn cli(setup: ModuleSetup) -> Result<(), Box<dyn std::error::Error + S
 
         let response = resolve(context).await;
 
-        if response.is_err() {
-            span.record("error.type", "resolve_error");
-            span.record("process.exit.code", 1);
-            eprintln!("Error: {:?}", response.err());
-        } else {
-            span.record("process.exit.code", 0);
-            let value = response.unwrap();
-            println!("{value}");
-        }
+        let Ok(value) = response;
+        println!("{value}");
+        span.record("process.exit.code", 0);
 
         Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     })

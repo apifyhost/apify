@@ -141,17 +141,20 @@ impl OpenAPIValidator {
 
         if let Some(Value::Object(validation_obj)) = value.get("validation") {
             if let Some(strict_val) = validation_obj.get("strict_mode")
-                && let Some(val) = strict_val.as_bool() {
-                    config.strict_mode = *val;
-                }
+                && let Some(val) = strict_val.as_bool()
+            {
+                config.strict_mode = *val;
+            }
             if let Some(validate_req_val) = validation_obj.get("validate_request_body")
-                && let Some(val) = validate_req_val.as_bool() {
-                    config.validate_request_body = *val;
-                }
+                && let Some(val) = validate_req_val.as_bool()
+            {
+                config.validate_request_body = *val;
+            }
             if let Some(validate_resp_val) = validation_obj.get("validate_response_body")
-                && let Some(val) = validate_resp_val.as_bool() {
-                    config.validate_response_body = *val;
-                }
+                && let Some(val) = validate_resp_val.as_bool()
+            {
+                config.validate_response_body = *val;
+            }
         }
 
         config
@@ -634,16 +637,14 @@ impl OpenAPIValidator {
             v.as_number()
                 .unwrap_or(Value::from(0).as_number().unwrap())
                 .to_i64()
-        })
-            && str_val.len() > max_len as usize {
-                errors.push(ValidationError {
-                    error_type: ValidationErrorType::InvalidFieldValue,
-                    message: format!(
-                        "Field '{field_name}' must be at most {max_len} characters long"
-                    ),
-                    field: Some(field_name.to_string()),
-                });
-            }
+        }) && str_val.len() > max_len as usize
+        {
+            errors.push(ValidationError {
+                error_type: ValidationErrorType::InvalidFieldValue,
+                message: format!("Field '{field_name}' must be at most {max_len} characters long"),
+                field: Some(field_name.to_string()),
+            });
+        }
 
         // Check pattern (regex) - with better error handling to prevent panics
         if let Some(pattern) = schema.get("pattern").and_then(|v| {
@@ -725,36 +726,32 @@ impl OpenAPIValidator {
         if let Some(type_str) = schema.get("type").map(|t| match t {
             Value::String(s) => s.as_str().to_string(),
             _ => t.to_string(),
-        })
-            && type_str == "integer" {
-                // For integer type, check if the number is actually an integer
-                let num_val = match number.to_f64() {
-                    Some(val) => val,
-                    None => {
-                        log::warn!(
-                            "Failed to convert number value for field '{field_name}' to f64"
-                        );
-                        errors.push(ValidationError {
-                            error_type: ValidationErrorType::InvalidFieldValue,
-                            message: format!("Field '{field_name}' has invalid numeric value"),
-                            field: Some(field_name.to_string()),
-                        });
-                        return;
-                    }
-                };
-
-                // Check if the value is actually an integer (no decimal part)
-                if num_val.fract() != 0.0 {
+        }) && type_str == "integer"
+        {
+            // For integer type, check if the number is actually an integer
+            let num_val = match number.to_f64() {
+                Some(val) => val,
+                None => {
+                    log::warn!("Failed to convert number value for field '{field_name}' to f64");
                     errors.push(ValidationError {
-                        error_type: ValidationErrorType::InvalidFieldType,
-                        message: format!(
-                            "Field '{field_name}' must be an integer (no decimal places)"
-                        ),
+                        error_type: ValidationErrorType::InvalidFieldValue,
+                        message: format!("Field '{field_name}' has invalid numeric value"),
                         field: Some(field_name.to_string()),
                     });
                     return;
                 }
+            };
+
+            // Check if the value is actually an integer (no decimal part)
+            if num_val.fract() != 0.0 {
+                errors.push(ValidationError {
+                    error_type: ValidationErrorType::InvalidFieldType,
+                    message: format!("Field '{field_name}' must be an integer (no decimal places)"),
+                    field: Some(field_name.to_string()),
+                });
+                return;
             }
+        }
 
         // Try to safely extract the numeric value
         let num_val = match number.to_f64() {
@@ -774,26 +771,28 @@ impl OpenAPIValidator {
         // Check minimum - with safe extraction
         if let Some(min_value) = schema.get("minimum")
             && let Some(min_number) = min_value.as_number()
-                && let Some(min) = min_number.to_f64()
-                    && num_val < min {
-                        errors.push(ValidationError {
-                            error_type: ValidationErrorType::InvalidFieldValue,
-                            message: format!("Field '{field_name}' must be at least {min}"),
-                            field: Some(field_name.to_string()),
-                        });
-                    }
+            && let Some(min) = min_number.to_f64()
+            && num_val < min
+        {
+            errors.push(ValidationError {
+                error_type: ValidationErrorType::InvalidFieldValue,
+                message: format!("Field '{field_name}' must be at least {min}"),
+                field: Some(field_name.to_string()),
+            });
+        }
 
         // Check maximum - with safe extraction
         if let Some(max_value) = schema.get("maximum")
             && let Some(max_number) = max_value.as_number()
-                && let Some(max) = max_number.to_f64()
-                    && num_val > max {
-                        errors.push(ValidationError {
-                            error_type: ValidationErrorType::InvalidFieldValue,
-                            message: format!("Field '{field_name}' must be at most {max}"),
-                            field: Some(field_name.to_string()),
-                        });
-                    }
+            && let Some(max) = max_number.to_f64()
+            && num_val > max
+        {
+            errors.push(ValidationError {
+                error_type: ValidationErrorType::InvalidFieldValue,
+                message: format!("Field '{field_name}' must be at most {max}"),
+                field: Some(field_name.to_string()),
+            });
+        }
     }
 
     /// Validate boolean field
@@ -844,76 +843,71 @@ impl OpenAPIValidator {
                 } else {
                     Some(string)
                 }
-            }) {
-                for (index, item) in arr.values.iter().enumerate() {
-                    match item_type.as_str() {
-                        "string" => {
-                            if !matches!(item, Value::String(_)) {
-                                errors.push(ValidationError {
-                                    error_type: ValidationErrorType::InvalidFieldType,
-                                    message: format!(
-                                        "Array item at index {index} must be a string"
-                                    ),
-                                    field: Some(format!("{field_name}[{index}]")),
-                                });
-                            }
+            })
+        {
+            for (index, item) in arr.values.iter().enumerate() {
+                match item_type.as_str() {
+                    "string" => {
+                        if !matches!(item, Value::String(_)) {
+                            errors.push(ValidationError {
+                                error_type: ValidationErrorType::InvalidFieldType,
+                                message: format!("Array item at index {index} must be a string"),
+                                field: Some(format!("{field_name}[{index}]")),
+                            });
                         }
-                        "number" | "integer" => {
-                            if !matches!(item, Value::Number(_)) {
-                                errors.push(ValidationError {
-                                    error_type: ValidationErrorType::InvalidFieldType,
-                                    message: format!(
-                                        "Array item at index {index} must be a number"
-                                    ),
-                                    field: Some(format!("{field_name}[{index}]")),
-                                });
-                            }
+                    }
+                    "number" | "integer" => {
+                        if !matches!(item, Value::Number(_)) {
+                            errors.push(ValidationError {
+                                error_type: ValidationErrorType::InvalidFieldType,
+                                message: format!("Array item at index {index} must be a number"),
+                                field: Some(format!("{field_name}[{index}]")),
+                            });
                         }
-                        "boolean" => {
-                            if !matches!(item, Value::Boolean(_)) {
-                                errors.push(ValidationError {
-                                    error_type: ValidationErrorType::InvalidFieldType,
-                                    message: format!(
-                                        "Array item at index {index} must be a boolean"
-                                    ),
-                                    field: Some(format!("{field_name}[{index}]")),
-                                });
-                            }
+                    }
+                    "boolean" => {
+                        if !matches!(item, Value::Boolean(_)) {
+                            errors.push(ValidationError {
+                                error_type: ValidationErrorType::InvalidFieldType,
+                                message: format!("Array item at index {index} must be a boolean"),
+                                field: Some(format!("{field_name}[{index}]")),
+                            });
                         }
-                        _ => {
-                            // Handle other item types if needed
-                        }
+                    }
+                    _ => {
+                        // Handle other item types if needed
                     }
                 }
             }
+        }
 
         // Check minItems
         if let Some(min_items) = schema.get("minItems").and_then(|v| {
             v.as_number()
                 .unwrap_or(Value::from(0).as_number().unwrap())
                 .to_i64()
-        })
-            && arr.len() < min_items as usize {
-                errors.push(ValidationError {
-                    error_type: ValidationErrorType::InvalidFieldValue,
-                    message: format!("Field '{field_name}' must have at least {min_items} items"),
-                    field: Some(field_name.to_string()),
-                });
-            }
+        }) && arr.len() < min_items as usize
+        {
+            errors.push(ValidationError {
+                error_type: ValidationErrorType::InvalidFieldValue,
+                message: format!("Field '{field_name}' must have at least {min_items} items"),
+                field: Some(field_name.to_string()),
+            });
+        }
 
         // Check maxItems
         if let Some(max_items) = schema.get("maxItems").and_then(|v| {
             v.as_number()
                 .unwrap_or(Value::from(0).as_number().unwrap())
                 .to_i64()
-        })
-            && arr.len() > max_items as usize {
-                errors.push(ValidationError {
-                    error_type: ValidationErrorType::InvalidFieldValue,
-                    message: format!("Field '{field_name}' must have at most {max_items} items"),
-                    field: Some(field_name.to_string()),
-                });
-            }
+        }) && arr.len() > max_items as usize
+        {
+            errors.push(ValidationError {
+                error_type: ValidationErrorType::InvalidFieldValue,
+                message: format!("Field '{field_name}' must have at most {max_items} items"),
+                field: Some(field_name.to_string()),
+            });
+        }
     }
 
     /// Validate query parameters (basic implementation)

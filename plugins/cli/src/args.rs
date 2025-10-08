@@ -137,7 +137,27 @@ impl Args {
             if let Some(long_flag) = &arg_def.long {
                 let flag = format!("--{long_flag}");
                 if let Some(pos) = raw_args.iter().position(|a| a == &flag)
-                    && arg_def.input_type == InputType::Boolean {
+                    && arg_def.input_type == InputType::Boolean
+                {
+                    let next = raw_args.get(pos + 1);
+                    if let Some(ref next_str) = next {
+                        if !next_str.starts_with('-') {
+                            found = Some(next_str.to_string());
+                        } else {
+                            found = Some("".to_string());
+                        }
+                    } else {
+                        found = raw_args.get(pos + 1).cloned();
+                    }
+                }
+            }
+
+            if found.is_none()
+                && let Some(short_flag) = &arg_def.short
+            {
+                let flag = format!("-{short_flag}");
+                if let Some(pos) = raw_args.iter().position(|a| a == &flag) {
+                    if arg_def.input_type == InputType::Boolean {
                         let next = raw_args.get(pos + 1);
                         if let Some(ref next_str) = next {
                             if !next_str.starts_with('-') {
@@ -148,43 +168,26 @@ impl Args {
                         } else {
                             found = raw_args.get(pos + 1).cloned();
                         }
+                    } else {
+                        found = raw_args.get(pos + 1).cloned();
                     }
+                }
             }
 
             if found.is_none()
-                && let Some(short_flag) = &arg_def.short {
-                    let flag = format!("-{short_flag}");
-                    if let Some(pos) = raw_args.iter().position(|a| a == &flag) {
-                        if arg_def.input_type == InputType::Boolean {
-                            let next = raw_args.get(pos + 1);
-                            if let Some(ref next_str) = next {
-                                if !next_str.starts_with('-') {
-                                    found = Some(next_str.to_string());
-                                } else {
-                                    found = Some("".to_string());
-                                }
-                            } else {
-                                found = raw_args.get(pos + 1).cloned();
-                            }
-                        } else {
-                            found = raw_args.get(pos + 1).cloned();
-                        }
-                    }
-                }
-
-            if found.is_none()
                 && let Some(idx) = arg_def.index
-                    && raw_args.len() > idx {
-                        let value = raw_args[idx].clone();
-                        if value.starts_with('-') {
-                            error.push(format!(
+                && raw_args.len() > idx
+            {
+                let value = raw_args[idx].clone();
+                if value.starts_with('-') {
+                    error.push(format!(
                                 "Invalid value for positional argument {}: cannot start with '-' or '--'. Found '{}'",
                                 arg_def.name, value
                             ));
-                        } else {
-                            found = Some(value);
-                        }
-                    }
+                } else {
+                    found = Some(value);
+                }
+            }
 
             if found.is_none() {
                 found = arg_def.default.clone();

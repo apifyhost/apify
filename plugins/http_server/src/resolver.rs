@@ -372,41 +372,42 @@ fn validate_request_and_extract_params(
 
     // If validation failed, return error response
     if let Some(validation) = &validation_result.validation_result
-        && !validation.is_valid {
-            let error_details: Vec<Value> = validation
-                .errors
-                .iter()
-                .map(|e| {
-                    let mut error_obj = HashMap::new();
-                    error_obj.insert("type".to_string(), format!("{:?}", e.error_type).to_value());
-                    error_obj.insert("message".to_string(), e.message.to_value());
-                    error_obj.insert(
-                        "field".to_string(),
-                        e.field
-                            .as_ref()
-                            .unwrap_or(&"unknown".to_string())
-                            .to_value(),
-                    );
-                    error_obj.to_value()
-                })
-                .collect();
+        && !validation.is_valid
+    {
+        let error_details: Vec<Value> = validation
+            .errors
+            .iter()
+            .map(|e| {
+                let mut error_obj = HashMap::new();
+                error_obj.insert("type".to_string(), format!("{:?}", e.error_type).to_value());
+                error_obj.insert("message".to_string(), e.message.to_value());
+                error_obj.insert(
+                    "field".to_string(),
+                    e.field
+                        .as_ref()
+                        .unwrap_or(&"unknown".to_string())
+                        .to_value(),
+                );
+                error_obj.to_value()
+            })
+            .collect();
 
-            let mut body_obj = HashMap::new();
-            body_obj.insert("error".to_string(), "Validation failed".to_value());
-            body_obj.insert("details".to_string(), error_details.to_value());
+        let mut body_obj = HashMap::new();
+        body_obj.insert("error".to_string(), "Validation failed".to_value());
+        body_obj.insert("details".to_string(), error_details.to_value());
 
-            let mut headers_obj = HashMap::new();
-            headers_obj.insert("Content-Type".to_string(), "application/json".to_value());
+        let mut headers_obj = HashMap::new();
+        headers_obj.insert("Content-Type".to_string(), "application/json".to_value());
 
-            let mut error_response_obj = HashMap::new();
-            error_response_obj.insert("status_code".to_string(), validation.status_code.to_value());
-            error_response_obj.insert("body".to_string(), body_obj.to_value());
-            error_response_obj.insert("headers".to_string(), headers_obj.to_value());
+        let mut error_response_obj = HashMap::new();
+        error_response_obj.insert("status_code".to_string(), validation.status_code.to_value());
+        error_response_obj.insert("body".to_string(), body_obj.to_value());
+        error_response_obj.insert("headers".to_string(), headers_obj.to_value());
 
-            let error_response = error_response_obj.to_value();
+        let error_response = error_response_obj.to_value();
 
-            return (path_params, original_path, Some(error_response));
-        }
+        return (path_params, original_path, Some(error_response));
+    }
 
     (path_params, original_path, None)
 }
