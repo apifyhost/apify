@@ -54,5 +54,5 @@ tracing-subscriber = { version = "0" }
 
 # to be removed
 rhai = { version = "1.22.2", features = ["serde", "sync"] }
-phs = { path = "phs", version = "0" }
+asd = { path = "asd", version = "0" }
 chrono = { version = "0.4.41", features = ["serde"] }

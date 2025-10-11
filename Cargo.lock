@@ -126,6 +126,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "asd"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "chrono",
+ "regex",
+ "rhai",
+ "sdk",
+ "serde",
+ "tokio",
+ "valu3",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -590,8 +604,8 @@ dependencies = [
 name = "flow"
 version = "0.1.0"
 dependencies = [
+ "asd",
  "once_cell",
- "phs",
  "regex",
  "rhai",
  "sdk",
@@ -1684,20 +1698,6 @@ checksum = "42919b05089acbd0a5dcd5405fb304d17d1053847b81163d09c4ad18ce8e8420"
 dependencies = [
  "pest",
  "sha2",
-]
-
-[[package]]
-name = "phs"
-version = "0.1.0"
-dependencies = [
- "base64",
- "chrono",
- "regex",
- "rhai",
- "sdk",
- "serde",
- "tokio",
- "valu3",
 ]
 
 [[package]]

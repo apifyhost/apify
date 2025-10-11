@@ -22,9 +22,9 @@ static APIFY_TRUNCATE_SPAN_VALUE: Lazy<usize> =
 #[derive(Debug)]
 pub enum StepWorkerError {
     ConditionError(ConditionError),
-    PayloadError(phs::ScriptError),
+    PayloadError(asd::ScriptError),
     ModulesError(ModulesError),
-    InputError(phs::ScriptError),
+    InputError(asd::ScriptError),
 }
 
 impl Display for StepWorkerError {
@@ -447,7 +447,7 @@ fn truncate_string(string: &Value) -> String {
 #[cfg(test)]
 mod test {
     use super::*;
-    use phs::build_engine;
+    use asd::build_engine;
     use sdk::valu3;
     use valu3::prelude::ToValueBehavior;
     use valu3::value::Value;

@@ -12,7 +12,7 @@ pub enum ConditionError {
     RightInvalid(String),
     LeftInvalid(String),
     AssertInvalid(String),
-    ScriptError(phs::ScriptError),
+    ScriptError(asd::ScriptError),
 }
 
 impl Display for ConditionError {
@@ -149,8 +149,8 @@ impl Condition {
         right: String,
         operator: Operator,
     ) -> Result<Self, ConditionError> {
-        let left = phs::Script::to_code_string(&left);
-        let right = phs::Script::to_code_string(&right);
+        let left = asd::Script::to_code_string(&left);
+        let right = asd::Script::to_code_string(&right);
 
         let assert = {
             match operator {
@@ -214,7 +214,7 @@ impl Condition {
 
         match result {
             Value::Boolean(result) => Ok(result),
-            _ => Err(ConditionError::ScriptError(phs::ScriptError::InvalidType(
+            _ => Err(ConditionError::ScriptError(asd::ScriptError::InvalidType(
                 Box::new(result),
             ))),
         }
@@ -224,7 +224,7 @@ impl Condition {
 #[cfg(test)]
 mod test {
     use super::*;
-    use phs::build_engine;
+    use asd::build_engine;
 
     #[test]
     fn test_condition_execute_equal() {

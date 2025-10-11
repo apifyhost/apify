@@ -1,17 +1,17 @@
 use crate::context::Context;
-use phs::ScriptError;
+use asd::ScriptError;
 use rhai::{Engine, Scope, plugin::*, serde::to_dynamic};
 use sdk::prelude::*;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct Script {
-    pub script: phs::Script,
+    pub script: asd::Script,
 }
 
 impl Script {
     pub fn try_build(engine: Arc<Engine>, script: &Value) -> Result<Self, ScriptError> {
-        let script = phs::Script::try_build(engine, script)?;
+        let script = asd::Script::try_build(engine, script)?;
         Ok(Self { script })
     }
 
