@@ -284,16 +284,16 @@ pub struct Module {
 
 impl Module {
     pub fn send(&self, input: Option<Value>, payload: Option<Value>) -> Receiver<ModuleResponse> {
-        let (package_sender, package_receiver) = oneshot::channel();
-        let package = ModulePackage {
+        let (plugin_sender, plugin_receiver) = oneshot::channel();
+        let plugin = ModulePackage {
             input,
             payload,
-            sender: package_sender,
+            sender: plugin_sender,
         };
 
-        let _ = self.sender.send(package);
+        let _ = self.sender.send(plugin);
 
-        package_receiver
+        plugin_receiver
     }
 }
 
@@ -336,9 +336,9 @@ impl Modules {
         payload: &Option<Value>,
     ) -> Result<ModuleResponse, ModulesError> {
         if let Some(module) = self.modules.get(name) {
-            let package_receiver = module.send(input.clone(), payload.clone());
+            let plugin_receiver = module.send(input.clone(), payload.clone());
 
-            let value = package_receiver.await.unwrap_or(ModuleResponse::from_error(
+            let value = plugin_receiver.await.unwrap_or(ModuleResponse::from_error(
                 "Module response channel closed".to_string(),
             ));
 
@@ -354,10 +354,10 @@ impl Modules {
         for (name, module) in self.modules.clone() {
             let args = module.params.input_order.clone();
             let func = move |value: Value| {
-                let package_receiver = module.send(Some(value), None);
+                let plugin_receiver = module.send(Some(value), None);
 
                 async move {
-                    let result = package_receiver.await.unwrap_or(ModuleResponse::from_error(
+                    let result = plugin_receiver.await.unwrap_or(ModuleResponse::from_error(
                         "Module response channel closed".to_string(),
                     ));
 

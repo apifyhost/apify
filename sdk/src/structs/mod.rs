@@ -7,7 +7,7 @@ use std::fmt::{Debug, Formatter};
 use tokio::sync::oneshot;
 use valu3::{traits::ToValueBehavior, value::Value};
 pub type ModuleId = usize;
-pub type MainRuntimeSender = channel::Sender<Package>;
+pub type MainRuntimeSender = channel::Sender<Plugin>;
 pub type ModuleSetupSender = oneshot::Sender<Option<channel::Sender<ModulePackage>>>;
 
 pub type ModuleReceiver = Receiver<ModulePackage>;
@@ -42,7 +42,7 @@ impl ModuleSetup {
 }
 
 #[derive(Default)]
-pub struct Package {
+pub struct Plugin {
     pub response: Option<oneshot::Sender<Value>>,
     pub request_data: Option<Value>,
     pub origin: ModuleId,
@@ -51,7 +51,7 @@ pub struct Package {
 }
 
 // Only production mode
-impl Debug for Package {
+impl Debug for Plugin {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let map: HashMap<_, _> = vec![
             ("request_data", self.request_data.to_value()),
@@ -68,7 +68,7 @@ impl Debug for Package {
     }
 }
 
-impl Package {
+impl Plugin {
     pub fn get_data(&self) -> Option<&Value> {
         self.request_data.as_ref()
     }

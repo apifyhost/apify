@@ -4,13 +4,13 @@ use sdk::tracing::debug;
 
 pub struct Envs {
     /**
-     * Number of package consumers
+     * Number of plugin consumers
      *
-     * This is the number of threads that will be used to process packages.
-     * Environment variable: APIFY_PACKAGE_CONSUMERS_COUNT
+     * This is the number of threads that will be used to process plugins.
+     * Environment variable: APIFY_PLUGIN_CONSUMERS_COUNT
      * Default: 10
      */
-    pub package_consumer_count: i32,
+    pub plugin_consumer_count: i32,
     /**
      * Minimum allocated memory in MB
      *
@@ -40,13 +40,13 @@ pub struct Envs {
     pub garbage_collection_interval: u64,
 
     /**
-     * Default package repository URL
+     * Default plugin repository URL
      *
-     * This is the URL of the default package repository that will be used to fetch packages.
-     * Environment variable: APIFY_DEFAULT_PACKAGE_REPOSITORY_URL
-     * Default: apify.host/packages
+     * This is the URL of the default plugin repository that will be used to fetch plugins.
+     * Environment variable: APIFY_DEFAULT_PLUGIN_REPOSITORY_URL
+     * Default: apify.host/plugins
      */
-    pub default_package_repository_url: String,
+    pub default_plugin_repository_url: String,
     /**
      * Default apify yaml file main
      *
@@ -59,7 +59,7 @@ pub struct Envs {
 
 impl Envs {
     pub fn load() -> Self {
-        let package_consumer_count = env::var("APIFY_PACKAGE_CONSUMERS_COUNT")
+        let plugin_consumer_count = env::var("APIFY_PLUGIN_CONSUMERS_COUNT")
             .ok()
             .and_then(|v| v.parse::<usize>().ok())
             .unwrap_or(10) as i32;
@@ -80,15 +80,14 @@ impl Envs {
             .and_then(|v| v.parse::<u64>().ok())
             .unwrap_or(60);
 
-        let default_package_repository_url = match env::var("APIFY_DEFAULT_PACKAGE_REPOSITORY_URL")
-        {
+        let default_plugin_repository_url = match env::var("APIFY_DEFAULT_PLUGIN_REPOSITORY_URL") {
             Ok(repo) => repo,
-            Err(_) => "apify.host/packages".to_string(),
+            Err(_) => "apifyhost/apify-plugins".to_string(),
         };
 
         let main = env::var("APIFY_MAIN").unwrap_or(".".to_string());
 
-        debug!("APIFY_PACKAGE_CONSUMERS_COUNT = {}", package_consumer_count);
+        debug!("APIFY_PLUGIN_CONSUMERS_COUNT = {}", plugin_consumer_count);
         #[cfg(target_env = "gnu")]
         debug!("APIFY_MIN_ALLOCATED_MEMORY_MB = {}", min_allocated_memory);
         #[cfg(target_env = "gnu")]
@@ -99,19 +98,19 @@ impl Envs {
             garbage_collection_interval
         );
         debug!(
-            "APIFY_DEFAULT_PACKAGE_REPOSITORY_URL = {}",
-            default_package_repository_url
+            "APIFY_DEFAULT_PLUGIN_REPOSITORY_URL = {}",
+            default_plugin_repository_url
         );
 
         Self {
-            package_consumer_count,
+            plugin_consumer_count,
             #[cfg(target_env = "gnu")]
             min_allocated_memory,
             #[cfg(target_env = "gnu")]
             garbage_collection,
             #[cfg(target_env = "gnu")]
             garbage_collection_interval,
-            default_package_repository_url,
+            default_plugin_repository_url,
             main,
         }
     }

@@ -1,0 +1,60 @@
+use sdk::prelude::*;
+
+create_step!(log(rx));
+
+#[derive(Debug)]
+enum LogLevel {
+    Info,
+    Debug,
+    Warn,
+    Error,
+}
+
+#[derive(Debug)]
+struct Log {
+    level: LogLevel,
+    message: String,
+}
+
+impl From<&Value> for Log {
+    fn from(value: &Value) -> Self {
+        let level = match value.get("level") {
+            Some(level) => match level.to_string().as_str() {
+                "info" => LogLevel::Info,
+                "debug" => LogLevel::Debug,
+                "warn" => LogLevel::Warn,
+                "error" => LogLevel::Error,
+                _ => LogLevel::Info,
+            },
+            _ => LogLevel::Info,
+        };
+
+        let message = value.get("message").unwrap_or(&Value::Null).to_string();
+
+        Self { level, message }
+    }
+}
+
+pub async fn log(rx: ModuleReceiver) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    log::debug!("Log module started, waiting for messages");
+
+    listen!(rx, move |plugin: ModulePackage| async {
+        let value = plugin.input().unwrap_or(Value::Null);
+        log::debug!("Log module received input: {value:?}");
+
+        let log_value = Log::from(&value);
+        log::debug!("Parsed log: {log_value:?}");
+
+        match log_value.level {
+            LogLevel::Info => log::info!("{}", log_value.message),
+            LogLevel::Debug => log::debug!("{}", log_value.message),
+            LogLevel::Warn => log::warn!("{}", log_value.message),
+            LogLevel::Error => log::error!("{}", log_value.message),
+        }
+
+        let payload = plugin.payload().unwrap_or(Value::Null);
+        sender_safe!(plugin.sender, payload.into());
+    });
+
+    Ok(())
+}

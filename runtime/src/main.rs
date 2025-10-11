@@ -1,12 +1,12 @@
 mod loader;
 mod memory;
-mod package;
+mod plugin;
 mod preprocessor;
 mod runtime;
 mod settings;
 mod test_runner;
 use loader::Loader;
-use package::Package;
+use plugin::Plugin;
 use runtime::Runtime;
 use sdk::otel::init_tracing_subscriber;
 use sdk::{tracing, use_log};
@@ -48,8 +48,8 @@ async fn main() {
         }
     };
 
-    if let Some(publish_path) = settings.package_path.clone() {
-        match Package::try_from(publish_path) {
+    if let Some(publish_path) = settings.plugin_path.clone() {
+        match Plugin::try_from(publish_path) {
             Ok(publish) => {
                 if let Err(err) = publish.run() {
                     log::error!("Error publishing module: {err:?}");
@@ -87,7 +87,7 @@ async fn main() {
     let fut = async {
         if settings.download
             && let Err(err) = loader
-                .download(&settings.default_package_repository_url)
+                .download(&settings.default_plugin_repository_url)
                 .await
         {
             log::error!("Download failed: {err:?}");
