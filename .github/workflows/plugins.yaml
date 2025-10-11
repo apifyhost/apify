@@ -1,13 +1,15 @@
 name: Build and Deploy Plugins
 
 on:
-  # workflow_dispatch:
   push:
     branches:
-    - main
-  pull_request:
-    branches:
-    - main
+      - main
+    tags:
+      - "**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
