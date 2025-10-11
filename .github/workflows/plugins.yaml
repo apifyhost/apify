@@ -113,7 +113,7 @@ jobs:
             VERSION="latest"
           fi
           echo "Using version: $VERSION"
-          gh auth login --with-token <<< "$GH_TOKEN"
+          # gh auth login --with-token <<< "$GH_TOKEN"
           gh repo clone apifyhost/apify-plugins
           mkdir -p apify-plugins/plugins/${VERSION}
           cp -R raw/* apify-plugins/plugins/${VERSION}/
