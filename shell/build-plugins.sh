@@ -102,8 +102,8 @@ package_plugin() {
     cd - > /dev/null
 
     if [ ! -d "./plugins-target/${NAME}/${VERSION}" ]; then
-        echo "📦 Create folder ./plugins-target/${NAME}"
-        mkdir -p ./plugins-target/${NAME}
+        echo "📦 Create folder ./plugins-target/${NAME}/${VERSION}"
+        mkdir -p ./plugins-target/${NAME}/${VERSION}
     fi
 
     RENAMED_ARCHIVE="${NAME}-${VERSION}-${TARGET}.tar.gz"
