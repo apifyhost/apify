@@ -21,20 +21,20 @@ pub fn run_script(path: &str, setup: ModuleSetup, settings: &Settings) {
         if let Ok(rt) = tokio::runtime::Runtime::new() {
             rt.block_on(async move {
                 let loader = Loader::load(path, settings.print_yaml).await.unwrap();
-                let (tx_main_package, rx_main_package) = channel::unbounded::<Package>();
+                let (tx_main_plugin, rx_main_plugin) = channel::unbounded::<Plugin>();
                 let app_data = loader.app_data.clone();
                 let dispatch = setup.dispatch.clone();
                 let dispatch_for_runtime = dispatch.clone();
                 let settings_cloned = settings.clone();
 
-                // Criar uma task para o runtime que não irá dropar o tx_main_package
-                let tx_for_runtime = tx_main_package.clone();
+                // Criar uma task para o runtime que não irá dropar o tx_main_plugin
+                let tx_for_runtime = tx_main_plugin.clone();
                 let context = Context::from_setup(setup.with.clone());
 
                 let runtime_handle = tokio::task::spawn(async move {
                     Runtime::run_script(
                         tx_for_runtime,
-                        rx_main_package,
+                        rx_main_plugin,
                         loader,
                         dispatch_for_runtime,
                         settings_cloned,
@@ -47,8 +47,8 @@ pub fn run_script(path: &str, setup: ModuleSetup, settings: &Settings) {
 
                 debug!("Script module loaded, starting main loop");
 
-                for package in rx {
-                    debug!("Received package: {package:?}");
+                for plugin in rx {
+                    debug!("Received plugin: {plugin:?}");
 
                     let span = tracing::span!(
                         tracing::Level::INFO,
@@ -59,32 +59,32 @@ pub fn run_script(path: &str, setup: ModuleSetup, settings: &Settings) {
                     // Criar um canal para receber a resposta do runtime
                     let (response_tx, response_rx) = tokio::sync::oneshot::channel::<Value>();
 
-                    let runtime_package = Package {
+                    let runtime_plugin = Plugin {
                         response: Some(response_tx),
-                        request_data: package.input(),
+                        request_data: plugin.input(),
                         origin: 0,
                         span: Some(span),
                         dispatch: Some(dispatch.clone()),
                     };
 
-                    debug!("Sending package to main loop: {runtime_package:?}");
+                    debug!("Sending plugin to main loop: {runtime_plugin:?}");
 
-                    if let Err(err) = tx_main_package.send(runtime_package) {
-                        error!("Failed to send package: {err:?}");
+                    if let Err(err) = tx_main_plugin.send(runtime_plugin) {
+                        error!("Failed to send plugin: {err:?}");
                         continue;
                     }
 
-                    debug!("Package sent to main loop, waiting for response");
+                    debug!("Plugin sent to main loop, waiting for response");
 
                     let response = match response_rx.await {
                         Ok(result) if result.is_undefined() => ModuleResponse::from_success(
-                            package.payload().unwrap_or(Value::Undefined),
+                            plugin.payload().unwrap_or(Value::Undefined),
                         ),
                         Ok(result) => ModuleResponse::from_success(result),
                         Err(err) => ModuleResponse::from_error(format!("Runtime error: {err}")),
                     };
 
-                    if let Err(err) = package.sender.send(response) {
+                    if let Err(err) = plugin.sender.send(response) {
                         error!("Failed to send response back to module: {err:?}");
                     }
 

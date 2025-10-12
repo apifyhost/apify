@@ -2,7 +2,20 @@
 members = [
     "flow",
     "runtime",
-    "sdk"
+    "sdk",
+    "phs",
+    "plugins/http_server",
+    "plugins/echo",
+    "plugins/amqp",
+    "plugins/log",
+    "plugins/sleep",
+    "plugins/http_request",
+    "plugins/postgres",
+    "plugins/cli",
+    "plugins/rpc",
+    "plugins/jwt",
+    "plugins/cache",
+
 ]
 resolver = "2"
 

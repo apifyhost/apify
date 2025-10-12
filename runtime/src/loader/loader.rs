@@ -268,7 +268,7 @@ fn resolve_script(file: &str, main_file_path: String, print_yaml: bool) -> Resul
 }
 
 pub fn load_external_module_info(module: &str) -> Value {
-    let module_path = format!("packages/{module}/apify.yaml");
+    let module_path = format!("plugins/{module}/apify.yaml");
 
     if !Path::new(&module_path).exists() {
         return Value::Null;
