@@ -101,8 +101,13 @@ package_plugin() {
 
     cd - > /dev/null
 
+    if [ ! -d "./plugins-target/${NAME}" ]; then
+        echo "📦 Create folder ./plugins-target/${NAME}"
+        mkdir -p ./plugins-target/${NAME}
+    fi
+
     RENAMED_ARCHIVE="${NAME}-${VERSION}-${TARGET}.tar.gz"
-    mv "$MODULE_DIR/$ARCHIVE_NAME" "./plugins-target/$RENAMED_ARCHIVE"
+    mv "$MODULE_DIR/$ARCHIVE_NAME" "./plugins-target/${NAME}/$RENAMED_ARCHIVE"
 
     echo "✅ Plugin packaged: $RENAMED_ARCHIVE"
 }

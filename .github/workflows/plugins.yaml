@@ -6,6 +6,9 @@ on:
       - main
     tags:
       - "**"
+  pull_request:
+    branches:
+    - main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -120,8 +123,13 @@ jobs:
             VERSION="latest"
           fi
           echo "Using version: $VERSION"
-          mkdir -p apify-plugins/plugins/${VERSION}
-          cp -R raw/* apify-plugins/plugins/${VERSION}/
+
+          if [ -f "apify-plugins/plugins" ]; then
+            echo "Removing old plugins directory"
+            rm -rf apify-plugins/plugins
+          fi
+
+          ./shell/restructure-plugins.sh
           cd apify-plugins
           git checkout -b update-plugins-${{ github.run_id }}
           git add .
