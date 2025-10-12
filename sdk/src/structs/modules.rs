@@ -145,7 +145,7 @@ impl TryFrom<Value> for ModuleData {
         };
 
         let repository_path = if repository.is_none() && !is_local_path {
-            let repository = format!("{module}");
+            let repository = module.to_string();
             Some(repository)
         } else {
             None
