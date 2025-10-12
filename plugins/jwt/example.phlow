@@ -24,9 +24,9 @@ steps:
   - use: jwt
     input:
       action: verify
-      token: !phs payload.token
+      token: !asd payload.token
 
-  - assert: !phs payload.valid
+  - assert: !asd payload.valid
     then:
       return: "❌ Token is valid - This should NOT happen!"
     else:

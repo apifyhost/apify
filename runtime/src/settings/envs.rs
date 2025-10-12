@@ -44,7 +44,7 @@ pub struct Envs {
      *
      * This is the URL of the default plugin repository that will be used to fetch plugins.
      * Environment variable: APIFY_DEFAULT_PLUGIN_REPOSITORY_URL
-     * Default: apify.host/plugins
+     * Default: apifyhost/apify-plugins
      */
     pub default_plugin_repository_url: String,
     /**

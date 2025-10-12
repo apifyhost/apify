@@ -47,7 +47,7 @@ description: |
     - use: logger
       input:
         level: info
-        message: !phs main  # 'main' contains the RPC request data
+        message: !asd main  # 'main' contains the RPC request data
   
   # As RPC client (in steps) - makes calls to RPC servers
   steps:

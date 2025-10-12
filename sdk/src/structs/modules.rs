@@ -145,15 +145,7 @@ impl TryFrom<Value> for ModuleData {
         };
 
         let repository_path = if repository.is_none() && !is_local_path {
-            let mut padded = module.to_string();
-            while padded.len() < 4 {
-                padded.push('_');
-            }
-
-            let prefix = &padded[0..2];
-            let middle = &padded[2..4];
-
-            let repository = format!("{prefix}/{middle}/{module}");
+            let repository = format!("{module}");
             Some(repository)
         } else {
             None

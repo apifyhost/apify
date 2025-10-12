@@ -3,7 +3,7 @@ members = [
     "flow",
     "runtime",
     "sdk",
-    "phs",
+    "asd",
     "plugins/http_server",
     "plugins/echo",
     "plugins/amqp",
