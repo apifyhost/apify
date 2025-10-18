@@ -278,7 +278,12 @@ impl Loader {
         use tar::Archive;
 
         let tarball_name = format!("{module}-{version}-{RUNTIME_ARCH}.tar.gz");
-        let target_url = format!("{}/{}/{}", base_url.trim_end_matches('/'), version, tarball_name);
+        let target_url = format!(
+            "{}/{}/{}",
+            base_url.trim_end_matches('/'),
+            version,
+            tarball_name
+        );
         let target_path = format!("plugins/{module}/{tarball_name}");
 
         if Path::new(&format!("plugins/{module}/module.{MODULE_EXTENSION}")).exists() {
