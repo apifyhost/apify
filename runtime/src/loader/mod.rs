@@ -210,7 +210,7 @@ impl Loader {
             let base_url = match &module.repository {
                 Some(repo) => repo.clone(),
                 None => format!(
-                    "{}/refs/heads/main/plugins/{}",
+                    "{}/refs/heads/main/{}",
                     if repo_regex.is_match(default_plugin_repository_url) {
                         default_plugin_repository_url.to_string()
                     } else {
@@ -278,7 +278,12 @@ impl Loader {
         use tar::Archive;
 
         let tarball_name = format!("{module}-{version}-{RUNTIME_ARCH}.tar.gz");
-        let target_url = format!("{}/{}", base_url.trim_end_matches('/'), tarball_name);
+        let target_url = format!(
+            "{}/{}/{}",
+            base_url.trim_end_matches('/'),
+            version,
+            tarball_name
+        );
         let target_path = format!("plugins/{module}/{tarball_name}");
 
         if Path::new(&format!("plugins/{module}/module.{MODULE_EXTENSION}")).exists() {

@@ -100,7 +100,7 @@ fn preprocessor_directives(flow: &str, base_path: &Path) -> (String, Vec<String>
                         .join(" ")
                         .replace('"', "\\\"");
 
-                    if extension == "phs" || extension == "rhai" {
+                    if extension == "asd" || extension == "rhai" {
                         format!(r#""{{{{ {one_line} }}}}""#)
                     } else {
                         format!(r#""{one_line}""#)
@@ -122,7 +122,7 @@ fn preprocessor_eval(flow: &str) -> String {
     let mut lines = flow.lines().peekable();
 
     while let Some(line) = lines.next() {
-        if let Some(pos) = line.find("!phs") {
+        if let Some(pos) = line.find("!asd") {
             let before_eval = &line[..pos];
             let after_eval = if line.len() > pos + 4 {
                 line[pos + 4..].trim()
@@ -237,7 +237,7 @@ fn preprocessor_eval(flow: &str) -> String {
                         lines.next();
                         continue;
                     } else if line_indent > current_line_indent {
-                        // Esta linha é mais indentada que a linha do !phs, então faz parte do bloco
+                        // Esta linha é mais indentada que a linha do !asd, então faz parte do bloco
                         let content = next_line.trim().to_string();
                         if !content.is_empty() {
                             block_lines.push(content);

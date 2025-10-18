@@ -15,4 +15,4 @@ tokio = { workspace = true }
 
 # to be removed
 rhai = { workspace = true }
-phs = { workspace = true }
+asd = { workspace = true }

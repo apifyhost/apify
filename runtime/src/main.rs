@@ -28,12 +28,14 @@ pub const MODULE_EXTENSION: &str = "so";
 #[cfg(target_os = "windows")]
 pub const MODULE_EXTENSION: &str = "dll";
 
-#[cfg(target_os = "macos")]
-pub const RUNTIME_ARCH: &str = "darwin";
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+pub const RUNTIME_ARCH: &str = "aarch64-apple-darwin";
+#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+pub const RUNTIME_ARCH: &str = "x86_64-apple-darwin";
 #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-pub const RUNTIME_ARCH: &str = "linux-aarch64";
+pub const RUNTIME_ARCH: &str = "aarch64-unknown-linux-gnu";
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-pub const RUNTIME_ARCH: &str = "linux-amd64";
+pub const RUNTIME_ARCH: &str = "x86_64-unknown-linux-gnu";
 
 #[tokio::main]
 async fn main() {
