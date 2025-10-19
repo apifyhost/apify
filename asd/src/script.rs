@@ -61,7 +61,7 @@ impl Script {
         {
             code.to_string()
         } else {
-            format!("{code}")
+            code.to_string()
         }
     }
 
