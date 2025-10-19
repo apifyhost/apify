@@ -40,3 +40,8 @@ jobs:
         save-if: ${{ github.ref == 'refs/heads/main' }}
     - name: Run tests
       run: cargo test --workspace --all-features --all-targets
+    - name: Run E2E tests
+      run: |
+        cargo run --release tests/log.yaml
+        cargo run --release tests/string.yaml
+        cargo run --release tests/simple-test.yaml

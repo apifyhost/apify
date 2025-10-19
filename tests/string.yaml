@@ -1,0 +1,20 @@
+name: String Test
+version: 1.0.0
+description: Testing string operations
+
+tests:
+  - main:
+      name: "John"
+    payload: "Hello"
+    assert_eq: "Hello John"
+  - main:
+      name: "Alice"
+    payload: "Hi"
+    assert_eq: "Hi Alice"
+  - main:
+      name: "Bob"
+    payload: "Hey"
+    assert_eq: "Hey Bob"
+
+steps:
+  - payload: !asd `${payload} ${main.name}`
