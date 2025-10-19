@@ -58,10 +58,13 @@ impl Script {
             || code == "false"
             || code == "null"
             || code == "undefined"
+            || code.contains("=")
+            || code.contains(">")
+            || code.contains("<")
         {
             code.to_string()
         } else {
-            code.to_string()
+            format!("{code}")
         }
     }
 
