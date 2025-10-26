@@ -6,10 +6,10 @@ listeners:
     - name: v1
       matches:
       - path:
-          pathPrefix: /v1
+          path_prefix: /v1
         method: GET
     - name: v2
       matches:
       - path:
-          pathPrefix: /v2
+          path_prefix: /v2
         method: GET

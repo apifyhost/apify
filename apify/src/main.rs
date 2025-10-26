@@ -1,7 +1,7 @@
 //! Application entry point, responsible for parsing CLI args, loading config, and starting services
 
-use clap::Parser;
 use apify::{config::Config, server::start_listener};
+use clap::Parser;
 use std::thread;
 
 /// Configurable HTTP server with route matching
@@ -31,14 +31,16 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     for (listener_idx, listener_config) in config.listeners.into_iter().enumerate() {
         for thread_id in 0..num_threads {
             let listener_config_clone = listener_config.clone();
-            let handle = thread::spawn(move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-                println!(
-                    "Starting thread {} for listener {} (port: {})",
-                    thread_id, listener_idx, listener_config_clone.port
-                );
-                start_listener(listener_config_clone, thread_id)?;
-                Ok(())
-            });
+            let handle = thread::spawn(
+                move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+                    println!(
+                        "Starting thread {} for listener {} (port: {})",
+                        thread_id, listener_idx, listener_config_clone.port
+                    );
+                    start_listener(listener_config_clone, thread_id)?;
+                    Ok(())
+                },
+            );
             handles.push(handle);
         }
     }

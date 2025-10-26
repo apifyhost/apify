@@ -36,15 +36,15 @@ pub struct MatchRule {
 /// Path matching rules (prefix matching)
 #[derive(Debug, Deserialize, Clone)]
 pub struct PathMatch {
-    pub pathPrefix: String,
+    pub path_prefix: String,
 }
 
 impl Config {
     /// Read and parse configuration from file
     // Updated error type to include Send + Sync
     pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read config file: {}", e))?;
+        let content =
+            fs::read_to_string(path).map_err(|e| format!("Failed to read config file: {}", e))?;
         let config = serde_yaml::from_str(&content)
             .map_err(|e| format!("Failed to parse config file: {}", e))?;
         Ok(config)

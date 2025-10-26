@@ -1,7 +1,7 @@
 //! Application state management and route matching logic
 
-use super::config::{RouteConfig, MatchRule};
-use super::hyper::{Method};
+use super::config::{MatchRule, RouteConfig};
+use super::hyper::Method;
 use std::collections::HashMap;
 
 /// Shared application state (route configurations and response mappings)
@@ -37,22 +37,25 @@ impl AppState {
 
     /// Check if a single route matches the request
     fn matches_route(&self, route: &RouteConfig, path: &str, method: &Method) -> bool {
-        route.matches.iter().any(|rule| {
-            self.matches_rule(rule, path, method)
-        })
+        route
+            .matches
+            .iter()
+            .any(|rule| self.matches_rule(rule, path, method))
     }
 
     /// Check if a single match rule matches the request
     fn matches_rule(&self, rule: &MatchRule, path: &str, method: &Method) -> bool {
         // 1. Path prefix matching
-        let path_matches = path.starts_with(&rule.path.pathPrefix);
+        let path_matches = path.starts_with(&rule.path.path_prefix);
         if !path_matches {
             return false;
         }
 
         // 2. Method matching (matches all if no method specified)
-        let method_matches = rule.method.as_ref()
-            .map_or(true, |rule_method| method.as_str() == rule_method);
+        let method_matches = rule
+            .method
+            .as_ref()
+            .is_none_or(|rule_method| method.as_str() == rule_method);
 
         path_matches && method_matches
     }
