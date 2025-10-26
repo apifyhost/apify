@@ -22,11 +22,11 @@ pub struct RoutePattern {
 
 #[derive(Debug, Clone)]
 pub enum OperationType {
-    List,    // GET /table
-    Get,     // GET /table/{id}
-    Create,  // POST /table
-    Update,  // PUT /table/{id}
-    Delete,  // DELETE /table/{id}
+    List,   // GET /table
+    Get,    // GET /table/{id}
+    Create, // POST /table
+    Update, // PUT /table/{id}
+    Delete, // DELETE /table/{id}
 }
 
 impl APIGenerator {
@@ -38,7 +38,9 @@ impl APIGenerator {
         })
     }
 
-    fn build_route_patterns(spec: &Value) -> Result<Vec<RoutePattern>, Box<dyn std::error::Error + Send + Sync>> {
+    fn build_route_patterns(
+        spec: &Value,
+    ) -> Result<Vec<RoutePattern>, Box<dyn std::error::Error + Send + Sync>> {
         let mut patterns = Vec::new();
 
         if let Some(paths) = spec.get("paths").and_then(|p| p.as_object()) {
@@ -46,7 +48,7 @@ impl APIGenerator {
                 if let Some(path_obj) = path_item.as_object() {
                     // Extract table name from path (e.g., "/users" -> "users")
                     let table_name = Self::extract_table_name(path);
-                    
+
                     for (method, operation) in path_obj.iter() {
                         if let Some(_op_obj) = operation.as_object() {
                             let operation_type = Self::determine_operation_type(method, path);
@@ -135,11 +137,7 @@ impl APIGenerator {
     }
 
     /// Match a request path and method to determine the operation
-    pub fn match_operation(
-        &self,
-        method: &str,
-        path: &str,
-    ) -> Option<&RoutePattern> {
+    pub fn match_operation(&self, method: &str, path: &str) -> Option<&RoutePattern> {
         for pattern in &self.route_patterns {
             if pattern.regex.is_match(path) && pattern.methods.contains(&method.to_uppercase()) {
                 return Some(pattern);
@@ -149,9 +147,13 @@ impl APIGenerator {
     }
 
     /// Extract path parameters from a matched route
-    pub fn extract_path_params(&self, pattern: &RoutePattern, path: &str) -> HashMap<String, String> {
+    pub fn extract_path_params(
+        &self,
+        pattern: &RoutePattern,
+        path: &str,
+    ) -> HashMap<String, String> {
         let mut params = HashMap::new();
-        
+
         if let Some(captures) = pattern.regex.captures(path) {
             for (i, param_name) in pattern.param_names.iter().enumerate() {
                 if let Some(capture) = captures.get(i + 1) {
@@ -159,7 +161,7 @@ impl APIGenerator {
                 }
             }
         }
-        
+
         params
     }
 
@@ -187,11 +189,26 @@ mod tests {
 
     #[test]
     fn test_determine_operation_type() {
-        assert!(matches!(APIGenerator::determine_operation_type("get", "/users"), OperationType::List));
-        assert!(matches!(APIGenerator::determine_operation_type("get", "/users/{id}"), OperationType::Get));
-        assert!(matches!(APIGenerator::determine_operation_type("post", "/users"), OperationType::Create));
-        assert!(matches!(APIGenerator::determine_operation_type("put", "/users/{id}"), OperationType::Update));
-        assert!(matches!(APIGenerator::determine_operation_type("delete", "/users/{id}"), OperationType::Delete));
+        assert!(matches!(
+            APIGenerator::determine_operation_type("get", "/users"),
+            OperationType::List
+        ));
+        assert!(matches!(
+            APIGenerator::determine_operation_type("get", "/users/{id}"),
+            OperationType::Get
+        ));
+        assert!(matches!(
+            APIGenerator::determine_operation_type("post", "/users"),
+            OperationType::Create
+        ));
+        assert!(matches!(
+            APIGenerator::determine_operation_type("put", "/users/{id}"),
+            OperationType::Update
+        ));
+        assert!(matches!(
+            APIGenerator::determine_operation_type("delete", "/users/{id}"),
+            OperationType::Delete
+        ));
     }
 
     #[test]
@@ -202,14 +219,16 @@ mod tests {
         assert!(!regex.is_match("/users/"));
         assert!(!regex.is_match("/users/123/posts"));
 
-        let regex2 = APIGenerator::build_regex_from_openapi_path("/users/{userId}/posts/{postId}").unwrap();
+        let regex2 =
+            APIGenerator::build_regex_from_openapi_path("/users/{userId}/posts/{postId}").unwrap();
         assert!(regex2.is_match("/users/john/posts/42"));
         assert!(!regex2.is_match("/users/john/posts"));
     }
 
     #[test]
     fn test_extract_param_names_from_openapi() {
-        let params = APIGenerator::extract_param_names_from_openapi("/users/{userId}/posts/{postId}");
+        let params =
+            APIGenerator::extract_param_names_from_openapi("/users/{userId}/posts/{postId}");
         assert_eq!(params, vec!["userId", "postId"]);
 
         let params2 = APIGenerator::extract_param_names_from_openapi("/users/{id}");

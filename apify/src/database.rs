@@ -131,13 +131,13 @@ impl DatabaseManager {
             if !conditions.is_empty() {
                 query.push_str(" WHERE ");
                 let mut conditions_vec: Vec<String> = Vec::new();
-                
+
                 for (key, value) in conditions {
                     conditions_vec.push(format!("{} = ${}", key, param_count));
                     params.push(Self::value_to_sql_param(&value));
                     param_count += 1;
                 }
-                
+
                 query.push_str(&conditions_vec.join(" AND "));
             }
         }
@@ -154,8 +154,15 @@ impl DatabaseManager {
             params.push(Box::new(offset_val as i32));
         }
 
-        let client = self.pool.get().await.map_err(DatabaseError::ConnectionError)?;
-        let rows = client.query(&query, &[]).await.map_err(DatabaseError::QueryError)?;
+        let client = self
+            .pool
+            .get()
+            .await
+            .map_err(DatabaseError::ConnectionError)?;
+        let rows = client
+            .query(&query, &[])
+            .await
+            .map_err(DatabaseError::QueryError)?;
 
         let mut results = Vec::new();
         for row in rows {
@@ -213,13 +220,13 @@ impl DatabaseManager {
         data: HashMap<String, Value>,
     ) -> Result<Value, DatabaseError> {
         if data.is_empty() {
-            return Err(DatabaseError::ValidationError("No data provided for insert".to_string()));
+            return Err(DatabaseError::ValidationError(
+                "No data provided for insert".to_string(),
+            ));
         }
 
         let columns: Vec<String> = data.keys().cloned().collect();
-        let placeholders: Vec<String> = (1..=data.len())
-            .map(|i| format!("${}", i))
-            .collect();
+        let placeholders: Vec<String> = (1..=data.len()).map(|i| format!("${}", i)).collect();
 
         let query = format!(
             "INSERT INTO {} ({}) VALUES ({}) RETURNING *",
@@ -228,13 +235,18 @@ impl DatabaseManager {
             placeholders.join(", ")
         );
 
-        let _values: Vec<Box<dyn tokio_postgres::types::ToSql + Sync + Send>> = data
-            .values()
-            .map(|v| Self::value_to_sql_param(v))
-            .collect();
+        let _values: Vec<Box<dyn tokio_postgres::types::ToSql + Sync + Send>> =
+            data.values().map(|v| Self::value_to_sql_param(v)).collect();
 
-        let client = self.pool.get().await.map_err(DatabaseError::ConnectionError)?;
-        let rows = client.query(&query, &[]).await.map_err(DatabaseError::QueryError)?;
+        let client = self
+            .pool
+            .get()
+            .await
+            .map_err(DatabaseError::ConnectionError)?;
+        let rows = client
+            .query(&query, &[])
+            .await
+            .map_err(DatabaseError::QueryError)?;
 
         if let Some(row) = rows.first() {
             let mut row_obj = serde_json::Map::new();
@@ -280,7 +292,9 @@ impl DatabaseManager {
             }
             Ok(Value::Object(row_obj))
         } else {
-            Err(DatabaseError::ValidationError("No data returned from insert".to_string()))
+            Err(DatabaseError::ValidationError(
+                "No data returned from insert".to_string(),
+            ))
         }
     }
 
@@ -292,11 +306,15 @@ impl DatabaseManager {
         where_clause: HashMap<String, Value>,
     ) -> Result<Value, DatabaseError> {
         if data.is_empty() {
-            return Err(DatabaseError::ValidationError("No data provided for update".to_string()));
+            return Err(DatabaseError::ValidationError(
+                "No data provided for update".to_string(),
+            ));
         }
 
         if where_clause.is_empty() {
-            return Err(DatabaseError::ValidationError("WHERE clause is required for update".to_string()));
+            return Err(DatabaseError::ValidationError(
+                "WHERE clause is required for update".to_string(),
+            ));
         }
 
         let mut param_count = 1;
@@ -325,8 +343,15 @@ impl DatabaseManager {
             where_clauses.join(" AND ")
         );
 
-        let client = self.pool.get().await.map_err(DatabaseError::ConnectionError)?;
-        let rows = client.query(&query, &[]).await.map_err(DatabaseError::QueryError)?;
+        let client = self
+            .pool
+            .get()
+            .await
+            .map_err(DatabaseError::ConnectionError)?;
+        let rows = client
+            .query(&query, &[])
+            .await
+            .map_err(DatabaseError::QueryError)?;
 
         if let Some(row) = rows.first() {
             let mut row_obj = serde_json::Map::new();
@@ -372,7 +397,9 @@ impl DatabaseManager {
             }
             Ok(Value::Object(row_obj))
         } else {
-            Err(DatabaseError::ValidationError("No data returned from update".to_string()))
+            Err(DatabaseError::ValidationError(
+                "No data returned from update".to_string(),
+            ))
         }
     }
 
@@ -383,7 +410,9 @@ impl DatabaseManager {
         where_clause: HashMap<String, Value>,
     ) -> Result<u64, DatabaseError> {
         if where_clause.is_empty() {
-            return Err(DatabaseError::ValidationError("WHERE clause is required for delete".to_string()));
+            return Err(DatabaseError::ValidationError(
+                "WHERE clause is required for delete".to_string(),
+            ));
         }
 
         let mut param_count = 1;
@@ -403,8 +432,15 @@ impl DatabaseManager {
             where_clauses.join(" AND ")
         );
 
-        let client = self.pool.get().await.map_err(DatabaseError::ConnectionError)?;
-        let result = client.execute(&query, &[]).await.map_err(DatabaseError::QueryError)?;
+        let client = self
+            .pool
+            .get()
+            .await
+            .map_err(DatabaseError::ConnectionError)?;
+        let result = client
+            .execute(&query, &[])
+            .await
+            .map_err(DatabaseError::QueryError)?;
 
         Ok(result)
     }

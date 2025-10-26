@@ -9,8 +9,37 @@ use std::net::SocketAddr;
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub listeners: Vec<ListenerConfig>,
-    pub database: Option<DatabaseConfig>,
-    pub openapi: Option<OpenAPIConfig>,
+}
+
+/// Database configuration structure
+#[derive(Debug, Deserialize, Clone)]
+pub struct DatabaseConfig {
+    pub database: DatabaseSettings,
+}
+
+/// Database settings
+#[derive(Debug, Deserialize, Clone)]
+pub struct DatabaseSettings {
+    pub host: String,
+    pub port: u16,
+    pub user: String,
+    pub password: String,
+    pub database: String,
+    pub ssl_mode: Option<String>,
+    pub max_pool_size: Option<usize>,
+}
+
+/// OpenAPI configuration structure
+#[derive(Debug, Deserialize, Clone)]
+pub struct OpenAPIConfig {
+    pub openapi: OpenAPISettings,
+}
+
+/// OpenAPI settings
+#[derive(Debug, Deserialize, Clone)]
+pub struct OpenAPISettings {
+    pub spec: Value,
+    pub validation: Option<ValidationConfig>,
 }
 
 /// Listener configuration (port, IP, routes, etc.)
@@ -19,7 +48,8 @@ pub struct ListenerConfig {
     pub port: u16,
     pub ip: String,
     pub protocol: String,
-    pub routes: Vec<RouteConfig>,
+    pub apis: Option<Vec<String>>, // API file paths
+    pub routes: Option<Vec<RouteConfig>>, // Legacy routes support
 }
 
 /// Route configuration (name and matching rules)
@@ -42,24 +72,6 @@ pub struct PathMatch {
     pub path_prefix: String,
 }
 
-/// Database configuration
-#[derive(Debug, Deserialize, Clone)]
-pub struct DatabaseConfig {
-    pub host: String,
-    pub port: u16,
-    pub user: String,
-    pub password: String,
-    pub database: String,
-    pub ssl_mode: Option<String>,
-    pub max_pool_size: Option<usize>,
-}
-
-/// OpenAPI configuration
-#[derive(Debug, Deserialize, Clone)]
-pub struct OpenAPIConfig {
-    pub spec: Value,
-    pub validation: Option<ValidationConfig>,
-}
 
 /// Validation configuration for OpenAPI
 #[derive(Debug, Deserialize, Clone)]
@@ -77,6 +89,28 @@ impl Config {
             fs::read_to_string(path).map_err(|e| format!("Failed to read config file: {}", e))?;
         let config = serde_yaml::from_str(&content)
             .map_err(|e| format!("Failed to parse config file: {}", e))?;
+        Ok(config)
+    }
+}
+
+impl DatabaseConfig {
+    /// Read and parse database configuration from file
+    pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let content =
+            fs::read_to_string(path).map_err(|e| format!("Failed to read database config file: {}", e))?;
+        let config = serde_yaml::from_str(&content)
+            .map_err(|e| format!("Failed to parse database config file: {}", e))?;
+        Ok(config)
+    }
+}
+
+impl OpenAPIConfig {
+    /// Read and parse OpenAPI configuration from file
+    pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let content =
+            fs::read_to_string(path).map_err(|e| format!("Failed to read OpenAPI config file: {}", e))?;
+        let config = serde_yaml::from_str(&content)
+            .map_err(|e| format!("Failed to parse OpenAPI config file: {}", e))?;
         Ok(config)
     }
 }

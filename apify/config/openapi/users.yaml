@@ -1,24 +1,3 @@
-listeners:
-  - port: 3000
-    ip: 0.0.0.0
-    protocol: HTTP
-    routes:
-    - name: api
-      matches:
-      - path:
-          path_prefix: /
-        method: GET
-
-# Database configuration
-database:
-  host: localhost
-  port: 5432
-  user: postgres
-  password: postgres
-  database: apify_db
-  ssl_mode: prefer
-  max_pool_size: 10
-
 # OpenAPI specification for CRUD operations
 openapi:
   spec:

@@ -2,14 +2,5 @@ listeners:
   - port: 3000
     ip: 0.0.0.0
     protocol: HTTP
-    routes:
-    - name: v1
-      matches:
-      - path:
-          path_prefix: /v1
-        method: GET
-    - name: v2
-      matches:
-      - path:
-          path_prefix: /v2
-        method: GET
+    apis:
+    - ./openapi/users.yaml

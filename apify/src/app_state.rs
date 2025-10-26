@@ -1,9 +1,9 @@
 //! Application state management and route matching logic
 
-use super::config::{MatchRule, RouteConfig, DatabaseConfig, OpenAPIConfig};
-use super::database::DatabaseManager;
 use super::api_generator::APIGenerator;
+use super::config::{DatabaseConfig, MatchRule, OpenAPIConfig, RouteConfig};
 use super::crud_handler::CRUDHandler;
+use super::database::DatabaseManager;
 use super::hyper::Method;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -33,29 +33,46 @@ impl AppState {
 
     /// Create new application state with CRUD support
     pub fn new_with_crud(
-        routes: Vec<RouteConfig>,
+        routes: Option<Vec<RouteConfig>>,
         database_config: Option<DatabaseConfig>,
-        openapi_config: Option<OpenAPIConfig>,
+        openapi_configs: Vec<OpenAPIConfig>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let routes = routes.unwrap_or_default();
         let mut route_responses = HashMap::new();
         // Generate fixed responses for each route (hello + route name)
         for route in &routes {
             route_responses.insert(route.name.clone(), format!("hello {}", route.name));
         }
 
-        let crud_handler = if let (Some(db_config), Some(openapi_config)) = (database_config, openapi_config) {
-            let db_config_converted = crate::database::DatabaseConfig {
-                host: db_config.host,
-                port: db_config.port,
-                user: db_config.user,
-                password: db_config.password,
-                database: db_config.database,
-                ssl_mode: db_config.ssl_mode.unwrap_or_else(|| "prefer".to_string()),
-                max_size: db_config.max_pool_size.unwrap_or(10),
-            };
-            let db_manager = DatabaseManager::new(db_config_converted)?;
-            let api_generator = APIGenerator::new(openapi_config.spec)?;
-            Some(Arc::new(CRUDHandler::new(db_manager, api_generator)))
+        let crud_handler = if let Some(db_config) = database_config {
+            if !openapi_configs.is_empty() {
+                let db_config_converted = crate::database::DatabaseConfig {
+                    host: db_config.database.host,
+                    port: db_config.database.port,
+                    user: db_config.database.user,
+                    password: db_config.database.password,
+                    database: db_config.database.database,
+                    ssl_mode: db_config.database.ssl_mode.unwrap_or_else(|| "prefer".to_string()),
+                    max_size: db_config.database.max_pool_size.unwrap_or(10),
+                };
+                let db_manager = DatabaseManager::new(db_config_converted)?;
+                
+                // Merge all OpenAPI specs into one
+                let mut merged_spec = serde_json::Map::new();
+                for openapi_config in &openapi_configs {
+                    if let Some(spec_obj) = openapi_config.openapi.spec.as_object() {
+                        for (key, value) in spec_obj {
+                            merged_spec.insert(key.clone(), value.clone());
+                        }
+                    }
+                }
+                
+                let merged_value = serde_json::Value::Object(merged_spec);
+                let api_generator = APIGenerator::new(merged_value)?;
+                Some(Arc::new(CRUDHandler::new(db_manager, api_generator)))
+            } else {
+                None
+            }
         } else {
             None
         };

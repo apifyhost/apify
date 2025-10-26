@@ -56,8 +56,12 @@ impl CRUDHandler {
         body: Option<Value>,
     ) -> Result<Value, CRUDError> {
         // Find matching route pattern
-        let pattern = self.api_generator.match_operation(method, path)
-            .ok_or_else(|| CRUDError::NotFoundError(format!("No matching route for {} {}", method, path)))?;
+        let pattern = self
+            .api_generator
+            .match_operation(method, path)
+            .ok_or_else(|| {
+                CRUDError::NotFoundError(format!("No matching route for {} {}", method, path))
+            })?;
 
         match pattern.operation_type {
             OperationType::List => self.handle_list(pattern, query_params).await,
@@ -75,11 +79,13 @@ impl CRUDHandler {
         query_params: HashMap<String, String>,
     ) -> Result<Value, CRUDError> {
         let table = &pattern.table_name;
-        
+
         // Extract pagination parameters
-        let limit = query_params.get("limit")
+        let limit = query_params
+            .get("limit")
             .and_then(|s| s.parse::<u32>().ok());
-        let offset = query_params.get("offset")
+        let offset = query_params
+            .get("offset")
             .and_then(|s| s.parse::<u32>().ok());
 
         // Extract filter parameters (exclude pagination params)
@@ -90,13 +96,20 @@ impl CRUDHandler {
             }
         }
 
-        let results = self.db_manager.select(
-            table,
-            None, // Select all columns
-            if where_clause.is_empty() { None } else { Some(where_clause) },
-            limit,
-            offset,
-        ).await?;
+        let results = self
+            .db_manager
+            .select(
+                table,
+                None, // Select all columns
+                if where_clause.is_empty() {
+                    None
+                } else {
+                    Some(where_clause)
+                },
+                limit,
+                offset,
+            )
+            .await?;
 
         Ok(Value::Array(results))
     }
@@ -108,26 +121,33 @@ impl CRUDHandler {
         path_params: HashMap<String, String>,
     ) -> Result<Value, CRUDError> {
         let table = &pattern.table_name;
-        
+
         // Use the first path parameter as the primary key
-        let id_param = path_params.keys().next()
+        let id_param = path_params
+            .keys()
+            .next()
             .ok_or_else(|| CRUDError::InvalidParameterError("No ID parameter found".to_string()))?;
-        let id_value = path_params.get(id_param)
-            .ok_or_else(|| CRUDError::InvalidParameterError("ID parameter value not found".to_string()))?;
+        let id_value = path_params.get(id_param).ok_or_else(|| {
+            CRUDError::InvalidParameterError("ID parameter value not found".to_string())
+        })?;
 
         let mut where_clause = HashMap::new();
         where_clause.insert(id_param.clone(), Value::String(id_value.clone()));
 
-        let results = self.db_manager.select(
-            table,
-            None, // Select all columns
-            Some(where_clause),
-            Some(1), // Limit to 1 record
-            None,
-        ).await?;
+        let results = self
+            .db_manager
+            .select(
+                table,
+                None, // Select all columns
+                Some(where_clause),
+                Some(1), // Limit to 1 record
+                None,
+            )
+            .await?;
 
-        results.into_iter().next()
-            .ok_or_else(|| CRUDError::NotFoundError(format!("Record with {} = {} not found", id_param, id_value)))
+        results.into_iter().next().ok_or_else(|| {
+            CRUDError::NotFoundError(format!("Record with {} = {} not found", id_param, id_value))
+        })
     }
 
     /// Handle POST /table (create new record)
@@ -137,12 +157,17 @@ impl CRUDHandler {
         body: Option<Value>,
     ) -> Result<Value, CRUDError> {
         let table = &pattern.table_name;
-        
-        let data = body.ok_or_else(|| CRUDError::ValidationError("Request body is required".to_string()))?;
-        
+
+        let data =
+            body.ok_or_else(|| CRUDError::ValidationError("Request body is required".to_string()))?;
+
         let data_map = match data {
             Value::Object(map) => map,
-            _ => return Err(CRUDError::ValidationError("Request body must be a JSON object".to_string())),
+            _ => {
+                return Err(CRUDError::ValidationError(
+                    "Request body must be a JSON object".to_string(),
+                ));
+            }
         };
 
         // Convert serde_json::Map to HashMap<String, Value>
@@ -163,12 +188,17 @@ impl CRUDHandler {
         body: Option<Value>,
     ) -> Result<Value, CRUDError> {
         let table = &pattern.table_name;
-        
-        let data = body.ok_or_else(|| CRUDError::ValidationError("Request body is required".to_string()))?;
-        
+
+        let data =
+            body.ok_or_else(|| CRUDError::ValidationError("Request body is required".to_string()))?;
+
         let data_map = match data {
             Value::Object(map) => map,
-            _ => return Err(CRUDError::ValidationError("Request body must be a JSON object".to_string())),
+            _ => {
+                return Err(CRUDError::ValidationError(
+                    "Request body must be a JSON object".to_string(),
+                ));
+            }
         };
 
         // Convert serde_json::Map to HashMap<String, Value>
@@ -178,15 +208,21 @@ impl CRUDHandler {
         }
 
         // Use the first path parameter as the primary key for WHERE clause
-        let id_param = path_params.keys().next()
+        let id_param = path_params
+            .keys()
+            .next()
             .ok_or_else(|| CRUDError::InvalidParameterError("No ID parameter found".to_string()))?;
-        let id_value = path_params.get(id_param)
-            .ok_or_else(|| CRUDError::InvalidParameterError("ID parameter value not found".to_string()))?;
+        let id_value = path_params.get(id_param).ok_or_else(|| {
+            CRUDError::InvalidParameterError("ID parameter value not found".to_string())
+        })?;
 
         let mut where_clause = HashMap::new();
         where_clause.insert(id_param.clone(), Value::String(id_value.clone()));
 
-        let result = self.db_manager.update(table, data_hashmap, where_clause).await?;
+        let result = self
+            .db_manager
+            .update(table, data_hashmap, where_clause)
+            .await?;
         Ok(result)
     }
 
@@ -197,27 +233,39 @@ impl CRUDHandler {
         path_params: HashMap<String, String>,
     ) -> Result<Value, CRUDError> {
         let table = &pattern.table_name;
-        
+
         // Use the first path parameter as the primary key for WHERE clause
-        let id_param = path_params.keys().next()
+        let id_param = path_params
+            .keys()
+            .next()
             .ok_or_else(|| CRUDError::InvalidParameterError("No ID parameter found".to_string()))?;
-        let id_value = path_params.get(id_param)
-            .ok_or_else(|| CRUDError::InvalidParameterError("ID parameter value not found".to_string()))?;
+        let id_value = path_params.get(id_param).ok_or_else(|| {
+            CRUDError::InvalidParameterError("ID parameter value not found".to_string())
+        })?;
 
         let mut where_clause = HashMap::new();
         where_clause.insert(id_param.clone(), Value::String(id_value.clone()));
 
         let affected_rows = self.db_manager.delete(table, where_clause).await?;
-        
+
         if affected_rows == 0 {
-            return Err(CRUDError::NotFoundError(format!("Record with {} = {} not found", id_param, id_value)));
+            return Err(CRUDError::NotFoundError(format!(
+                "Record with {} = {} not found",
+                id_param, id_value
+            )));
         }
 
         // Return success response
         let mut response = HashMap::new();
-        response.insert("message".to_string(), Value::String("Record deleted successfully".to_string()));
-        response.insert("affected_rows".to_string(), Value::Number(serde_json::Number::from(affected_rows)));
-        
+        response.insert(
+            "message".to_string(),
+            Value::String("Record deleted successfully".to_string()),
+        );
+        response.insert(
+            "affected_rows".to_string(),
+            Value::Number(serde_json::Number::from(affected_rows)),
+        );
+
         Ok(Value::Object(response.into_iter().collect()))
     }
 }

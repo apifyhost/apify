@@ -1,10 +1,10 @@
+pub mod api_generator;
 pub mod app_state;
 pub mod config;
+pub mod crud_handler;
+pub mod database;
 pub mod handler;
 pub mod server;
-pub mod database;
-pub mod api_generator;
-pub mod crud_handler;
 
 pub use http_body_util;
 pub use hyper;
