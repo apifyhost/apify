@@ -12,7 +12,6 @@ use std::error::Error;
 use std::net::{SocketAddr, TcpListener as StdTcpListener};
 
 /// Create TCP listener with SO_REUSEPORT support
-// Updated error type to include Send + Sync
 pub fn create_reuse_port_socket(
     addr: SocketAddr,
 ) -> Result<TcpListener, Box<dyn Error + Send + Sync>> {
@@ -45,18 +44,20 @@ pub fn create_reuse_port_socket(
     Ok(tokio_listener)
 }
 
-/// Start listener service (runs independently in each thread)
+/// Start listener service (runs independently in each thread with current_thread runtime)
 pub fn start_listener(
     listener_config: ListenerConfig,
     thread_id: usize,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    // Create single-threaded tokio runtime
-    let rt = tokio::runtime::Builder::new_current_thread()
+    // Critical: Create single-threaded runtime using new_current_thread
+    let rt = tokio::runtime::Builder::new_current_thread() // <-- Restored critical line
         .enable_all()
         .build()
-        .map_err(|e| format!("Failed to build runtime: {}", e))?;
+        .map_err(|e| format!("Failed to build current_thread runtime: {}", e))?;
 
+    // Run the async event loop on the dedicated single thread
     rt.block_on(async move {
+        // <-- Restored critical pattern
         let addr = listener_config.to_socket_addr()?;
         let listener = create_reuse_port_socket(addr)?;
         println!("Thread {} bound to http://{}", thread_id, addr);
