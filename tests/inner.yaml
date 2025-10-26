@@ -1,0 +1,6 @@
+steps:
+  - log:
+      level: debug
+      message: !asd main + 1
+
+  - payload: !asd main + 1

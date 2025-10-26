@@ -1,0 +1,42 @@
+name: jwt-example
+version: 1.0.0
+description: Exemplo de uso do módulo JWT
+
+modules:
+  - module: jwt
+    version: "0.0.1"
+    with:
+      secret: "fo4XKdZ1xSrIZyms4q2BwPrW5lMpls9qqy5tiAk2esc"
+  - module: sleep
+    version: "0.0.1"
+
+steps:
+  - use: jwt
+    input:
+      action: create
+      data:
+        user_id: 12345
+        role: admin
+      expires_in: "{{main.expires_in}}"
+
+  - use: sleep
+    input:
+      seconds: 2
+
+  - use: jwt
+    input:
+      action: verify
+      token: "{{payload.token}}"
+
+  - return: "{{payload.valid}}"
+
+tests:
+  - describe: JWT valid
+    main:
+      expires_in: 10
+    assert_eq: true
+  - describe: JWT expired
+    main:
+      expires_in: 1
+    assert_eq: false
+
