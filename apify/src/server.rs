@@ -48,6 +48,8 @@ pub fn create_reuse_port_socket(
 pub fn start_listener(
     listener_config: ListenerConfig,
     thread_id: usize,
+    database_config: Option<super::config::DatabaseConfig>,
+    openapi_config: Option<super::config::OpenAPIConfig>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Critical: Create single-threaded runtime using new_current_thread
     let rt = tokio::runtime::Builder::new_current_thread() // <-- Restored critical line
@@ -63,7 +65,13 @@ pub fn start_listener(
         println!("Thread {} bound to http://{}", thread_id, addr);
 
         // Create application state
-        let state = Arc::new(AppState::new(listener_config.routes));
+        let state = Arc::new(
+            AppState::new_with_crud(
+                listener_config.routes,
+                database_config,
+                openapi_config,
+            )?
+        );
 
         // Continuously accept and handle connections
         loop {

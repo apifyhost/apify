@@ -31,13 +31,20 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     for (listener_idx, listener_config) in config.listeners.into_iter().enumerate() {
         for thread_id in 0..num_threads {
             let listener_config_clone = listener_config.clone();
+            let database_config_clone = config.database.clone();
+            let openapi_config_clone = config.openapi.clone();
             let handle = thread::spawn(
                 move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     println!(
                         "Starting thread {} for listener {} (port: {})",
                         thread_id, listener_idx, listener_config_clone.port
                     );
-                    start_listener(listener_config_clone, thread_id)?;
+                    start_listener(
+                        listener_config_clone, 
+                        thread_id,
+                        database_config_clone,
+                        openapi_config_clone,
+                    )?;
                     Ok(())
                 },
             );

@@ -1,6 +1,7 @@
 //! Configuration file parsing and structure definitions
 
 use serde::Deserialize;
+use serde_json::Value;
 use std::fs;
 use std::net::SocketAddr;
 
@@ -8,6 +9,8 @@ use std::net::SocketAddr;
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub listeners: Vec<ListenerConfig>,
+    pub database: Option<DatabaseConfig>,
+    pub openapi: Option<OpenAPIConfig>,
 }
 
 /// Listener configuration (port, IP, routes, etc.)
@@ -37,6 +40,33 @@ pub struct MatchRule {
 #[derive(Debug, Deserialize, Clone)]
 pub struct PathMatch {
     pub path_prefix: String,
+}
+
+/// Database configuration
+#[derive(Debug, Deserialize, Clone)]
+pub struct DatabaseConfig {
+    pub host: String,
+    pub port: u16,
+    pub user: String,
+    pub password: String,
+    pub database: String,
+    pub ssl_mode: Option<String>,
+    pub max_pool_size: Option<usize>,
+}
+
+/// OpenAPI configuration
+#[derive(Debug, Deserialize, Clone)]
+pub struct OpenAPIConfig {
+    pub spec: Value,
+    pub validation: Option<ValidationConfig>,
+}
+
+/// Validation configuration for OpenAPI
+#[derive(Debug, Deserialize, Clone)]
+pub struct ValidationConfig {
+    pub strict_mode: Option<bool>,
+    pub validate_request_body: Option<bool>,
+    pub validate_response_body: Option<bool>,
 }
 
 impl Config {
