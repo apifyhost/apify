@@ -4,3 +4,4 @@ listeners:
     protocol: HTTP
     apis:
     - ./openapi/users.yaml
+    - ./openapi/books.yaml
