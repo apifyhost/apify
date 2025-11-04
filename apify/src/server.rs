@@ -65,36 +65,55 @@ pub fn start_listener(
         println!("Thread {} bound to http://{}", thread_id, addr);
 
         // Create application state
-        let state = Arc::new(AppState::new_with_crud(
+        println!("Thread {} creating AppState...", thread_id);
+        let state = match AppState::new_with_crud(
             listener_config.routes,
             database_config,
             openapi_configs,
-        )?);
+        ).await {
+            Ok(s) => {
+                println!("Thread {} AppState created successfully", thread_id);
+                Arc::new(s)
+            }
+            Err(e) => {
+                eprintln!("Thread {} failed to create AppState: {}", thread_id, e);
+                return Err(format!("Thread {} AppState creation failed: {}", thread_id, e).into());
+            }
+        };
 
+        println!("Thread {} entering accept loop", thread_id);
         // Continuously accept and handle connections
         loop {
-            let (stream, _) = listener
-                .accept()
-                .await
-                .map_err(|e| format!("Failed to accept connection: {}", e))?;
-            stream
-                .set_nodelay(true)
-                .map_err(|e| format!("Failed to set TCP_NODELAY: {}", e))?;
-            let io = TokioIo::new(stream);
-            let state_clone = Arc::clone(&state);
-
-            // Handle connection asynchronously
-            tokio::task::spawn(async move {
-                let service = service_fn(move |req| handle_request(req, Arc::clone(&state_clone)));
-
-                if let Err(err) = http1::Builder::new()
-                    .keep_alive(true)
-                    .serve_connection(io, service)
-                    .await
-                {
-                    eprintln!("Thread {} connection handling error: {:?}", thread_id, err);
+            match listener.accept().await {
+                Ok((stream, _)) => {
+                    if let Err(e) = stream.set_nodelay(true) {
+                        eprintln!("Thread {} set_nodelay error: {}", thread_id, e);
+                        continue;
+                    }
+                    let io = TokioIo::new(stream);
+                    let state_clone = Arc::clone(&state);
+                    // Handle connection asynchronously
+                    tokio::task::spawn(async move {
+                        let service = service_fn(move |req| handle_request(req, Arc::clone(&state_clone)));
+                        if let Err(err) = http1::Builder::new()
+                            .keep_alive(true)
+                            .serve_connection(io, service)
+                            .await
+                        {
+                            eprintln!("Thread {} connection handling error: {:?}", thread_id, err);
+                        }
+                    });
                 }
-            });
+                Err(e) => {
+                    eprintln!("Thread {} accept error: {}", thread_id, e);
+                    continue;
+                }
+            }
+        }
+        #[allow(unreachable_code)]
+        {
+            use std::time::Duration;
+            loop { tokio::time::sleep(Duration::from_secs(3600)).await; }
         }
     })
 }

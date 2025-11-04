@@ -65,10 +65,13 @@ pub async fn handle_request(
             Err(CRUDError::InvalidParameterError(msg)) => {
                 Ok(create_error_response(StatusCode::BAD_REQUEST, &msg))
             }
-            Err(CRUDError::DatabaseError(_)) => Ok(create_error_response(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Database error",
-            )),
+            Err(CRUDError::DatabaseError(e)) => {
+                eprintln!("Database error: {:?}", e);
+                Ok(create_error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &format!("Database error: {}", e),
+                ))
+            }
         }
     } else {
         // Fallback to original route matching
@@ -102,12 +105,16 @@ fn extract_query_params(query: Option<&str>) -> HashMap<String, String> {
 
 /// Extract path parameters from route matching
 fn extract_path_params(
-    _state: &AppState,
-    _path: &str,
-    _method: &hyper::Method,
+    state: &AppState,
+    path: &str,
+    method: &hyper::Method,
 ) -> HashMap<String, String> {
-    // For now, return empty HashMap - this would need to be implemented
-    // based on the route patterns and OpenAPI spec
+    // Try to extract path parameters using the CRUD handler's route patterns
+    if let Some(crud_handler) = &state.crud_handler {
+        if let Some(pattern) = crud_handler.api_generator.match_operation(method.as_str(), path) {
+            return crud_handler.api_generator.extract_path_params(pattern, path);
+        }
+    }
     HashMap::new()
 }
 

@@ -38,3 +38,4 @@ WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'wangwu@example.com');
 
 -- 显示示例数据
 SELECT * FROM users ORDER BY id;
+

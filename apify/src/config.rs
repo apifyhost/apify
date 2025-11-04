@@ -20,6 +20,7 @@ pub struct DatabaseConfig {
 /// Database settings
 #[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseSettings {
+    pub driver: Option<String>,
     pub host: String,
     pub port: u16,
     pub user: String,

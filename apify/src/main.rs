@@ -84,11 +84,21 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 
     // Wait for all threads to complete
-    for handle in handles {
-        if let Err(e) = handle.join() {
-            eprintln!("Thread execution error: {:?}", e);
+    for (idx, handle) in handles.into_iter().enumerate() {
+        match handle.join() {
+            Ok(Ok(())) => {
+                eprintln!("Thread {} exited normally", idx);
+            }
+            Ok(Err(e)) => {
+                eprintln!("Thread {} execution error: {}", idx, e);
+            }
+            Err(e) => {
+                eprintln!("Thread {} panicked: {:?}", idx, e);
+            }
         }
     }
+    
+    eprintln!("All threads exited, main process terminating");
 
     Ok(())
 }

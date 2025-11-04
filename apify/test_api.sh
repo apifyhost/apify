@@ -65,3 +65,4 @@ echo "   - 确保 PostgreSQL 数据库正在运行"
 echo "   - 确保数据库中有 users 表"
 echo "   - 确保 Apify 服务正在运行在端口 3000"
 echo "   - 如果没有安装 jq，请运行: brew install jq (macOS) 或 apt-get install jq (Ubuntu)"
+

@@ -32,7 +32,7 @@ impl AppState {
     }
 
     /// Create new application state with CRUD support
-    pub fn new_with_crud(
+    pub async fn new_with_crud(
         routes: Option<Vec<RouteConfig>>,
         database_config: Option<DatabaseConfig>,
         openapi_configs: Vec<OpenAPIConfig>,
@@ -44,18 +44,11 @@ impl AppState {
             route_responses.insert(route.name.clone(), format!("hello {}", route.name));
         }
 
-        let crud_handler = if let Some(db_config) = database_config {
+        // For now, always use SQLite backend regardless of provided database config
+        let crud_handler = {
             if !openapi_configs.is_empty() {
-                let db_config_converted = crate::database::DatabaseConfig {
-                    host: db_config.database.host,
-                    port: db_config.database.port,
-                    user: db_config.database.user,
-                    password: db_config.database.password,
-                    database: db_config.database.database,
-                    ssl_mode: db_config.database.ssl_mode.unwrap_or_else(|| "prefer".to_string()),
-                    max_size: db_config.database.max_pool_size.unwrap_or(10),
-                };
-                let db_manager = DatabaseManager::new(db_config_converted)?;
+                let db_cfg = crate::database::DatabaseConfig::sqlite_default();
+                let db_manager = DatabaseManager::new(db_cfg).await?;
                 
                 // Merge all OpenAPI specs into one
                 let mut merged_spec = serde_json::Map::new();
@@ -70,11 +63,7 @@ impl AppState {
                 let merged_value = serde_json::Value::Object(merged_spec);
                 let api_generator = APIGenerator::new(merged_value)?;
                 Some(Arc::new(CRUDHandler::new(db_manager, api_generator)))
-            } else {
-                None
-            }
-        } else {
-            None
+            } else { None }
         };
 
         Ok(Self {

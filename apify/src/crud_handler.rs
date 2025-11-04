@@ -35,7 +35,7 @@ impl From<crate::database::DatabaseError> for CRUDError {
 #[derive(Debug)]
 pub struct CRUDHandler {
     db_manager: DatabaseManager,
-    api_generator: APIGenerator,
+    pub api_generator: APIGenerator,
 }
 
 impl CRUDHandler {
