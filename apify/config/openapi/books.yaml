@@ -6,6 +6,71 @@ openapi:
       title: "Apify Books CRUD API"
       version: "1.0.0"
       description: "Auto-generated CRUD API for books management"
+    
+    # Table schema definition - used for dynamic table creation
+    x-table-schemas:
+      - table_name: "books"
+        columns:
+          - name: "id"
+            column_type: "INTEGER"
+            nullable: false
+            primary_key: true
+            unique: false
+            auto_increment: true
+            default_value: null
+          - name: "title"
+            column_type: "TEXT"
+            nullable: false
+            primary_key: false
+            unique: false
+            auto_increment: false
+            default_value: null
+          - name: "author"
+            column_type: "TEXT"
+            nullable: false
+            primary_key: false
+            unique: false
+            auto_increment: false
+            default_value: null
+          - name: "isbn"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: true
+            auto_increment: false
+            default_value: null
+          - name: "published_date"
+            column_type: "DATE"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            default_value: null
+          - name: "price"
+            column_type: "REAL"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            default_value: null
+          - name: "created_at"
+            column_type: "DATETIME"
+            nullable: false
+            primary_key: false
+            unique: false
+            auto_increment: false
+            default_value: "CURRENT_TIMESTAMP"
+        indexes:
+          - name: "idx_books_author"
+            columns: ["author"]
+            unique: false
+          - name: "idx_books_isbn"
+            columns: ["isbn"]
+            unique: false
+          - name: "idx_books_published_date"
+            columns: ["published_date"]
+            unique: false
+    
     paths:
       /books:
         get:

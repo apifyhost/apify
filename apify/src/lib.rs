@@ -4,6 +4,7 @@ pub mod config;
 pub mod crud_handler;
 pub mod database;
 pub mod handler;
+pub mod schema_generator;
 pub mod server;
 
 pub use http_body_util;

@@ -5,6 +5,7 @@ use super::config::{DatabaseConfig, MatchRule, OpenAPIConfig, RouteConfig};
 use super::crud_handler::CRUDHandler;
 use super::database::DatabaseManager;
 use super::hyper::Method;
+use super::schema_generator::SchemaGenerator;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -34,7 +35,7 @@ impl AppState {
     /// Create new application state with CRUD support
     pub async fn new_with_crud(
         routes: Option<Vec<RouteConfig>>,
-        database_config: Option<DatabaseConfig>,
+        _database_config: Option<DatabaseConfig>,
         openapi_configs: Vec<OpenAPIConfig>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let routes = routes.unwrap_or_default();
@@ -50,15 +51,45 @@ impl AppState {
                 let db_cfg = crate::database::DatabaseConfig::sqlite_default();
                 let db_manager = DatabaseManager::new(db_cfg).await?;
                 
-                // Merge all OpenAPI specs into one
+                // Extract table schemas from all OpenAPI specs
+                let mut all_schemas = Vec::new();
+                for openapi_config in &openapi_configs {
+                    let schemas = SchemaGenerator::extract_schemas_from_openapi(&openapi_config.openapi.spec)?;
+                    all_schemas.extend(schemas);
+                }
+                
+                // Initialize database schema with extracted table definitions
+                if !all_schemas.is_empty() {
+                    eprintln!("Initializing database with {} table schemas", all_schemas.len());
+                    db_manager.initialize_schema(all_schemas).await?;
+                } else {
+                    eprintln!("Warning: No table schemas found in OpenAPI configurations");
+                }
+                
+                // Merge all OpenAPI specs into one - deep merge for paths
                 let mut merged_spec = serde_json::Map::new();
+                let mut merged_paths = serde_json::Map::new();
+                
                 for openapi_config in &openapi_configs {
                     if let Some(spec_obj) = openapi_config.openapi.spec.as_object() {
                         for (key, value) in spec_obj {
-                            merged_spec.insert(key.clone(), value.clone());
+                            if key == "paths" {
+                                // Deep merge paths from all specs
+                                if let Some(paths_obj) = value.as_object() {
+                                    for (path_key, path_value) in paths_obj {
+                                        merged_paths.insert(path_key.clone(), path_value.clone());
+                                    }
+                                }
+                            } else {
+                                // For other keys, just use the last value
+                                merged_spec.insert(key.clone(), value.clone());
+                            }
                         }
                     }
                 }
+                
+                // Add merged paths to the spec
+                merged_spec.insert("paths".to_string(), serde_json::Value::Object(merged_paths));
                 
                 let merged_value = serde_json::Value::Object(merged_spec);
                 let api_generator = APIGenerator::new(merged_value)?;

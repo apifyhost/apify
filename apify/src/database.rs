@@ -1,5 +1,6 @@
 //! Database operations and connection management (SQLite-only for now; Postgres support to follow)
 
+use crate::schema_generator::{SchemaGenerator, TableSchema};
 use serde_json::{json, Value};
 use sqlx::{sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions, SqliteRow}, Column, Row};
 use sqlx::{QueryBuilder, Sqlite};
@@ -78,28 +79,27 @@ impl DatabaseManager {
     pub async fn new(config: DatabaseConfig) -> Result<Self, DatabaseError> {
         let pool = config.create_pool().await?;
         let manager = Self { pool };
-        
-        // Initialize database schema if needed
-        manager.initialize_schema().await?;
-        
         Ok(manager)
     }
 
-    /// Initialize database schema by running the initialization script
-    async fn initialize_schema(&self) -> Result<(), DatabaseError> {
-        // Read the SQLite initialization script
-        let schema_sql = include_str!("../init_db_sqlite.sql");
-        
-        // Execute the schema initialization
-        sqlx::raw_sql(schema_sql)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| {
-                eprintln!("Failed to initialize database schema: {}", e);
-                DatabaseError::QueryError(e)
-            })?;
+    /// Initialize database schema with dynamic table schemas
+    pub async fn initialize_schema(&self, table_schemas: Vec<TableSchema>) -> Result<(), DatabaseError> {
+        for schema in table_schemas {
+            let sql = SchemaGenerator::generate_create_table_sql_sqlite(&schema);
+            eprintln!("Creating table: {}\nSQL: {}", schema.table_name, sql);
             
-        eprintln!("Database schema initialized successfully");
+            // Execute the schema initialization
+            sqlx::raw_sql(&sql)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| {
+                    eprintln!("Failed to create table {}: {}", schema.table_name, e);
+                    DatabaseError::QueryError(e)
+                })?;
+                
+            eprintln!("Table {} created successfully", schema.table_name);
+        }
+        
         Ok(())
     }
 
@@ -270,35 +270,5 @@ fn push_bind_sqlite(sep: &mut sqlx::query_builder::Separated<'_, '_, Sqlite, &st
         }
         Value::String(s) => { sep.push_bind(s.clone()); }
         Value::Array(_) | Value::Object(_) => { sep.push_bind(serde_json::to_string(v).unwrap_or_default()); }
-    }
-}
-
-fn push_set_sqlite(sep: &mut sqlx::query_builder::Separated<'_, '_, Sqlite, &str>, k: String, v: Value) {
-    sep.push(format!("{} = ", k));
-    match v {
-        Value::Null => { sep.push("NULL"); }
-        Value::Bool(b) => { sep.push_bind(b); }
-        Value::Number(n) => {
-            if let Some(i) = n.as_i64() { sep.push_bind(i); }
-            else if let Some(f) = n.as_f64() { sep.push_bind(f); }
-            else { sep.push_bind(n.to_string()); }
-        }
-        Value::String(s) => { sep.push_bind(s); }
-        Value::Array(_) | Value::Object(_) => { sep.push_bind(serde_json::to_string(&v).unwrap_or_default()); }
-    }
-}
-
-fn push_where_eq_sqlite(sep: &mut sqlx::query_builder::Separated<'_, '_, Sqlite, &str>, k: String, v: Value) {
-    sep.push(format!("{} = ", k));
-    match v {
-        Value::Null => { sep.push("NULL"); }
-        Value::Bool(b) => { sep.push_bind(b); }
-        Value::Number(n) => {
-            if let Some(i) = n.as_i64() { sep.push_bind(i); }
-            else if let Some(f) = n.as_f64() { sep.push_bind(f); }
-            else { sep.push_bind(n.to_string()); }
-        }
-        Value::String(s) => { sep.push_bind(s); }
-        Value::Array(_) | Value::Object(_) => { sep.push_bind(serde_json::to_string(&v).unwrap_or_default()); }
     }
 }

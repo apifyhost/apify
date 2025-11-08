@@ -6,6 +6,47 @@ openapi:
       title: "Apify CRUD API"
       version: "1.0.0"
       description: "Auto-generated CRUD API"
+    
+    # Table schema definition - used for dynamic table creation
+    x-table-schemas:
+      - table_name: "users"
+        columns:
+          - name: "id"
+            column_type: "INTEGER"
+            nullable: false
+            primary_key: true
+            unique: false
+            auto_increment: true
+            default_value: null
+          - name: "name"
+            column_type: "TEXT"
+            nullable: false
+            primary_key: false
+            unique: false
+            auto_increment: false
+            default_value: null
+          - name: "email"
+            column_type: "TEXT"
+            nullable: false
+            primary_key: false
+            unique: true
+            auto_increment: false
+            default_value: null
+          - name: "created_at"
+            column_type: "DATETIME"
+            nullable: false
+            primary_key: false
+            unique: false
+            auto_increment: false
+            default_value: "CURRENT_TIMESTAMP"
+        indexes:
+          - name: "idx_users_email"
+            columns: ["email"]
+            unique: false
+          - name: "idx_users_created_at"
+            columns: ["created_at"]
+            unique: false
+    
     paths:
       /users:
         get:
