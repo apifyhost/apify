@@ -1,0 +1,6 @@
+listeners:
+  - port: 3000
+    ip: 0.0.0.0
+    protocol: HTTP
+    apis:
+      - ./openapi/components_only.yaml

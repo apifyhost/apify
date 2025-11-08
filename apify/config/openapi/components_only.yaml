@@ -1,0 +1,79 @@
+openapi:
+  spec:
+    openapi: "3.0.0"
+    info:
+      title: "Apify Components-only API"
+      version: "1.0.0"
+      description: "OpenAPI without x-table-schemas; tables derived automatically from components.schemas"
+    paths:
+      /pets:
+        get:
+          summary: List pets
+          operationId: listPets
+          responses:
+            "200": { description: OK }
+        post:
+          summary: Create pet
+          operationId: createPet
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/Pet'
+          responses:
+            "201": { description: Created }
+      /pets/{id}:
+        get:
+          summary: Get pet
+          operationId: getPet
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema: { type: string }
+          responses:
+            "200": { description: OK }
+        put:
+          summary: Update pet
+          operationId: updatePet
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema: { type: string }
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/Pet'
+          responses:
+            "200": { description: Updated }
+        delete:
+          summary: Delete pet
+          operationId: deletePet
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema: { type: string }
+          responses:
+            "200": { description: Deleted }
+    components:
+      schemas:
+        Pet:
+          type: object
+          required: [name]
+          properties:
+            id: { type: integer }
+            name: { type: string, x-index: true }
+            species: { type: string }
+            created_at: { type: string, format: date-time }
+        Owner:
+          type: object
+          required: [email]
+          properties:
+            id: { type: integer }
+            email: { type: string, format: email, x-unique: true }
+            name: { type: string }

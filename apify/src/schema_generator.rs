@@ -59,7 +59,145 @@ impl SchemaGenerator {
             }
         }
 
+        // Fallback: derive from components.schemas if no explicit schemas found
+        if schemas.is_empty() {
+            if let Some(derived) = Self::derive_from_components(spec) {
+                if !derived.is_empty() {
+                    return Ok(derived);
+                }
+            }
+        }
+
         Ok(schemas)
+    }
+
+    /// Derive table schemas from OpenAPI components.schemas (best-effort)
+    /// Rules:
+    /// - Each object schema becomes a table, table name = lowercased schema name + 's' (if not ending with 's')
+    /// - Properties map to columns; required => NOT NULL; infer basic SQL types
+    /// - Ensure an 'id INTEGER PRIMARY KEY AUTOINCREMENT' if not present
+    /// - Special cases: created_at -> DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    /// - Extensions: x-unique => UNIQUE; x-index => create index
+    fn derive_from_components(spec: &Value) -> Option<Vec<TableSchema>> {
+        let components = spec.get("components")?.get("schemas")?.as_object()?;
+        let mut tables = Vec::new();
+
+        for (schema_name, schema_value) in components.iter() {
+            let obj = match schema_value.as_object() { Some(o) => o, None => continue };
+
+            // Only process object schemas or those with properties
+            let is_object = obj.get("type").and_then(|t| t.as_str()).map(|t| t == "object").unwrap_or(false)
+                || obj.get("properties").is_some();
+            if !is_object { continue; }
+
+            let mut columns: Vec<ColumnDefinition> = Vec::new();
+            let mut indexes: Vec<IndexDefinition> = Vec::new();
+
+            let required: std::collections::HashSet<String> = obj
+                .get("required")
+                .and_then(|r| r.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                .unwrap_or_default();
+
+            if let Some(props) = obj.get("properties").and_then(|p| p.as_object()) {
+                for (prop_name, prop_schema) in props.iter() {
+                    // special-case primary key id
+                    if prop_name == "id" {
+                        columns.push(ColumnDefinition {
+                            name: prop_name.clone(),
+                            column_type: "INTEGER".to_string(),
+                            nullable: false,
+                            primary_key: true,
+                            unique: false,
+                            auto_increment: true,
+                            default_value: None,
+                        });
+                        continue;
+                    }
+
+                    // infer type
+                    let (col_type, default_value) = Self::infer_sql_type_and_default(prop_name, prop_schema);
+                    let nullable = !required.contains(prop_name);
+
+                    let unique = prop_schema
+                        .as_object()
+                        .and_then(|o| o.get("x-unique"))
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+
+                    // indexes via x-index
+                    let index = prop_schema
+                        .as_object()
+                        .and_then(|o| o.get("x-index"))
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+
+                    columns.push(ColumnDefinition {
+                        name: prop_name.clone(),
+                        column_type: col_type,
+                        nullable,
+                        primary_key: false,
+                        unique,
+                        auto_increment: false,
+                        default_value,
+                    });
+
+                    if index {
+                        indexes.push(IndexDefinition {
+                            name: format!("idx_{}_{}", Self::to_table_name(schema_name), prop_name),
+                            columns: vec![prop_name.clone()],
+                            unique: false,
+                        });
+                    }
+                }
+            }
+
+            // Ensure id column exists
+            if !columns.iter().any(|c| c.primary_key) {
+                columns.insert(0, ColumnDefinition {
+                    name: "id".to_string(),
+                    column_type: "INTEGER".to_string(),
+                    nullable: false,
+                    primary_key: true,
+                    unique: false,
+                    auto_increment: true,
+                    default_value: None,
+                });
+            }
+
+            let table_name = Self::to_table_name(schema_name);
+            tables.push(TableSchema { table_name, columns, indexes });
+        }
+
+        Some(tables)
+    }
+
+    fn to_table_name(schema_name: &str) -> String {
+        let mut s = schema_name.to_lowercase();
+        if !s.ends_with('s') { s.push('s'); }
+        s
+    }
+
+    fn infer_sql_type_and_default(prop_name: &str, prop_schema: &Value) -> (String, Option<String>) {
+        // special-case created_at
+        if prop_name == "created_at" {
+            return ("DATETIME".to_string(), Some("CURRENT_TIMESTAMP".to_string()));
+        }
+
+        let t = prop_schema.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        let format = prop_schema.get("format").and_then(|v| v.as_str()).unwrap_or("");
+
+        match (t, format) {
+            ("string", "date-time") => ("DATETIME".to_string(), None),
+            ("string", "date") => ("DATE".to_string(), None),
+            ("string", _) => ("TEXT".to_string(), None),
+            ("integer", _) => ("INTEGER".to_string(), None),
+            ("number", _) => ("REAL".to_string(), None),
+            ("boolean", _) => ("INTEGER".to_string(), None),
+            ("array", _) => ("TEXT".to_string(), None),
+            ("object", _) => ("TEXT".to_string(), None),
+            _ => ("TEXT".to_string(), None),
+        }
     }
 
     /// Generate CREATE TABLE SQL statement for SQLite

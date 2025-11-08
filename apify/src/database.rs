@@ -82,24 +82,66 @@ impl DatabaseManager {
         Ok(manager)
     }
 
-    /// Initialize database schema with dynamic table schemas
+    /// Initialize database schema with dynamic table schemas (idempotent, per-table + per-index checks)
     pub async fn initialize_schema(&self, table_schemas: Vec<TableSchema>) -> Result<(), DatabaseError> {
         for schema in table_schemas {
-            let sql = SchemaGenerator::generate_create_table_sql_sqlite(&schema);
-            eprintln!("Creating table: {}\nSQL: {}", schema.table_name, sql);
-            
-            // Execute the schema initialization
-            sqlx::raw_sql(&sql)
-                .execute(&self.pool)
+            // Check if table already exists
+            let table_exists = sqlx::query_scalar::<_, Option<String>>("SELECT name FROM sqlite_master WHERE type='table' AND name = ?")
+                .bind(&schema.table_name)
+                .fetch_optional(&self.pool)
                 .await
-                .map_err(|e| {
-                    eprintln!("Failed to create table {}: {}", schema.table_name, e);
-                    DatabaseError::QueryError(e)
-                })?;
-                
-            eprintln!("Table {} created successfully", schema.table_name);
+                .map_err(DatabaseError::QueryError)?
+                .flatten()
+                .is_some();
+
+            if table_exists {
+                eprintln!("Skipping table {} (already exists)", schema.table_name);
+            } else {
+                // Build only CREATE TABLE part (reuse generator output but split at first index statement)
+                let full_sql = SchemaGenerator::generate_create_table_sql_sqlite(&schema);
+                // Extract just the create table statement (up to first CREATE INDEX)
+                let create_table_sql = full_sql
+                    .lines()
+                    .take_while(|l| !l.trim_start().to_ascii_uppercase().starts_with("CREATE INDEX") && !l.trim_start().to_ascii_uppercase().starts_with("CREATE UNIQUE INDEX"))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                eprintln!("Creating table: {}", schema.table_name);
+                sqlx::raw_sql(&create_table_sql)
+                    .execute(&self.pool)
+                    .await
+                    .map_err(|e| {
+                        eprintln!("Failed to create table {}: {}", schema.table_name, e);
+                        DatabaseError::QueryError(e)
+                    })?;
+                eprintln!("Table {} created successfully", schema.table_name);
+            }
+
+            // Ensure indexes exist (even if table pre-existed)
+            for index in &schema.indexes {
+                let idx_exists = sqlx::query_scalar::<_, Option<String>>("SELECT name FROM sqlite_master WHERE type='index' AND name = ?")
+                    .bind(&index.name)
+                    .fetch_optional(&self.pool)
+                    .await
+                    .map_err(DatabaseError::QueryError)?
+                    .flatten()
+                    .is_some();
+                if idx_exists {
+                    eprintln!("Skipping index {} (already exists)", index.name);
+                } else {
+                    let idx_type = if index.unique { "UNIQUE INDEX" } else { "INDEX" };
+                    let idx_sql = format!("CREATE {} IF NOT EXISTS {} ON {} ({});", idx_type, index.name, schema.table_name, index.columns.join(", "));
+                    eprintln!("Creating index: {}", index.name);
+                    sqlx::raw_sql(&idx_sql)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(|e| {
+                            eprintln!("Failed to create index {}: {}", index.name, e);
+                            DatabaseError::QueryError(e)
+                        })?;
+                    eprintln!("Index {} created successfully", index.name);
+                }
+            }
         }
-        
         Ok(())
     }
 
