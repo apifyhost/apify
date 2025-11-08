@@ -17,7 +17,7 @@ regex = "1.10"
 uuid = { version = "1.6", features = ["v4", "serde"] }
 
 # SQLx for DB-agnostic (SQLite + Postgres)
-sqlx = { version = "0.7", default-features = false, features = [
+sqlx = { version = "0", default-features = false, features = [
     "runtime-tokio",
     "macros",
     "any",
