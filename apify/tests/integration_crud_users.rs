@@ -55,24 +55,24 @@ async fn users_crud_flow() -> Result<(), Box<dyn std::error::Error>> {
       /users:
         get:
           operationId: listUsers
-          x-modules: { access: ["key_auth", "database"] }
+          x-modules: { access: ["key_auth"] }
           responses: { "200": { description: "ok" } }
         post:
           operationId: createUser
-          x-modules: { access: ["key_auth", "database"] }
+          x-modules: { access: ["key_auth"] }
           responses: { "200": { description: "ok" } }
       /users/{id}:
         get:
           operationId: getUser
-          x-modules: { access: ["key_auth", "database"] }
+          x-modules: { access: ["key_auth"] }
           responses: { "200": { description: "ok" } }
         put:
           operationId: updateUser
-          x-modules: { access: ["key_auth", "database"] }
+          x-modules: { access: ["key_auth"] }
           responses: { "200": { description: "ok" } }
         delete:
           operationId: deleteUser
-          x-modules: { access: ["key_auth", "database"] }
+          x-modules: { access: ["key_auth"] }
           responses: { "200": { description: "ok" } }
 "#;
     fs::write(dir.join("users.yaml"), users_spec)?;
@@ -89,16 +89,13 @@ async fn users_crud_flow() -> Result<(), Box<dyn std::error::Error>> {
     let cfg_path = dir.join("config.yaml");
     fs::write(&cfg_path, cfg)?;
 
-    // Provide database.yaml with init_schemas so tables are created before CRUD
+    // Provide database.yaml with datasource configuration
     let db_cfg = format!(
-        r#"database:
-  driver: sqlite
-  host: localhost
-  port: 0
-  user: user
-  password: pass
-  database: {}
-  operations: ["init_schemas"]
+        r#"datasource:
+  test_db:
+    driver: sqlite
+    database: {}
+    max_pool_size: 5
 "#,
         db_file.display()
     );

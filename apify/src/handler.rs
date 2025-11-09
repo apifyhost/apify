@@ -154,19 +154,7 @@ pub async fn handle_request(
             }
         }
 
-        // Phase: Data (CRUD or fallback)
-        // Gate database usage via modules config similar to key_auth
-        let path_pat_opt = ctx
-            .matched_route
-            .as_ref()
-            .map(|p| p.path_pattern.as_str());
-        if !state.is_database_allowed(method.as_str(), path_pat_opt) {
-            return Ok(create_error_response(
-                StatusCode::FORBIDDEN,
-                "Database module disabled for this endpoint",
-            ));
-        }
-
+        // Phase: Data (CRUD execution)
         match crud_handler
             .handle_request(
                 method.as_str(),

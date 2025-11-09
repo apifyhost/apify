@@ -1,8 +1,14 @@
-database:
-  host: localhost
-  port: 5432
-  user: postgres
-  password: postgres
-  database: apify_db
-  ssl_mode: prefer
-  max_pool_size: 10
+datasource:
+  pg1:
+    driver: postgres
+    host: localhost
+    port: 5432
+    user: postgres
+    password: postgres
+    database: apify_db
+    ssl_mode: prefer
+    max_pool_size: 10
+  sqlite1:
+    driver: sqlite
+    database: ./apify.sqlite
+    max_pool_size: 5

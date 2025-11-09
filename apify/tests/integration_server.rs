@@ -59,7 +59,7 @@ async fn key_auth_required_for_users() -> Result<(), Box<dyn std::error::Error>>
         get:
           operationId: listUsers
           x-modules:
-            access: ["key_auth", "database"]
+            access: ["key_auth"]
           responses:
             "200": { description: "ok" }
 "#;
@@ -83,17 +83,14 @@ async fn key_auth_required_for_users() -> Result<(), Box<dyn std::error::Error>>
     let main_cfg_path = config_dir.join("config.yaml");
     fs::write(&main_cfg_path, main_cfg)?;
 
-  // database.yaml with init_schemas for users table
+  // database.yaml with datasource configuration
   let db_file = config_dir.join("server.sqlite");
   let db_cfg = format!(
-    r#"database:
-  driver: sqlite
-  host: localhost
-  port: 0
-  user: user
-  password: pass
-  database: {}
-  operations: ["init_schemas"]
+    r#"datasource:
+  test_db:
+    driver: sqlite
+    database: {}
+    max_pool_size: 5
 "#,
     db_file.display()
   );

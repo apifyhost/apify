@@ -22,10 +22,6 @@ pub struct AppState {
     pub operation_modules: HashMap<String, crate::modules::ModuleRegistry>, // "METHOD path_pattern" -> modules
     consumers: HashMap<String, ConsumerConfig>,                             // name -> config
     key_to_consumer: HashMap<String, String>, // api_key -> consumer name
-    // database gating flags (like key_auth): operation > route > listener
-    pub allow_database_listener: bool,
-    pub route_allow_database: HashMap<String, bool>, // path_pattern -> allow database
-    pub operation_allow_database: HashMap<String, bool>, // "METHOD path_pattern" -> allow database
 }
 
 impl AppState {
@@ -45,16 +41,13 @@ impl AppState {
             operation_modules: HashMap::new(),
             consumers: HashMap::new(),
             key_to_consumer: HashMap::new(),
-            allow_database_listener: false,
-            route_allow_database: HashMap::new(),
-            operation_allow_database: HashMap::new(),
         }
     }
 
     /// Create new application state with CRUD support
     pub async fn new_with_crud(
         routes: Option<Vec<RouteConfig>>,
-    database_config: Option<DatabaseConfig>,
+        database_config: Option<DatabaseConfig>,
         openapi_configs: Vec<(OpenAPIConfig, Option<ModulesConfig>)>,
         listener_modules: Option<ModulesConfig>,
         consumers: Vec<ConsumerConfig>,
@@ -66,32 +59,50 @@ impl AppState {
             route_responses.insert(route.name.clone(), format!("hello {}", route.name));
         }
 
-        // For now, always use SQLite backend regardless of provided database config
+        // Build CRUD handler if OpenAPI configs exist and database is configured
         let crud_handler = {
-            if !openapi_configs.is_empty() {
-                // Build runtime config from database_config if provided (shared across APIs)
-                let db_cfg = if let Some(db_conf) = &database_config {
-                    // Build URL from components (only postgres/sqlite supported)
-                    let driver = db_conf.database.driver.clone().unwrap_or_else(|| "sqlite".into());
-                    let max_size = db_conf.database.max_pool_size.unwrap_or(10) as u32;
-                    let url = if driver == "postgres" {
+            if !openapi_configs.is_empty() && database_config.is_some() {
+                let db_conf = database_config.as_ref().unwrap();
+                
+                // Determine which datasource to use (use first OpenAPI config's datasource or first available)
+                let datasource_name = openapi_configs.first()
+                    .and_then(|(cfg, _)| cfg.datasource.clone())
+                    .or_else(|| db_conf.datasource.keys().next().cloned())
+                    .ok_or("No datasource specified and none available")?;
+                
+                let ds = db_conf.datasource.get(&datasource_name)
+                    .ok_or_else(|| format!("Datasource '{}' not found in database config", datasource_name))?;
+                
+                // Build database URL
+                let url = match ds.driver.as_str() {
+                    "postgres" => {
                         format!(
                             "postgres://{}:{}@{}:{}/{}",
-                            db_conf.database.user,
-                            db_conf.database.password,
-                            db_conf.database.host,
-                            db_conf.database.port,
-                            db_conf.database.database
+                            ds.user.as_deref().unwrap_or("postgres"),
+                            ds.password.as_deref().unwrap_or(""),
+                            ds.host.as_deref().unwrap_or("localhost"),
+                            ds.port.unwrap_or(5432),
+                            ds.database
                         )
-                    } else {
-                        // For sqlite treat 'database' as filename
-                        let path = &db_conf.database.database;
-                        if path == ":memory:" { "sqlite::memory:".into() } else { format!("sqlite:{}", path) }
-                    };
-                    crate::database::DatabaseRuntimeConfig { driver, url, max_size }
-                } else {
-                    crate::database::DatabaseRuntimeConfig::sqlite_default()
+                    }
+                    "sqlite" => {
+                        let path = &ds.database;
+                        if path == ":memory:" { 
+                            "sqlite::memory:".to_string() 
+                        } else { 
+                            format!("sqlite:{}", path) 
+                        }
+                    }
+                    _ => return Err(format!("Unsupported database driver: {}", ds.driver).into()),
                 };
+                
+                let max_size = ds.max_pool_size.unwrap_or(10) as u32;
+                let db_cfg = crate::database::DatabaseRuntimeConfig { 
+                    driver: ds.driver.clone(), 
+                    url, 
+                    max_size 
+                };
+                
                 let db_manager = DatabaseManager::new(db_cfg).await?;
 
                 // Extract table schemas from all OpenAPI specs
@@ -103,25 +114,16 @@ impl AppState {
                     all_schemas.extend(schemas);
                 }
 
-                // Initialize database schema with extracted table definitions
-                // Only run schema initialization if database operations include "init_schemas" (opt-in)
-                let should_init = database_config
-                    .as_ref()
-                    .and_then(|c| c.database.operations.as_ref())
-                    .map(|ops| ops.iter().any(|o| o == "init_schemas"))
-                    .unwrap_or(false);
-                if should_init {
-                    if !all_schemas.is_empty() {
-                        eprintln!(
-                            "Initializing database with {} table schemas",
-                            all_schemas.len()
-                        );
-                        db_manager.initialize_schema(all_schemas).await?;
-                    } else {
-                        eprintln!("Warning: No table schemas found in OpenAPI configurations");
-                    }
+                // Always initialize schema if schemas are defined (removed opt-in gating)
+                if !all_schemas.is_empty() {
+                    eprintln!(
+                        "Initializing database '{}' with {} table schemas",
+                        datasource_name,
+                        all_schemas.len()
+                    );
+                    db_manager.initialize_schema(all_schemas).await?;
                 } else {
-                    eprintln!("Skipping schema initialization (init_schemas not in operations)");
+                    eprintln!("Warning: No table schemas found in OpenAPI configurations");
                 }
 
                 // Merge all OpenAPI specs into one - deep merge for paths
@@ -155,19 +157,14 @@ impl AppState {
             }
         };
 
-        // Build listener-level fallback module registry and database flag
+        // Build listener-level fallback module registry
         let mut modules_registry = crate::modules::ModuleRegistry::new();
-        let mut allow_database_listener = false;
         if let Some(cfg) = listener_modules {
-            if cfg.access.as_ref().is_some_and(|v| v.iter().any(|m| m == "database")) {
-                allow_database_listener = true;
-            }
             modules_registry = apply_modules_cfg(modules_registry, cfg);
         }
 
-        // Build per-route module registries from per-API modules, and db flags
+        // Build per-route module registries from per-API modules
         let mut route_modules: HashMap<String, crate::modules::ModuleRegistry> = HashMap::new();
-        let mut route_allow_database: HashMap<String, bool> = HashMap::new();
         for (openapi_config, per_api_modules) in &openapi_configs {
             if let Some(cfg) = per_api_modules.clone() {
                 let mut reg = crate::modules::ModuleRegistry::new();
@@ -181,13 +178,6 @@ impl AppState {
                     for (path_key, _value) in paths_obj.iter() {
                         // Assign same registry for all paths in this API
                         route_modules.insert(path_key.clone(), reg.clone());
-                        // database allowed if per-api modules include it
-                        let allow_db = per_api_modules
-                            .as_ref()
-                            .and_then(|c| c.access.as_ref())
-                            .map(|v| v.iter().any(|m| m == "database"))
-                            .unwrap_or(false);
-                        route_allow_database.insert(path_key.clone(), allow_db);
                     }
                 }
             }
@@ -195,7 +185,6 @@ impl AppState {
 
         // Build per-operation module registries from OpenAPI x-modules on operations
         let mut operation_modules: HashMap<String, crate::modules::ModuleRegistry> = HashMap::new();
-        let mut operation_allow_database: HashMap<String, bool> = HashMap::new();
         if let Some(ch) = &crud_handler {
             let spec = ch.api_generator.get_spec();
             if let Some(paths_obj) = spec.get("paths").and_then(|v| v.as_object()) {
@@ -210,17 +199,10 @@ impl AppState {
                                 && let Some(xmods) = op.get("x-modules")
                                 && let Some(cfg) = modules_from_value(xmods)
                             {
-                                // compute allow_db before moving cfg
-                                let allow_db = cfg
-                                    .access
-                                    .as_ref()
-                                    .map(|v| v.iter().any(|m| m == "database"))
-                                    .unwrap_or(false);
                                 let reg =
                                     apply_modules_cfg(crate::modules::ModuleRegistry::new(), cfg);
                                 let key = format!("{} {}", method.to_uppercase(), path_key);
-                                operation_modules.insert(key.clone(), reg);
-                                operation_allow_database.insert(key, allow_db);
+                                operation_modules.insert(key, reg);
                             }
                         }
                     }
@@ -247,9 +229,6 @@ impl AppState {
             operation_modules,
             consumers: consumers_map,
             key_to_consumer: key_map,
-            allow_database_listener,
-            route_allow_database,
-            operation_allow_database,
         })
     }
 }
@@ -266,10 +245,6 @@ fn apply_modules_cfg(
             match name.as_str() {
                 "key_auth" => {
                     reg = reg.with(Arc::new(crate::modules::key_auth::KeyAuthModule::new()));
-                }
-                // database is a gating flag only (no runtime module implementation required)
-                "database" => {
-                    // no-op: presence handled elsewhere for gating
                 }
                 _ => eprintln!("Unknown access module: {}", name),
             }
@@ -354,19 +329,5 @@ impl AppState {
         self.key_to_consumer
             .get(key)
             .and_then(|name| self.consumers.get(name))
-    }
-
-    /// Resolve whether database is allowed for this request by precedence: operation > route > listener
-    pub fn is_database_allowed(&self, method: &str, path_pattern: Option<&str>) -> bool {
-        if let Some(p) = path_pattern {
-            let op_key = format!("{} {}", method.to_uppercase(), p);
-            if let Some(v) = self.operation_allow_database.get(&op_key) {
-                return *v;
-            }
-            if let Some(v) = self.route_allow_database.get(p) {
-                return *v;
-            }
-        }
-        self.allow_database_listener
     }
 }

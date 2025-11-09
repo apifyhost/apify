@@ -11,30 +11,30 @@ pub struct Config {
     pub listeners: Vec<ListenerConfig>,
 }
 
-/// Database configuration structure
+/// Database configuration structure - supports multiple named datasources
 #[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseConfig {
-    pub database: DatabaseSettings,
+    pub datasource: std::collections::HashMap<String, DatabaseSettings>,
 }
 
-/// Database settings
+/// Database settings for a single datasource
 #[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseSettings {
-    pub driver: Option<String>,
-    pub host: String,
-    pub port: u16,
-    pub user: String,
-    pub password: String,
+    pub driver: String,
+    pub host: Option<String>,
+    pub port: Option<u16>,
+    pub user: Option<String>,
+    pub password: Option<String>,
     pub database: String,
     pub ssl_mode: Option<String>,
     pub max_pool_size: Option<usize>,
-    pub operations: Option<Vec<String>>, // e.g. ["init_schemas"] controls which db ops run
 }
 
 /// OpenAPI configuration structure
 #[derive(Debug, Deserialize, Clone)]
 pub struct OpenAPIConfig {
     pub openapi: OpenAPISettings,
+    pub datasource: Option<String>, // Optional: which datasource to use for this API
 }
 
 /// OpenAPI settings

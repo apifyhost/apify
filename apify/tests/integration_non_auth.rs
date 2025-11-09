@@ -57,7 +57,7 @@ async fn books_is_open_users_is_protected() -> Result<(), Box<dyn std::error::Er
         get:
           operationId: listUsers
           x-modules:
-            access: ["key_auth", "database"]
+            access: ["key_auth"]
           responses: { "200": { description: "ok" } }
 "#;
     fs::write(cfg_dir.join("users.yaml"), users_spec)?;
@@ -77,8 +77,6 @@ async fn books_is_open_users_is_protected() -> Result<(), Box<dyn std::error::Er
       /books:
         get:
           operationId: listBooks
-          x-modules:
-            access: ["database"]
           responses: { "200": { description: "ok" } }
 "#;
     fs::write(cfg_dir.join("books.yaml"), books_spec)?;
@@ -99,16 +97,13 @@ async fn books_is_open_users_is_protected() -> Result<(), Box<dyn std::error::Er
     let main_cfg_path = cfg_dir.join("config.yaml");
     fs::write(&main_cfg_path, main_cfg)?;
 
-  // database.yaml with init_schemas to create users and books tables
+  // database.yaml with datasource configuration
   let db_cfg = format!(
-    r#"database:
-  driver: sqlite
-  host: localhost
-  port: 0
-  user: user
-  password: pass
-  database: {}
-  operations: ["init_schemas"]
+    r#"datasource:
+  test_db:
+    driver: sqlite
+    database: {}
+    max_pool_size: 5
 "#,
     db_file.display()
   );
