@@ -55,50 +55,7 @@ pub async fn handle_request(
             }
         };
 
-        // Determine per-route module registry candidate (tentative pre-route match)
-        let mut active_registry = None;
-        if let Some(pattern) = crud_handler
-            .api_generator
-            .match_operation(method.as_str(), &ctx.path)
-        {
-            ctx.matched_route = Some(pattern.clone());
-            active_registry = state.route_modules.get(&pattern.path_pattern).cloned();
-        }
-
-        // Phase: Rewrite (before routing) using per-route registry if exists, else listener-level
-        if let Some(reg) = &active_registry {
-            if let Some(outcome) = reg.run_phase(Phase::Rewrite, &mut ctx, &state) {
-                match outcome {
-                    ModuleOutcome::Continue => {}
-                    ModuleOutcome::Respond(resp) => {
-                        return Ok(resp);
-                    }
-                    ModuleOutcome::Error(e) => {
-                        eprintln!("Module error: {e}");
-                        return Ok(create_error_response(
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            "Module error",
-                        ));
-                    }
-                }
-            }
-        } else if let Some(outcome) = state.modules.run_phase(Phase::Rewrite, &mut ctx, &state) {
-            match outcome {
-                ModuleOutcome::Continue => {}
-                ModuleOutcome::Respond(resp) => {
-                    return Ok(resp);
-                }
-                ModuleOutcome::Error(e) => {
-                    eprintln!("Module error: {e}");
-                    return Ok(create_error_response(
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        "Module error",
-                    ));
-                }
-            }
-        }
-
-        // Phase: Route (after potential rewrite)
+        // Phase: Route - determine matched route and extract path params
         if let Some(pattern) = crud_handler
             .api_generator
             .match_operation(method.as_str(), &ctx.path)
@@ -110,7 +67,7 @@ pub async fn handle_request(
         }
 
         // Phase: Access
-        // Phase: Access: prefer operation-level modules > route-level > listener-level
+        // Prefer operation-level modules > route-level > listener-level
         let op_registry = if let Some(ref pattern) = ctx.matched_route {
             let key = format!(
                 "{} {}",
@@ -124,7 +81,7 @@ pub async fn handle_request(
         let route_registry = if let Some(ref pattern) = ctx.matched_route {
             state.route_modules.get(&pattern.path_pattern).cloned()
         } else {
-            active_registry.clone()
+            None
         };
 
         if let Some(reg) = op_registry
@@ -190,9 +147,13 @@ pub async fn handle_request(
         };
 
         // Phase: Response (serialize JSON)
-        if let Some(val) = ctx.result_json {
-            let json_response = serde_json::to_string(&val)
+        if let Some(ref val) = ctx.result_json {
+            let json_response = serde_json::to_string(val)
                 .map_err(|e| format!("Failed to serialize response: {}", e))?;
+            
+            // Phase: Log (after response is ready)
+            let _ = state.modules.run_phase(Phase::Log, &mut ctx, &state);
+            
             return Ok(create_json_response(StatusCode::OK, json_response));
         }
 

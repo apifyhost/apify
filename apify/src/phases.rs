@@ -16,7 +16,6 @@ pub enum Phase {
     BodyParse,
     Route,
     Access,
-    Rewrite,
     Data,
     Response,
     Log,
