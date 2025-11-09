@@ -1,7 +1,7 @@
 //! Application entry point, responsible for parsing CLI args, loading config, and starting services
 
 use apify::{
-    config::{ApiRef, Config, DatabaseConfig, OpenAPIConfig},
+    config::{ApiRef, Config, OpenAPIConfig},
     server::start_listener,
 };
 use clap::Parser;
@@ -26,19 +26,14 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let config = Config::from_file(&cli.config)?;
     println!("Config loaded successfully");
 
-    // Load database configuration if database.yaml exists
-    let config_dir = Path::new(&cli.config).parent().unwrap_or(Path::new("."));
-    let database_config =
-        match DatabaseConfig::from_file(&config_dir.join("database.yaml").to_string_lossy()) {
-            Ok(db_config) => {
-                println!("Database config loaded successfully");
-                Some(db_config)
-            }
-            Err(e) => {
-                println!("No database config found or error loading: {}", e);
-                None
-            }
-        };
+    // Use datasources from config if available
+    let datasources = config.datasource.clone();
+    if let Some(ref ds) = datasources {
+        println!("Found {} datasource(s) in config", ds.len());
+    }
+
+    // Use consumers from config (global or listener-level)
+    let global_consumers = config.consumers.clone().unwrap_or_default();
 
     // Start worker threads (multiple threads per listener, sharing port via SO_REUSEPORT)
     // Allow override via APIFY_THREADS env var (useful for tests)
@@ -50,8 +45,16 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let mut handles = Vec::new();
 
+    let config_dir = Path::new(&cli.config).parent().unwrap_or(Path::new("."));
+    
     for (listener_idx, listener_config) in config.listeners.into_iter().enumerate() {
-        // Load OpenAPI configurations for this listener
+        // Merge global consumers with listener-specific consumers
+        let mut all_consumers = global_consumers.clone();
+        if let Some(ref listener_consumers) = listener_config.consumers {
+            all_consumers.extend(listener_consumers.clone());
+        }
+
+        // Load OpenAPI configurations for this listener with datasource info
         let mut openapi_configs = Vec::new();
         if let Some(api_refs) = &listener_config.apis {
             for api_ref in api_refs {
@@ -61,17 +64,23 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
                             Ok(openapi_config) => {
                                 println!("OpenAPI config loaded from: {}", p);
-                                openapi_configs.push((openapi_config, None));
+                                openapi_configs.push((openapi_config, None, None));
                             }
                             Err(e) => eprintln!("Error loading OpenAPI config from {}: {}", p, e),
                         }
                     }
-                    ApiRef::WithModules { path, modules } => {
+                    ApiRef::WithConfig { path, modules, datasource } => {
                         let api_path = config_dir.join(path);
                         match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
                             Ok(openapi_config) => {
-                                println!("OpenAPI config loaded from: {} (with modules)", path);
-                                openapi_configs.push((openapi_config, modules.clone()));
+                                let ds_info = if let Some(ds_name) = datasource {
+                                    println!("OpenAPI config loaded from: {} (datasource: {})", path, ds_name);
+                                    Some(ds_name.clone())
+                                } else {
+                                    println!("OpenAPI config loaded from: {}", path);
+                                    None
+                                };
+                                openapi_configs.push((openapi_config, modules.clone(), ds_info));
                             }
                             Err(e) => {
                                 eprintln!("Error loading OpenAPI config from {}: {}", path, e)
@@ -84,8 +93,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
         for thread_id in 0..num_threads {
             let listener_config_clone = listener_config.clone();
-            let database_config_clone = database_config.clone();
+            let datasources_clone = datasources.clone();
             let openapi_configs_clone = openapi_configs.clone();
+            let consumers_clone = all_consumers.clone();
             let handle = thread::spawn(
                 move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     println!(
@@ -95,8 +105,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     start_listener(
                         listener_config_clone,
                         thread_id,
-                        database_config_clone,
+                        datasources_clone,
                         openapi_configs_clone,
+                        consumers_clone,
                     )?;
                     Ok(())
                 },

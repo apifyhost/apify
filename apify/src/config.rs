@@ -9,6 +9,8 @@ use std::net::SocketAddr;
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub listeners: Vec<ListenerConfig>,
+    pub consumers: Option<Vec<ConsumerConfig>>, // Global consumers
+    pub datasource: Option<std::collections::HashMap<String, DatabaseSettings>>, // Global datasources
 }
 
 /// Database configuration structure - supports multiple named datasources
@@ -34,7 +36,6 @@ pub struct DatabaseSettings {
 #[derive(Debug, Deserialize, Clone)]
 pub struct OpenAPIConfig {
     pub openapi: OpenAPISettings,
-    pub datasource: Option<String>, // Optional: which datasource to use for this API
 }
 
 /// OpenAPI settings
@@ -91,14 +92,15 @@ pub struct ModulesConfig {
     pub rewrite: Option<Vec<String>>, // e.g., ["prefix_strip:/api"] (future)
 }
 
-/// API reference in listener: path string or object with path + per-API modules
+/// API reference in listener: path string or object with path + per-API modules + datasource
 #[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum ApiRef {
     Path(String),
-    WithModules {
+    WithConfig {
         path: String,
         modules: Option<ModulesConfig>,
+        datasource: Option<String>, // Specify which datasource to use for this API
     },
 }
 

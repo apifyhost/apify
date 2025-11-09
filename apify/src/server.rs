@@ -48,11 +48,13 @@ pub fn create_reuse_port_socket(
 pub fn start_listener(
     listener_config: ListenerConfig,
     thread_id: usize,
-    database_config: Option<super::config::DatabaseConfig>,
+    datasources: Option<std::collections::HashMap<String, super::config::DatabaseSettings>>,
     openapi_configs: Vec<(
         super::config::OpenAPIConfig,
         Option<super::config::ModulesConfig>,
+        Option<String>, // datasource name for this API
     )>,
+    consumers: Vec<super::config::ConsumerConfig>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Critical: Create single-threaded runtime using new_current_thread
     let rt = tokio::runtime::Builder::new_current_thread() // <-- Restored critical line
@@ -71,10 +73,10 @@ pub fn start_listener(
         println!("Thread {} creating AppState...", thread_id);
         let state = match AppState::new_with_crud(
             listener_config.routes,
-            database_config,
+            datasources,
             openapi_configs,
             listener_config.modules,
-            listener_config.consumers.unwrap_or_default(),
+            consumers,
         )
         .await
         {

@@ -188,4 +188,3 @@ openapi:
     strict_mode: true
     validate_request_body: true
     validate_response_body: false
-datasource: sqlite1  # Use sqlite1 datasource for users

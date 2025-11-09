@@ -77,4 +77,3 @@ openapi:
             id: { type: integer }
             email: { type: string, format: email, x-unique: true }
             name: { type: string }
-datasource: sqlite1  # Use sqlite1 datasource

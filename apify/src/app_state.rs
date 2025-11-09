@@ -2,7 +2,7 @@
 
 use super::api_generator::APIGenerator;
 use super::config::{
-    ConsumerConfig, DatabaseConfig, MatchRule, ModulesConfig, OpenAPIConfig, RouteConfig,
+    ConsumerConfig, DatabaseSettings, MatchRule, ModulesConfig, OpenAPIConfig, RouteConfig,
 };
 use super::crud_handler::CRUDHandler;
 use super::database::DatabaseManager;
@@ -47,8 +47,8 @@ impl AppState {
     /// Create new application state with CRUD support
     pub async fn new_with_crud(
         routes: Option<Vec<RouteConfig>>,
-        database_config: Option<DatabaseConfig>,
-        openapi_configs: Vec<(OpenAPIConfig, Option<ModulesConfig>)>,
+        datasources: Option<HashMap<String, DatabaseSettings>>,
+        openapi_configs: Vec<(OpenAPIConfig, Option<ModulesConfig>, Option<String>)>,
         listener_modules: Option<ModulesConfig>,
         consumers: Vec<ConsumerConfig>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
@@ -59,19 +59,19 @@ impl AppState {
             route_responses.insert(route.name.clone(), format!("hello {}", route.name));
         }
 
-        // Build CRUD handler if OpenAPI configs exist and database is configured
+        // Build CRUD handler if OpenAPI configs exist and datasources are configured
         let crud_handler = {
-            if !openapi_configs.is_empty() && database_config.is_some() {
-                let db_conf = database_config.as_ref().unwrap();
+            if !openapi_configs.is_empty() && datasources.is_some() {
+                let ds_map = datasources.as_ref().unwrap();
                 
-                // Determine which datasource to use (use first OpenAPI config's datasource or first available)
+                // Determine which datasource to use (from first API config or first available)
                 let datasource_name = openapi_configs.first()
-                    .and_then(|(cfg, _)| cfg.datasource.clone())
-                    .or_else(|| db_conf.datasource.keys().next().cloned())
+                    .and_then(|(_, _, ds_name)| ds_name.clone())
+                    .or_else(|| ds_map.keys().next().cloned())
                     .ok_or("No datasource specified and none available")?;
                 
-                let ds = db_conf.datasource.get(&datasource_name)
-                    .ok_or_else(|| format!("Datasource '{}' not found in database config", datasource_name))?;
+                let ds = ds_map.get(&datasource_name)
+                    .ok_or_else(|| format!("Datasource '{}' not found in config", datasource_name))?;
                 
                 // Build database URL
                 let url = match ds.driver.as_str() {
@@ -107,7 +107,7 @@ impl AppState {
 
                 // Extract table schemas from all OpenAPI specs
                 let mut all_schemas = Vec::new();
-                for (openapi_config, _) in &openapi_configs {
+                for (openapi_config, _, _) in &openapi_configs {
                     let schemas = SchemaGenerator::extract_schemas_from_openapi(
                         &openapi_config.openapi.spec,
                     )?;
@@ -130,7 +130,7 @@ impl AppState {
                 let mut merged_spec = serde_json::Map::new();
                 let mut merged_paths = serde_json::Map::new();
 
-                for (openapi_config, _) in &openapi_configs {
+                for (openapi_config, _, _) in &openapi_configs {
                     if let Some(spec_obj) = openapi_config.openapi.spec.as_object() {
                         for (key, value) in spec_obj {
                             if key == "paths" {
@@ -165,7 +165,7 @@ impl AppState {
 
         // Build per-route module registries from per-API modules
         let mut route_modules: HashMap<String, crate::modules::ModuleRegistry> = HashMap::new();
-        for (openapi_config, per_api_modules) in &openapi_configs {
+        for (openapi_config, per_api_modules, _) in &openapi_configs {
             if let Some(cfg) = per_api_modules.clone() {
                 let mut reg = crate::modules::ModuleRegistry::new();
                 reg = apply_modules_cfg(reg, cfg);
