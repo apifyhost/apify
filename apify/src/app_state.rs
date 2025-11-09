@@ -1,7 +1,9 @@
 //! Application state management and route matching logic
 
 use super::api_generator::APIGenerator;
-use super::config::{DatabaseConfig, MatchRule, OpenAPIConfig, RouteConfig, ModulesConfig, ConsumerConfig};
+use super::config::{
+    ConsumerConfig, DatabaseConfig, MatchRule, ModulesConfig, OpenAPIConfig, RouteConfig,
+};
 use super::crud_handler::CRUDHandler;
 use super::database::DatabaseManager;
 use super::hyper::Method;
@@ -18,8 +20,8 @@ pub struct AppState {
     pub modules: crate::modules::ModuleRegistry,
     pub route_modules: HashMap<String, crate::modules::ModuleRegistry>, // path_pattern -> modules
     pub operation_modules: HashMap<String, crate::modules::ModuleRegistry>, // "METHOD path_pattern" -> modules
-    consumers: HashMap<String, ConsumerConfig>, // name -> config
-    key_to_consumer: HashMap<String, String>,   // api_key -> consumer name
+    consumers: HashMap<String, ConsumerConfig>,                             // name -> config
+    key_to_consumer: HashMap<String, String>, // api_key -> consumer name
 }
 
 impl AppState {
@@ -62,26 +64,31 @@ impl AppState {
             if !openapi_configs.is_empty() {
                 let db_cfg = crate::database::DatabaseConfig::sqlite_default();
                 let db_manager = DatabaseManager::new(db_cfg).await?;
-                
+
                 // Extract table schemas from all OpenAPI specs
                 let mut all_schemas = Vec::new();
                 for (openapi_config, _) in &openapi_configs {
-                    let schemas = SchemaGenerator::extract_schemas_from_openapi(&openapi_config.openapi.spec)?;
+                    let schemas = SchemaGenerator::extract_schemas_from_openapi(
+                        &openapi_config.openapi.spec,
+                    )?;
                     all_schemas.extend(schemas);
                 }
-                
+
                 // Initialize database schema with extracted table definitions
                 if !all_schemas.is_empty() {
-                    eprintln!("Initializing database with {} table schemas", all_schemas.len());
+                    eprintln!(
+                        "Initializing database with {} table schemas",
+                        all_schemas.len()
+                    );
                     db_manager.initialize_schema(all_schemas).await?;
                 } else {
                     eprintln!("Warning: No table schemas found in OpenAPI configurations");
                 }
-                
+
                 // Merge all OpenAPI specs into one - deep merge for paths
                 let mut merged_spec = serde_json::Map::new();
                 let mut merged_paths = serde_json::Map::new();
-                
+
                 for (openapi_config, _) in &openapi_configs {
                     if let Some(spec_obj) = openapi_config.openapi.spec.as_object() {
                         for (key, value) in spec_obj {
@@ -99,14 +106,16 @@ impl AppState {
                         }
                     }
                 }
-                
+
                 // Add merged paths to the spec
                 merged_spec.insert("paths".to_string(), serde_json::Value::Object(merged_paths));
-                
+
                 let merged_value = serde_json::Value::Object(merged_spec);
                 let api_generator = APIGenerator::new(merged_value.clone())?;
                 Some(Arc::new(CRUDHandler::new(db_manager, api_generator)))
-            } else { None }
+            } else {
+                None
+            }
         };
 
         // Build listener-level fallback module registry
@@ -121,7 +130,12 @@ impl AppState {
             if let Some(cfg) = per_api_modules.clone() {
                 let mut reg = crate::modules::ModuleRegistry::new();
                 reg = apply_modules_cfg(reg, cfg);
-                if let Some(paths_obj) = openapi_config.openapi.spec.get("paths").and_then(|v| v.as_object()) {
+                if let Some(paths_obj) = openapi_config
+                    .openapi
+                    .spec
+                    .get("paths")
+                    .and_then(|v| v.as_object())
+                {
                     for (path_key, _value) in paths_obj.iter() {
                         // Assign same registry for all paths in this API
                         route_modules.insert(path_key.clone(), reg.clone());
@@ -137,14 +151,20 @@ impl AppState {
             if let Some(paths_obj) = spec.get("paths").and_then(|v| v.as_object()) {
                 for (path_key, path_item) in paths_obj.iter() {
                     if let Some(po) = path_item.as_object() {
-                        for method in ["get","post","put","patch","delete","head","options","trace"].iter() {
+                        for method in [
+                            "get", "post", "put", "patch", "delete", "head", "options", "trace",
+                        ]
+                        .iter()
+                        {
                             if let Some(op) = po.get(*method)
                                 && let Some(xmods) = op.get("x-modules")
-                                    && let Some(cfg) = modules_from_value(xmods) {
-                                        let reg = apply_modules_cfg(crate::modules::ModuleRegistry::new(), cfg);
-                                        let key = format!("{} {}", method.to_uppercase(), path_key);
-                                        operation_modules.insert(key, reg);
-                                    }
+                                && let Some(cfg) = modules_from_value(xmods)
+                            {
+                                let reg =
+                                    apply_modules_cfg(crate::modules::ModuleRegistry::new(), cfg);
+                                let key = format!("{} {}", method.to_uppercase(), path_key);
+                                operation_modules.insert(key, reg);
+                            }
                         }
                     }
                 }
@@ -155,7 +175,9 @@ impl AppState {
         let mut consumers_map = HashMap::new();
         let mut key_map = HashMap::new();
         for c in consumers {
-            for k in &c.keys { key_map.insert(k.clone(), c.name.clone()); }
+            for k in &c.keys {
+                key_map.insert(k.clone(), c.name.clone());
+            }
             consumers_map.insert(c.name.clone(), c);
         }
 
@@ -170,17 +192,21 @@ impl AppState {
             key_to_consumer: key_map,
         })
     }
-
 }
 
 /// Helper to apply ModulesConfig into a ModuleRegistry
-fn apply_modules_cfg(mut reg: crate::modules::ModuleRegistry, cfg: ModulesConfig) -> crate::modules::ModuleRegistry {
+fn apply_modules_cfg(
+    mut reg: crate::modules::ModuleRegistry,
+    cfg: ModulesConfig,
+) -> crate::modules::ModuleRegistry {
     use std::sync::Arc;
     // Access modules
     if let Some(list) = cfg.access {
         for name in list {
             match name.as_str() {
-                "key_auth" => { reg = reg.with(Arc::new(crate::modules::key_auth::KeyAuthModule::new())); }
+                "key_auth" => {
+                    reg = reg.with(Arc::new(crate::modules::key_auth::KeyAuthModule::new()));
+                }
                 _ => eprintln!("Unknown access module: {}", name),
             }
         }
@@ -199,15 +225,29 @@ fn modules_from_value(v: &serde_json::Value) -> Option<ModulesConfig> {
     let mut cfg = ModulesConfig::default();
     if let Some(obj) = v.as_object() {
         if let Some(acc) = obj.get("access").and_then(|a| a.as_array()) {
-            let list: Vec<String> = acc.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect();
-            if !list.is_empty() { cfg.access = Some(list); }
+            let list: Vec<String> = acc
+                .iter()
+                .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                .collect();
+            if !list.is_empty() {
+                cfg.access = Some(list);
+            }
         }
         if let Some(rw) = obj.get("rewrite").and_then(|a| a.as_array()) {
-            let list: Vec<String> = rw.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect();
-            if !list.is_empty() { cfg.rewrite = Some(list); }
+            let list: Vec<String> = rw
+                .iter()
+                .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                .collect();
+            if !list.is_empty() {
+                cfg.rewrite = Some(list);
+            }
         }
     }
-    if cfg.access.is_some() || cfg.rewrite.is_some() { Some(cfg) } else { None }
+    if cfg.access.is_some() || cfg.rewrite.is_some() {
+        Some(cfg)
+    } else {
+        None
+    }
 }
 
 impl AppState {
@@ -247,6 +287,8 @@ impl AppState {
     }
 
     pub fn lookup_consumer_by_key(&self, key: &str) -> Option<&ConsumerConfig> {
-        self.key_to_consumer.get(key).and_then(|name| self.consumers.get(name))
+        self.key_to_consumer
+            .get(key)
+            .and_then(|name| self.consumers.get(name))
     }
 }

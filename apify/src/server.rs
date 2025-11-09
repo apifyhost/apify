@@ -49,7 +49,10 @@ pub fn start_listener(
     listener_config: ListenerConfig,
     thread_id: usize,
     database_config: Option<super::config::DatabaseConfig>,
-    openapi_configs: Vec<(super::config::OpenAPIConfig, Option<super::config::ModulesConfig>)>,
+    openapi_configs: Vec<(
+        super::config::OpenAPIConfig,
+        Option<super::config::ModulesConfig>,
+    )>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Critical: Create single-threaded runtime using new_current_thread
     let rt = tokio::runtime::Builder::new_current_thread() // <-- Restored critical line
@@ -72,7 +75,9 @@ pub fn start_listener(
             openapi_configs,
             listener_config.modules,
             listener_config.consumers.unwrap_or_default(),
-        ).await {
+        )
+        .await
+        {
             Ok(s) => {
                 println!("Thread {} AppState created successfully", thread_id);
                 Arc::new(s)
@@ -96,7 +101,8 @@ pub fn start_listener(
                     let state_clone = Arc::clone(&state);
                     // Handle connection asynchronously
                     tokio::task::spawn(async move {
-                        let service = service_fn(move |req| handle_request(req, Arc::clone(&state_clone)));
+                        let service =
+                            service_fn(move |req| handle_request(req, Arc::clone(&state_clone)));
                         if let Err(err) = http1::Builder::new()
                             .keep_alive(true)
                             .serve_connection(io, service)
@@ -115,7 +121,9 @@ pub fn start_listener(
         #[allow(unreachable_code)]
         {
             use std::time::Duration;
-            loop { tokio::time::sleep(Duration::from_secs(3600)).await; }
+            loop {
+                tokio::time::sleep(Duration::from_secs(3600)).await;
+            }
         }
     })
 }

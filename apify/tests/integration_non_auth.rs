@@ -1,19 +1,28 @@
 //! Verify non-auth endpoint (books) is accessible without key while users is protected
 
+use reqwest::Client;
 use serial_test::serial;
+use std::fs;
+use std::net::TcpListener;
 use std::time::Duration;
 use tempfile::TempDir;
-use std::fs;
-use reqwest::Client;
 use tokio::process::Command as TokioCommand;
-use std::net::TcpListener;
 
-async fn wait_for_ready(host: &str, port: u16, timeout: Duration) -> Result<(), Box<dyn std::error::Error>> {
+async fn wait_for_ready(
+    host: &str,
+    port: u16,
+    timeout: Duration,
+) -> Result<(), Box<dyn std::error::Error>> {
     let client = reqwest::Client::builder().no_proxy().build()?;
     let start = std::time::Instant::now();
     while start.elapsed() < timeout {
-        if let Ok(resp) = client.get(format!("http://{}:{}/healthz", host, port)).send().await
-            && if resp.status().as_u16() == 200 { return Ok(()); }
+        if let Ok(resp) = client
+            .get(format!("http://{}:{}/healthz", host, port))
+            .send()
+            .await
+            && resp.status().as_u16() == 200
+        {
+            return Ok(());
         }
         tokio::time::sleep(Duration::from_millis(120)).await;
     }
@@ -27,7 +36,9 @@ async fn books_is_open_users_is_protected() -> Result<(), Box<dyn std::error::Er
     let cfg_dir = temp.path();
 
     // Free port and temp DB
-    let listener = TcpListener::bind(("127.0.0.1", 0))?; let port = listener.local_addr()?.port(); drop(listener);
+    let listener = TcpListener::bind(("127.0.0.1", 0))?;
+    let port = listener.local_addr()?.port();
+    drop(listener);
     let db_file = cfg_dir.join("test.sqlite");
 
     // users API with auth
@@ -70,7 +81,8 @@ async fn books_is_open_users_is_protected() -> Result<(), Box<dyn std::error::Er
 "#;
     fs::write(cfg_dir.join("books.yaml"), books_spec)?;
 
-    let main_cfg = format!(r#"listeners:
+    let main_cfg = format!(
+        r#"listeners:
   - port: {port}
     ip: 127.0.0.1
     protocol: HTTP
@@ -80,7 +92,8 @@ async fn books_is_open_users_is_protected() -> Result<(), Box<dyn std::error::Er
     consumers:
       - name: test
         keys: [ t-key-001 ]
-"#);
+"#
+    );
     let main_cfg_path = cfg_dir.join("config.yaml");
     fs::write(&main_cfg_path, main_cfg)?;
 
@@ -90,7 +103,8 @@ async fn books_is_open_users_is_protected() -> Result<(), Box<dyn std::error::Er
     let mut child = TokioCommand::new(bin)
         .env("APIFY_DB_URL", &db_url)
         .env("APIFY_THREADS", "1")
-        .arg("-c").arg(main_cfg_path.to_string_lossy().to_string())
+        .arg("-c")
+        .arg(main_cfg_path.to_string_lossy().to_string())
         .spawn()?;
 
     wait_for_ready("127.0.0.1", port, Duration::from_secs(8)).await?;
@@ -104,7 +118,11 @@ async fn books_is_open_users_is_protected() -> Result<(), Box<dyn std::error::Er
     let r = client.get(format!("{}/users", base)).send().await?;
     assert_eq!(r.status(), 401);
     // users with key -> 200
-    let r = client.get(format!("{}/users", base)).header("X-Api-Key", "t-key-001").send().await?;
+    let r = client
+        .get(format!("{}/users", base))
+        .header("X-Api-Key", "t-key-001")
+        .send()
+        .await?;
     assert_eq!(r.status(), 200);
 
     let _ = child.kill().await;

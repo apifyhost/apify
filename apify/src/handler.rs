@@ -4,8 +4,8 @@ use super::app_state::AppState;
 use super::crud_handler::CRUDError;
 use super::hyper::{Request, Response, StatusCode};
 use super::{Arc, http_body_util::Full, hyper::body::Bytes};
-use crate::phases::{RequestContext, Phase};
 use crate::modules::ModuleOutcome;
+use crate::phases::{Phase, RequestContext};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error;
@@ -26,7 +26,10 @@ pub async fn handle_request(
 
     // Health endpoint shortcut
     if method == hyper::Method::GET && ctx.path == "/healthz" {
-        return Ok(create_json_response(StatusCode::OK, serde_json::json!({"status":"ok"}).to_string()));
+        return Ok(create_json_response(
+            StatusCode::OK,
+            serde_json::json!({"status":"ok"}).to_string(),
+        ));
     }
 
     // Try CRUD handler first if available
@@ -39,7 +42,9 @@ pub async fn handle_request(
             if !body_bytes.is_empty() {
                 ctx.raw_body = Some(body_bytes.to_vec());
                 match serde_json::from_slice::<Value>(&body_bytes) {
-                    Ok(value) => { ctx.json_body = Some(value); }
+                    Ok(value) => {
+                        ctx.json_body = Some(value);
+                    }
                     Err(_) => {
                         return Ok(create_error_response(
                             StatusCode::BAD_REQUEST,
@@ -52,7 +57,10 @@ pub async fn handle_request(
 
         // Determine per-route module registry candidate (tentative pre-route match)
         let mut active_registry = None;
-        if let Some(pattern) = crud_handler.api_generator.match_operation(method.as_str(), &ctx.path) {
+        if let Some(pattern) = crud_handler
+            .api_generator
+            .match_operation(method.as_str(), &ctx.path)
+        {
             ctx.matched_route = Some(pattern.clone());
             active_registry = state.route_modules.get(&pattern.path_pattern).cloned();
         }
@@ -61,55 +69,110 @@ pub async fn handle_request(
         if let Some(reg) = &active_registry {
             if let Some(outcome) = reg.run_phase(Phase::Rewrite, &mut ctx, &state) {
                 match outcome {
-                    ModuleOutcome::Continue => {},
-                    ModuleOutcome::Respond(resp) => { return Ok(resp); },
-                    ModuleOutcome::Error(e) => { eprintln!("Module error: {e}"); return Ok(create_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Module error")); }
+                    ModuleOutcome::Continue => {}
+                    ModuleOutcome::Respond(resp) => {
+                        return Ok(resp);
+                    }
+                    ModuleOutcome::Error(e) => {
+                        eprintln!("Module error: {e}");
+                        return Ok(create_error_response(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Module error",
+                        ));
+                    }
                 }
             }
         } else if let Some(outcome) = state.modules.run_phase(Phase::Rewrite, &mut ctx, &state) {
             match outcome {
-                ModuleOutcome::Continue => {},
-                ModuleOutcome::Respond(resp) => { return Ok(resp); },
-                ModuleOutcome::Error(e) => { eprintln!("Module error: {e}"); return Ok(create_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Module error")); }
+                ModuleOutcome::Continue => {}
+                ModuleOutcome::Respond(resp) => {
+                    return Ok(resp);
+                }
+                ModuleOutcome::Error(e) => {
+                    eprintln!("Module error: {e}");
+                    return Ok(create_error_response(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Module error",
+                    ));
+                }
             }
         }
 
         // Phase: Route (after potential rewrite)
-        if let Some(pattern) = crud_handler.api_generator.match_operation(method.as_str(), &ctx.path) {
+        if let Some(pattern) = crud_handler
+            .api_generator
+            .match_operation(method.as_str(), &ctx.path)
+        {
             ctx.matched_route = Some(pattern.clone());
-            ctx.path_params = crud_handler.api_generator.extract_path_params(pattern, &ctx.path);
+            ctx.path_params = crud_handler
+                .api_generator
+                .extract_path_params(pattern, &ctx.path);
         }
 
         // Phase: Access
         // Phase: Access: prefer operation-level modules > route-level > listener-level
         let op_registry = if let Some(ref pattern) = ctx.matched_route {
-            let key = format!("{} {}", method.as_str().to_uppercase(), pattern.path_pattern);
+            let key = format!(
+                "{} {}",
+                method.as_str().to_uppercase(),
+                pattern.path_pattern
+            );
             state.operation_modules.get(&key).cloned()
-        } else { None };
+        } else {
+            None
+        };
         let route_registry = if let Some(ref pattern) = ctx.matched_route {
             state.route_modules.get(&pattern.path_pattern).cloned()
-        } else { active_registry.clone() };
+        } else {
+            active_registry.clone()
+        };
 
-        if let Some(reg) = op_registry.as_ref().or(route_registry.as_ref()).or_else(|| if state.modules.has_phase(Phase::Access) { Some(&state.modules) } else { None })
-            && let Some(outcome) = reg.run_phase(Phase::Access, &mut ctx, &state) {
-                match outcome {
-                    ModuleOutcome::Continue => {},
-                    ModuleOutcome::Respond(resp) => { return Ok(resp); },
-                    ModuleOutcome::Error(e) => { eprintln!("Module error: {e}"); return Ok(create_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Module error")); }
+        if let Some(reg) = op_registry
+            .as_ref()
+            .or(route_registry.as_ref())
+            .or_else(|| {
+                if state.modules.has_phase(Phase::Access) {
+                    Some(&state.modules)
+                } else {
+                    None
+                }
+            })
+            && let Some(outcome) = reg.run_phase(Phase::Access, &mut ctx, &state)
+        {
+            match outcome {
+                ModuleOutcome::Continue => {}
+                ModuleOutcome::Respond(resp) => {
+                    return Ok(resp);
+                }
+                ModuleOutcome::Error(e) => {
+                    eprintln!("Module error: {e}");
+                    return Ok(create_error_response(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Module error",
+                    ));
                 }
             }
+        }
 
         // Phase: Data (CRUD or fallback)
         match crud_handler
-            .handle_request(method.as_str(), &ctx.path, ctx.path_params.clone(), ctx.query_params.clone(), ctx.json_body.clone())
+            .handle_request(
+                method.as_str(),
+                &ctx.path,
+                ctx.path_params.clone(),
+                ctx.query_params.clone(),
+                ctx.json_body.clone(),
+            )
             .await
         {
             Ok(result) => {
                 ctx.result_json = Some(result);
-                
             }
             Err(CRUDError::NotFoundError(_)) => {
-                return Ok(create_error_response(StatusCode::NOT_FOUND, "Resource not found"));
+                return Ok(create_error_response(
+                    StatusCode::NOT_FOUND,
+                    "Resource not found",
+                ));
             }
             Err(CRUDError::ValidationError(msg)) => {
                 return Ok(create_error_response(StatusCode::BAD_REQUEST, &msg));
@@ -119,7 +182,10 @@ pub async fn handle_request(
             }
             Err(CRUDError::DatabaseError(e)) => {
                 eprintln!("Database error: {:?}", e);
-                return Ok(create_error_response(StatusCode::INTERNAL_SERVER_ERROR, &format!("Database error: {}", e)));
+                return Ok(create_error_response(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &format!("Database error: {}", e),
+                ));
             }
         };
 
@@ -131,7 +197,10 @@ pub async fn handle_request(
         }
 
         // Should not reach here
-        Ok(create_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Empty response"))
+        Ok(create_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Empty response",
+        ))
     } else {
         // Fallback to original route matching
         let (status, body) = match state.match_route(&ctx.path, &method) {
@@ -161,7 +230,6 @@ fn extract_query_params(query: Option<&str>) -> HashMap<String, String> {
     }
     params
 }
-
 
 /// Create a JSON response
 fn create_json_response(status: StatusCode, body: String) -> Response<Full<Bytes>> {

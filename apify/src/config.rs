@@ -75,7 +75,6 @@ pub struct PathMatch {
     pub path_prefix: String,
 }
 
-
 /// Validation configuration for OpenAPI
 #[derive(Debug, Deserialize, Clone)]
 pub struct ValidationConfig {
@@ -96,14 +95,17 @@ pub struct ModulesConfig {
 #[serde(untagged)]
 pub enum ApiRef {
     Path(String),
-    WithModules { path: String, modules: Option<ModulesConfig> },
+    WithModules {
+        path: String,
+        modules: Option<ModulesConfig>,
+    },
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ConsumerConfig {
     pub name: String,
     pub keys: Vec<String>, // API keys bound to this consumer
-    // Future: rate limits, roles, metadata, etc.
+                           // Future: rate limits, roles, metadata, etc.
 }
 
 impl Config {
@@ -121,8 +123,8 @@ impl Config {
 impl DatabaseConfig {
     /// Read and parse database configuration from file
     pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let content =
-            fs::read_to_string(path).map_err(|e| format!("Failed to read database config file: {}", e))?;
+        let content = fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read database config file: {}", e))?;
         let config = serde_yaml::from_str(&content)
             .map_err(|e| format!("Failed to parse database config file: {}", e))?;
         Ok(config)
@@ -132,8 +134,8 @@ impl DatabaseConfig {
 impl OpenAPIConfig {
     /// Read and parse OpenAPI configuration from file
     pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let content =
-            fs::read_to_string(path).map_err(|e| format!("Failed to read OpenAPI config file: {}", e))?;
+        let content = fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read OpenAPI config file: {}", e))?;
         let config = serde_yaml::from_str(&content)
             .map_err(|e| format!("Failed to parse OpenAPI config file: {}", e))?;
         Ok(config)

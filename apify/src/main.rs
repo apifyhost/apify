@@ -1,9 +1,12 @@
 //! Application entry point, responsible for parsing CLI args, loading config, and starting services
 
-use apify::{config::{Config, DatabaseConfig, OpenAPIConfig, ApiRef}, server::start_listener};
+use apify::{
+    config::{ApiRef, Config, DatabaseConfig, OpenAPIConfig},
+    server::start_listener,
+};
 use clap::Parser;
-use std::thread;
 use std::path::Path;
+use std::thread;
 
 /// Configurable HTTP server with route matching
 #[derive(Parser, Debug)]
@@ -25,16 +28,17 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Load database configuration if database.yaml exists
     let config_dir = Path::new(&cli.config).parent().unwrap_or(Path::new("."));
-    let database_config = match DatabaseConfig::from_file(&config_dir.join("database.yaml").to_string_lossy()) {
-        Ok(db_config) => {
-            println!("Database config loaded successfully");
-            Some(db_config)
-        }
-        Err(e) => {
-            println!("No database config found or error loading: {}", e);
-            None
-        }
-    };
+    let database_config =
+        match DatabaseConfig::from_file(&config_dir.join("database.yaml").to_string_lossy()) {
+            Ok(db_config) => {
+                println!("Database config loaded successfully");
+                Some(db_config)
+            }
+            Err(e) => {
+                println!("No database config found or error loading: {}", e);
+                None
+            }
+        };
 
     // Start worker threads (multiple threads per listener, sharing port via SO_REUSEPORT)
     // Allow override via APIFY_THREADS env var (useful for tests)
@@ -69,7 +73,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 println!("OpenAPI config loaded from: {} (with modules)", path);
                                 openapi_configs.push((openapi_config, modules.clone()));
                             }
-                            Err(e) => eprintln!("Error loading OpenAPI config from {}: {}", path, e),
+                            Err(e) => {
+                                eprintln!("Error loading OpenAPI config from {}: {}", path, e)
+                            }
                         }
                     }
                 }
@@ -113,7 +119,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             }
         }
     }
-    
+
     eprintln!("All threads exited, main process terminating");
 
     Ok(())

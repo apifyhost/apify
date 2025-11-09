@@ -35,7 +35,9 @@ pub struct SchemaGenerator;
 
 impl SchemaGenerator {
     /// Extract table schemas from OpenAPI specification
-    pub fn extract_schemas_from_openapi(spec: &Value) -> Result<Vec<TableSchema>, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn extract_schemas_from_openapi(
+        spec: &Value,
+    ) -> Result<Vec<TableSchema>, Box<dyn std::error::Error + Send + Sync>> {
         let mut schemas = Vec::new();
 
         // Look for x-table-schema extensions in the OpenAPI spec
@@ -62,9 +64,10 @@ impl SchemaGenerator {
         // Fallback: derive from components.schemas if no explicit schemas found
         if schemas.is_empty()
             && let Some(derived) = Self::derive_from_components(spec)
-                && !derived.is_empty() {
-                    return Ok(derived);
-                }
+            && !derived.is_empty()
+        {
+            return Ok(derived);
+        }
 
         Ok(schemas)
     }
@@ -81,12 +84,21 @@ impl SchemaGenerator {
         let mut tables = Vec::new();
 
         for (schema_name, schema_value) in components.iter() {
-            let obj = match schema_value.as_object() { Some(o) => o, None => continue };
+            let obj = match schema_value.as_object() {
+                Some(o) => o,
+                None => continue,
+            };
 
             // Only process object schemas or those with properties
-            let is_object = obj.get("type").and_then(|t| t.as_str()).map(|t| t == "object").unwrap_or(false)
+            let is_object = obj
+                .get("type")
+                .and_then(|t| t.as_str())
+                .map(|t| t == "object")
+                .unwrap_or(false)
                 || obj.get("properties").is_some();
-            if !is_object { continue; }
+            if !is_object {
+                continue;
+            }
 
             let mut columns: Vec<ColumnDefinition> = Vec::new();
             let mut indexes: Vec<IndexDefinition> = Vec::new();
@@ -94,7 +106,11 @@ impl SchemaGenerator {
             let required: std::collections::HashSet<String> = obj
                 .get("required")
                 .and_then(|r| r.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
                 .unwrap_or_default();
 
             if let Some(props) = obj.get("properties").and_then(|p| p.as_object()) {
@@ -114,7 +130,8 @@ impl SchemaGenerator {
                     }
 
                     // infer type
-                    let (col_type, default_value) = Self::infer_sql_type_and_default(prop_name, prop_schema);
+                    let (col_type, default_value) =
+                        Self::infer_sql_type_and_default(prop_name, prop_schema);
                     let nullable = !required.contains(prop_name);
 
                     let unique = prop_schema
@@ -152,19 +169,26 @@ impl SchemaGenerator {
 
             // Ensure id column exists
             if !columns.iter().any(|c| c.primary_key) {
-                columns.insert(0, ColumnDefinition {
-                    name: "id".to_string(),
-                    column_type: "INTEGER".to_string(),
-                    nullable: false,
-                    primary_key: true,
-                    unique: false,
-                    auto_increment: true,
-                    default_value: None,
-                });
+                columns.insert(
+                    0,
+                    ColumnDefinition {
+                        name: "id".to_string(),
+                        column_type: "INTEGER".to_string(),
+                        nullable: false,
+                        primary_key: true,
+                        unique: false,
+                        auto_increment: true,
+                        default_value: None,
+                    },
+                );
             }
 
             let table_name = Self::to_table_name(schema_name);
-            tables.push(TableSchema { table_name, columns, indexes });
+            tables.push(TableSchema {
+                table_name,
+                columns,
+                indexes,
+            });
         }
 
         Some(tables)
@@ -172,18 +196,32 @@ impl SchemaGenerator {
 
     fn to_table_name(schema_name: &str) -> String {
         let mut s = schema_name.to_lowercase();
-        if !s.ends_with('s') { s.push('s'); }
+        if !s.ends_with('s') {
+            s.push('s');
+        }
         s
     }
 
-    fn infer_sql_type_and_default(prop_name: &str, prop_schema: &Value) -> (String, Option<String>) {
+    fn infer_sql_type_and_default(
+        prop_name: &str,
+        prop_schema: &Value,
+    ) -> (String, Option<String>) {
         // special-case created_at
         if prop_name == "created_at" {
-            return ("DATETIME".to_string(), Some("CURRENT_TIMESTAMP".to_string()));
+            return (
+                "DATETIME".to_string(),
+                Some("CURRENT_TIMESTAMP".to_string()),
+            );
         }
 
-        let t = prop_schema.get("type").and_then(|v| v.as_str()).unwrap_or("");
-        let format = prop_schema.get("format").and_then(|v| v.as_str()).unwrap_or("");
+        let t = prop_schema
+            .get("type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let format = prop_schema
+            .get("format")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
 
         match (t, format) {
             ("string", "date-time") => ("DATETIME".to_string(), None),
@@ -201,39 +239,47 @@ impl SchemaGenerator {
     /// Generate CREATE TABLE SQL statement for SQLite
     pub fn generate_create_table_sql_sqlite(schema: &TableSchema) -> String {
         let mut sql = format!("CREATE TABLE IF NOT EXISTS {} (\n", schema.table_name);
-        
+
         let mut column_defs = Vec::new();
         for col in &schema.columns {
-            let mut col_def = format!("    {} {}", col.name, Self::map_type_to_sqlite(&col.column_type));
-            
+            let mut col_def = format!(
+                "    {} {}",
+                col.name,
+                Self::map_type_to_sqlite(&col.column_type)
+            );
+
             if col.primary_key {
                 col_def.push_str(" PRIMARY KEY");
                 if col.auto_increment {
                     col_def.push_str(" AUTOINCREMENT");
                 }
             }
-            
+
             if !col.nullable && !col.primary_key {
                 col_def.push_str(" NOT NULL");
             }
-            
+
             if col.unique && !col.primary_key {
                 col_def.push_str(" UNIQUE");
             }
-            
+
             if let Some(default) = &col.default_value {
                 col_def.push_str(&format!(" DEFAULT {}", default));
             }
-            
+
             column_defs.push(col_def);
         }
-        
+
         sql.push_str(&column_defs.join(",\n"));
         sql.push_str("\n);\n");
-        
+
         // Generate index statements
         for index in &schema.indexes {
-            let index_type = if index.unique { "UNIQUE INDEX" } else { "INDEX" };
+            let index_type = if index.unique {
+                "UNIQUE INDEX"
+            } else {
+                "INDEX"
+            };
             sql.push_str(&format!(
                 "CREATE {} IF NOT EXISTS {} ON {} ({});\n",
                 index_type,
@@ -242,18 +288,22 @@ impl SchemaGenerator {
                 index.columns.join(", ")
             ));
         }
-        
+
         sql
     }
 
     /// Generate CREATE TABLE SQL statement for PostgreSQL
     pub fn generate_create_table_sql_postgres(schema: &TableSchema) -> String {
         let mut sql = format!("CREATE TABLE IF NOT EXISTS {} (\n", schema.table_name);
-        
+
         let mut column_defs = Vec::new();
         for col in &schema.columns {
-            let mut col_def = format!("    {} {}", col.name, Self::map_type_to_postgres(&col.column_type));
-            
+            let mut col_def = format!(
+                "    {} {}",
+                col.name,
+                Self::map_type_to_postgres(&col.column_type)
+            );
+
             if col.primary_key {
                 // For PostgreSQL, SERIAL already includes NOT NULL
                 if col.auto_increment && Self::is_integer_type(&col.column_type) {
@@ -262,28 +312,32 @@ impl SchemaGenerator {
                     col_def.push_str(" PRIMARY KEY");
                 }
             }
-            
+
             if !col.nullable && !col.primary_key {
                 col_def.push_str(" NOT NULL");
             }
-            
+
             if col.unique && !col.primary_key {
                 col_def.push_str(" UNIQUE");
             }
-            
+
             if let Some(default) = &col.default_value {
                 col_def.push_str(&format!(" DEFAULT {}", default));
             }
-            
+
             column_defs.push(col_def);
         }
-        
+
         sql.push_str(&column_defs.join(",\n"));
         sql.push_str("\n);\n");
-        
+
         // Generate index statements
         for index in &schema.indexes {
-            let index_type = if index.unique { "UNIQUE INDEX" } else { "INDEX" };
+            let index_type = if index.unique {
+                "UNIQUE INDEX"
+            } else {
+                "INDEX"
+            };
             sql.push_str(&format!(
                 "CREATE {} IF NOT EXISTS {} ON {} ({});\n",
                 index_type,
@@ -292,7 +346,7 @@ impl SchemaGenerator {
                 index.columns.join(", ")
             ));
         }
-        
+
         sql
     }
 
@@ -378,18 +432,16 @@ mod tests {
                     default_value: None,
                 },
             ],
-            indexes: vec![
-                IndexDefinition {
-                    name: "idx_users_email".to_string(),
-                    columns: vec!["email".to_string()],
-                    unique: false,
-                },
-            ],
+            indexes: vec![IndexDefinition {
+                name: "idx_users_email".to_string(),
+                columns: vec!["email".to_string()],
+                unique: false,
+            }],
         };
 
         let sql = SchemaGenerator::generate_create_table_sql_sqlite(&schema);
         println!("{}", sql);
-        
+
         assert!(sql.contains("CREATE TABLE IF NOT EXISTS users"));
         assert!(sql.contains("id INTEGER PRIMARY KEY AUTOINCREMENT"));
         assert!(sql.contains("name TEXT NOT NULL"));

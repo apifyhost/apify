@@ -1,8 +1,8 @@
 //! Execution phases and request context for the HTTP pipeline
 
 use crate::api_generator::RoutePattern;
-use crate::hyper::{HeaderMap, Method, Uri};
 use crate::hyper::http::Extensions;
+use crate::hyper::{HeaderMap, Method, Uri};
 use serde_json::Value;
 use std::collections::HashMap;
 
