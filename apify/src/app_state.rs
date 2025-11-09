@@ -62,7 +62,7 @@ impl AppState {
         // For now, always use SQLite backend regardless of provided database config
         let crud_handler = {
             if !openapi_configs.is_empty() {
-                let db_cfg = crate::database::DatabaseConfig::sqlite_default();
+                let db_cfg = crate::database::DatabaseRuntimeConfig::sqlite_default();
                 let db_manager = DatabaseManager::new(db_cfg).await?;
 
                 // Extract table schemas from all OpenAPI specs
