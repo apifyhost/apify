@@ -47,7 +47,7 @@ impl AppState {
     /// Create new application state with CRUD support
     pub async fn new_with_crud(
         routes: Option<Vec<RouteConfig>>,
-        _database_config: Option<DatabaseConfig>,
+    database_config: Option<DatabaseConfig>,
         openapi_configs: Vec<(OpenAPIConfig, Option<ModulesConfig>)>,
         listener_modules: Option<ModulesConfig>,
         consumers: Vec<ConsumerConfig>,
@@ -62,7 +62,29 @@ impl AppState {
         // For now, always use SQLite backend regardless of provided database config
         let crud_handler = {
             if !openapi_configs.is_empty() {
-                let db_cfg = crate::database::DatabaseRuntimeConfig::sqlite_default();
+                // Build runtime config from database_config if provided (shared across APIs)
+                let db_cfg = if let Some(db_conf) = &database_config {
+                    // Build URL from components (only postgres/sqlite supported)
+                    let driver = db_conf.database.driver.clone().unwrap_or_else(|| "sqlite".into());
+                    let max_size = db_conf.database.max_pool_size.unwrap_or(10) as u32;
+                    let url = if driver == "postgres" {
+                        format!(
+                            "postgres://{}:{}@{}:{}/{}",
+                            db_conf.database.user,
+                            db_conf.database.password,
+                            db_conf.database.host,
+                            db_conf.database.port,
+                            db_conf.database.database
+                        )
+                    } else {
+                        // For sqlite treat 'database' as filename
+                        let path = &db_conf.database.database;
+                        if path == ":memory:" { "sqlite::memory:".into() } else { format!("sqlite:{}", path) }
+                    };
+                    crate::database::DatabaseRuntimeConfig { driver, url, max_size }
+                } else {
+                    crate::database::DatabaseRuntimeConfig::sqlite_default()
+                };
                 let db_manager = DatabaseManager::new(db_cfg).await?;
 
                 // Extract table schemas from all OpenAPI specs
@@ -75,14 +97,24 @@ impl AppState {
                 }
 
                 // Initialize database schema with extracted table definitions
-                if !all_schemas.is_empty() {
-                    eprintln!(
-                        "Initializing database with {} table schemas",
-                        all_schemas.len()
-                    );
-                    db_manager.initialize_schema(all_schemas).await?;
+                // Only run schema initialization if database operations include "init_schemas" (opt-in)
+                let should_init = database_config
+                    .as_ref()
+                    .and_then(|c| c.database.operations.as_ref())
+                    .map(|ops| ops.iter().any(|o| o == "init_schemas"))
+                    .unwrap_or(false);
+                if should_init {
+                    if !all_schemas.is_empty() {
+                        eprintln!(
+                            "Initializing database with {} table schemas",
+                            all_schemas.len()
+                        );
+                        db_manager.initialize_schema(all_schemas).await?;
+                    } else {
+                        eprintln!("Warning: No table schemas found in OpenAPI configurations");
+                    }
                 } else {
-                    eprintln!("Warning: No table schemas found in OpenAPI configurations");
+                    eprintln!("Skipping schema initialization (init_schemas not in operations)");
                 }
 
                 // Merge all OpenAPI specs into one - deep merge for paths

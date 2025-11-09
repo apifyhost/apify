@@ -97,15 +97,30 @@ async fn books_is_open_users_is_protected() -> Result<(), Box<dyn std::error::Er
     let main_cfg_path = cfg_dir.join("config.yaml");
     fs::write(&main_cfg_path, main_cfg)?;
 
+  // database.yaml with init_schemas to create users and books tables
+  let db_cfg = format!(
+    r#"database:
+  driver: sqlite
+  host: localhost
+  port: 0
+  user: user
+  password: pass
+  database: {}
+  operations: ["init_schemas"]
+"#,
+    db_file.display()
+  );
+  fs::write(cfg_dir.join("database.yaml"), db_cfg)?;
+
     // Spawn with test env
     let bin = assert_cmd::cargo::cargo_bin!("apify");
     let db_url = format!("sqlite:{}", db_file.display());
-    let mut child = TokioCommand::new(bin)
-        .env("APIFY_DB_URL", &db_url)
-        .env("APIFY_THREADS", "1")
-        .arg("-c")
-        .arg(main_cfg_path.to_string_lossy().to_string())
-        .spawn()?;
+  let mut child = TokioCommand::new(bin)
+    .env("APIFY_DB_URL", &db_url)
+    .env("APIFY_THREADS", "1")
+    .arg("-c")
+    .arg(main_cfg_path.to_string_lossy().to_string())
+    .spawn()?;
 
     wait_for_ready("127.0.0.1", port, Duration::from_secs(8)).await?;
     let client = Client::builder().no_proxy().build()?;

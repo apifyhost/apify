@@ -83,6 +83,22 @@ async fn key_auth_required_for_users() -> Result<(), Box<dyn std::error::Error>>
     let main_cfg_path = config_dir.join("config.yaml");
     fs::write(&main_cfg_path, main_cfg)?;
 
+  // database.yaml with init_schemas for users table
+  let db_file = config_dir.join("server.sqlite");
+  let db_cfg = format!(
+    r#"database:
+  driver: sqlite
+  host: localhost
+  port: 0
+  user: user
+  password: pass
+  database: {}
+  operations: ["init_schemas"]
+"#,
+    db_file.display()
+  );
+  fs::write(config_dir.join("database.yaml"), db_cfg)?;
+
     // Spawn server
     let bin_path = assert_cmd::cargo::cargo_bin!("apify");
     let mut child = TokioCommand::new(bin_path)

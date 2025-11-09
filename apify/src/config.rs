@@ -28,6 +28,7 @@ pub struct DatabaseSettings {
     pub database: String,
     pub ssl_mode: Option<String>,
     pub max_pool_size: Option<usize>,
+    pub operations: Option<Vec<String>>, // e.g. ["init_schemas"] controls which db ops run
 }
 
 /// OpenAPI configuration structure

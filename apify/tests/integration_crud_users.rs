@@ -89,6 +89,21 @@ async fn users_crud_flow() -> Result<(), Box<dyn std::error::Error>> {
     let cfg_path = dir.join("config.yaml");
     fs::write(&cfg_path, cfg)?;
 
+    // Provide database.yaml with init_schemas so tables are created before CRUD
+    let db_cfg = format!(
+        r#"database:
+  driver: sqlite
+  host: localhost
+  port: 0
+  user: user
+  password: pass
+  database: {}
+  operations: ["init_schemas"]
+"#,
+        db_file.display()
+    );
+    fs::write(dir.join("database.yaml"), db_cfg)?;
+
     // Spawn
     let bin = assert_cmd::cargo::cargo_bin!("apify");
     let db_url = format!("sqlite:{}", db_file.display());
