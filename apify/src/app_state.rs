@@ -60,19 +60,19 @@ impl AppState {
         }
 
         // Build CRUD handler if OpenAPI configs exist and datasources are configured
-        let crud_handler = {
-            if !openapi_configs.is_empty() && datasources.is_some() {
-                let ds_map = datasources.as_ref().unwrap();
-                
+        let crud_handler = if let Some(ds_map) = datasources.as_ref() {
+            if !openapi_configs.is_empty() {
                 // Determine which datasource to use (from first API config or first available)
-                let datasource_name = openapi_configs.first()
+                let datasource_name = openapi_configs
+                    .first()
                     .and_then(|(_, _, ds_name)| ds_name.clone())
                     .or_else(|| ds_map.keys().next().cloned())
                     .ok_or("No datasource specified and none available")?;
-                
-                let ds = ds_map.get(&datasource_name)
-                    .ok_or_else(|| format!("Datasource '{}' not found in config", datasource_name))?;
-                
+
+                let ds = ds_map.get(&datasource_name).ok_or_else(|| {
+                    format!("Datasource '{}' not found in config", datasource_name)
+                })?;
+
                 // Build database URL
                 let url = match ds.driver.as_str() {
                     "postgres" => {
@@ -87,22 +87,22 @@ impl AppState {
                     }
                     "sqlite" => {
                         let path = &ds.database;
-                        if path == ":memory:" { 
-                            "sqlite::memory:".to_string() 
-                        } else { 
-                            format!("sqlite:{}", path) 
+                        if path == ":memory:" {
+                            "sqlite::memory:".to_string()
+                        } else {
+                            format!("sqlite:{}", path)
                         }
                     }
                     _ => return Err(format!("Unsupported database driver: {}", ds.driver).into()),
                 };
-                
+
                 let max_size = ds.max_pool_size.unwrap_or(10) as u32;
-                let db_cfg = crate::database::DatabaseRuntimeConfig { 
-                    driver: ds.driver.clone(), 
-                    url, 
-                    max_size 
+                let db_cfg = crate::database::DatabaseRuntimeConfig {
+                    driver: ds.driver.clone(),
+                    url,
+                    max_size,
                 };
-                
+
                 let db_manager = DatabaseManager::new(db_cfg).await?;
 
                 // Extract table schemas from all OpenAPI specs
@@ -155,6 +155,8 @@ impl AppState {
             } else {
                 None
             }
+        } else {
+            None
         };
 
         // Build listener-level fallback module registry

@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut handles = Vec::new();
 
     let config_dir = Path::new(&cli.config).parent().unwrap_or(Path::new("."));
-    
+
     for (listener_idx, listener_config) in config.listeners.into_iter().enumerate() {
         // Merge global consumers with listener-specific consumers
         let mut all_consumers = global_consumers.clone();
@@ -69,12 +69,19 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             Err(e) => eprintln!("Error loading OpenAPI config from {}: {}", p, e),
                         }
                     }
-                    ApiRef::WithConfig { path, modules, datasource } => {
+                    ApiRef::WithConfig {
+                        path,
+                        modules,
+                        datasource,
+                    } => {
                         let api_path = config_dir.join(path);
                         match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
                             Ok(openapi_config) => {
                                 let ds_info = if let Some(ds_name) = datasource {
-                                    println!("OpenAPI config loaded from: {} (datasource: {})", path, ds_name);
+                                    println!(
+                                        "OpenAPI config loaded from: {} (datasource: {})",
+                                        path, ds_name
+                                    );
                                     Some(ds_name.clone())
                                 } else {
                                     println!("OpenAPI config loaded from: {}", path);

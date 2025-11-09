@@ -1,8 +1,8 @@
 //! SQLite backend implementation for DatabaseBackend
 
-use serde_json::{json, Value};
-use sqlx::{Column, Row};
+use serde_json::{Value, json};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions, SqliteRow};
+use sqlx::{Column, Row};
 use sqlx::{QueryBuilder, Sqlite};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -21,7 +21,9 @@ impl SqliteBackend {
             SqliteConnectOptions::from_str(&config.url).map_err(DatabaseError::PoolError)?
         } else {
             let filename = config.url.strip_prefix("sqlite:").unwrap_or(&config.url);
-            SqliteConnectOptions::new().filename(filename).create_if_missing(true)
+            SqliteConnectOptions::new()
+                .filename(filename)
+                .create_if_missing(true)
         };
         let pool = SqlitePoolOptions::new()
             .max_connections(config.max_size)
@@ -256,7 +258,11 @@ impl SqliteBackend {
 }
 
 impl DatabaseBackend for SqliteBackend {
-    fn initialize_schema<'a>(&'a self, table_schemas: Vec<TableSchema>) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<(), DatabaseError>> + Send + 'a>> {
+    fn initialize_schema<'a>(
+        &'a self,
+        table_schemas: Vec<TableSchema>,
+    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<(), DatabaseError>> + Send + 'a>>
+    {
         Box::pin(async move { self.do_initialize_schema(table_schemas).await })
     }
     fn select<'a>(
@@ -266,14 +272,21 @@ impl DatabaseBackend for SqliteBackend {
         where_clause: Option<HashMap<String, Value>>,
         limit: Option<u32>,
         offset: Option<u32>,
-    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<Vec<Value>, DatabaseError>> + Send + 'a>> {
-        Box::pin(async move { self.do_select(table, columns, where_clause, limit, offset).await })
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<Vec<Value>, DatabaseError>> + Send + 'a>,
+    > {
+        Box::pin(async move {
+            self.do_select(table, columns, where_clause, limit, offset)
+                .await
+        })
     }
     fn insert<'a>(
         &'a self,
         table: &'a str,
         data: HashMap<String, Value>,
-    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<Value, DatabaseError>> + Send + 'a>> {
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<Value, DatabaseError>> + Send + 'a>,
+    > {
         Box::pin(async move { self.do_insert(table, data).await })
     }
     fn update<'a>(
@@ -281,14 +294,18 @@ impl DatabaseBackend for SqliteBackend {
         table: &'a str,
         data: HashMap<String, Value>,
         where_clause: HashMap<String, Value>,
-    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<Value, DatabaseError>> + Send + 'a>> {
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<Value, DatabaseError>> + Send + 'a>,
+    > {
         Box::pin(async move { self.do_update(table, data, where_clause).await })
     }
     fn delete<'a>(
         &'a self,
         table: &'a str,
         where_clause: HashMap<String, Value>,
-    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<u64, DatabaseError>> + Send + 'a>> {
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<u64, DatabaseError>> + Send + 'a>,
+    > {
         Box::pin(async move { self.do_delete(table, where_clause).await })
     }
 }

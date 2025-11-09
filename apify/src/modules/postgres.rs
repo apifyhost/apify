@@ -1,8 +1,8 @@
 //! Postgres backend implementation for DatabaseBackend
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
-use sqlx::{Column, QueryBuilder, Row, Postgres};
+use sqlx::{Column, Postgres, QueryBuilder, Row};
 use std::collections::HashMap;
 
 use crate::database::{DatabaseBackend, DatabaseError, DatabaseRuntimeConfig};
@@ -126,18 +126,30 @@ impl PostgresBackend {
         qb.push(table).push(" SET ");
         let mut first = true;
         for (k, v) in data {
-            if !first { qb.push(", "); }
+            if !first {
+                qb.push(", ");
+            }
             first = false;
             qb.push(&k).push(" = ");
             match v {
-                Value::Null => { qb.push("NULL"); }
-                Value::Bool(b) => { qb.push_bind(b); }
-                Value::Number(n) => {
-                    if let Some(i) = n.as_i64() { qb.push_bind(i); }
-                    else if let Some(f) = n.as_f64() { qb.push_bind(f); }
-                    else { qb.push_bind(n.to_string()); }
+                Value::Null => {
+                    qb.push("NULL");
                 }
-                Value::String(s) => { qb.push_bind(s); }
+                Value::Bool(b) => {
+                    qb.push_bind(b);
+                }
+                Value::Number(n) => {
+                    if let Some(i) = n.as_i64() {
+                        qb.push_bind(i);
+                    } else if let Some(f) = n.as_f64() {
+                        qb.push_bind(f);
+                    } else {
+                        qb.push_bind(n.to_string());
+                    }
+                }
+                Value::String(s) => {
+                    qb.push_bind(s);
+                }
                 Value::Array(_) | Value::Object(_) => {
                     qb.push_bind(serde_json::to_string(&v).unwrap_or_default());
                 }
@@ -146,18 +158,30 @@ impl PostgresBackend {
         qb.push(" WHERE ");
         let mut first = true;
         for (k, v) in where_clause {
-            if !first { qb.push(" AND "); }
+            if !first {
+                qb.push(" AND ");
+            }
             first = false;
             qb.push(format!("{} = ", k));
             match v {
-                Value::Null => { qb.push("NULL"); }
-                Value::Bool(b) => { qb.push_bind(b); }
-                Value::Number(n) => {
-                    if let Some(i) = n.as_i64() { qb.push_bind(i); }
-                    else if let Some(f) = n.as_f64() { qb.push_bind(f); }
-                    else { qb.push_bind(n.to_string()); }
+                Value::Null => {
+                    qb.push("NULL");
                 }
-                Value::String(s) => { qb.push_bind(s); }
+                Value::Bool(b) => {
+                    qb.push_bind(b);
+                }
+                Value::Number(n) => {
+                    if let Some(i) = n.as_i64() {
+                        qb.push_bind(i);
+                    } else if let Some(f) = n.as_f64() {
+                        qb.push_bind(f);
+                    } else {
+                        qb.push_bind(n.to_string());
+                    }
+                }
+                Value::String(s) => {
+                    qb.push_bind(s);
+                }
                 Value::Array(_) | Value::Object(_) => {
                     qb.push_bind(serde_json::to_string(&v).unwrap_or_default());
                 }
@@ -185,18 +209,30 @@ impl PostgresBackend {
         qb.push(table).push(" WHERE ");
         let mut first = true;
         for (k, v) in where_clause {
-            if !first { qb.push(" AND "); }
+            if !first {
+                qb.push(" AND ");
+            }
             first = false;
             qb.push(format!("{} = ", k));
             match v {
-                Value::Null => { qb.push("NULL"); }
-                Value::Bool(b) => { qb.push_bind(b); }
-                Value::Number(n) => {
-                    if let Some(i) = n.as_i64() { qb.push_bind(i); }
-                    else if let Some(f) = n.as_f64() { qb.push_bind(f); }
-                    else { qb.push_bind(n.to_string()); }
+                Value::Null => {
+                    qb.push("NULL");
                 }
-                Value::String(s) => { qb.push_bind(s); }
+                Value::Bool(b) => {
+                    qb.push_bind(b);
+                }
+                Value::Number(n) => {
+                    if let Some(i) = n.as_i64() {
+                        qb.push_bind(i);
+                    } else if let Some(f) = n.as_f64() {
+                        qb.push_bind(f);
+                    } else {
+                        qb.push_bind(n.to_string());
+                    }
+                }
+                Value::String(s) => {
+                    qb.push_bind(s);
+                }
                 Value::Array(_) | Value::Object(_) => {
                     qb.push_bind(serde_json::to_string(&v).unwrap_or_default());
                 }
@@ -212,7 +248,11 @@ impl PostgresBackend {
 }
 
 impl DatabaseBackend for PostgresBackend {
-    fn initialize_schema<'a>(&'a self, table_schemas: Vec<TableSchema>) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<(), DatabaseError>> + Send + 'a>> {
+    fn initialize_schema<'a>(
+        &'a self,
+        table_schemas: Vec<TableSchema>,
+    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<(), DatabaseError>> + Send + 'a>>
+    {
         Box::pin(async move { self.do_initialize_schema(table_schemas).await })
     }
     fn select<'a>(
@@ -222,14 +262,21 @@ impl DatabaseBackend for PostgresBackend {
         where_clause: Option<HashMap<String, Value>>,
         limit: Option<u32>,
         offset: Option<u32>,
-    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<Vec<Value>, DatabaseError>> + Send + 'a>> {
-        Box::pin(async move { self.do_select(table, columns, where_clause, limit, offset).await })
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<Vec<Value>, DatabaseError>> + Send + 'a>,
+    > {
+        Box::pin(async move {
+            self.do_select(table, columns, where_clause, limit, offset)
+                .await
+        })
     }
     fn insert<'a>(
         &'a self,
         table: &'a str,
         data: HashMap<String, Value>,
-    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<Value, DatabaseError>> + Send + 'a>> {
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<Value, DatabaseError>> + Send + 'a>,
+    > {
         Box::pin(async move { self.do_insert(table, data).await })
     }
     fn update<'a>(
@@ -237,14 +284,18 @@ impl DatabaseBackend for PostgresBackend {
         table: &'a str,
         data: HashMap<String, Value>,
         where_clause: HashMap<String, Value>,
-    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<Value, DatabaseError>> + Send + 'a>> {
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<Value, DatabaseError>> + Send + 'a>,
+    > {
         Box::pin(async move { self.do_update(table, data, where_clause).await })
     }
     fn delete<'a>(
         &'a self,
         table: &'a str,
         where_clause: HashMap<String, Value>,
-    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<u64, DatabaseError>> + Send + 'a>> {
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<u64, DatabaseError>> + Send + 'a>,
+    > {
         Box::pin(async move { self.do_delete(table, where_clause).await })
     }
 }
@@ -258,7 +309,8 @@ fn row_to_json_postgres(row: &PgRow) -> Value {
             continue;
         }
         if let Ok(v) = row.try_get::<String, _>(i) {
-            if ((v.starts_with('{') && v.ends_with('}')) || (v.starts_with('[') && v.ends_with(']')))
+            if ((v.starts_with('{') && v.ends_with('}'))
+                || (v.starts_with('[') && v.ends_with(']')))
                 && let Ok(j) = serde_json::from_str::<Value>(&v)
             {
                 obj.insert(name, j);
@@ -274,7 +326,9 @@ fn row_to_json_postgres(row: &PgRow) -> Value {
         if let Ok(v) = row.try_get::<f64, _>(i) {
             obj.insert(
                 name,
-                serde_json::Number::from_f64(v).map(Value::Number).unwrap_or(Value::Null),
+                serde_json::Number::from_f64(v)
+                    .map(Value::Number)
+                    .unwrap_or(Value::Null),
             );
             continue;
         }
@@ -288,22 +342,36 @@ fn row_to_json_postgres(row: &PgRow) -> Value {
 }
 
 fn push_where_postgres(qb: &mut QueryBuilder<Postgres>, conds: HashMap<String, Value>) {
-    if conds.is_empty() { return; }
+    if conds.is_empty() {
+        return;
+    }
     qb.push(" WHERE ");
     let mut first = true;
     for (k, v) in conds {
-        if !first { qb.push(" AND "); }
+        if !first {
+            qb.push(" AND ");
+        }
         first = false;
         qb.push(format!("{} = ", k));
         match v {
-            Value::Null => { qb.push("NULL"); }
-            Value::Bool(b) => { qb.push_bind(b); }
-            Value::Number(n) => {
-                if let Some(i) = n.as_i64() { qb.push_bind(i); }
-                else if let Some(f) = n.as_f64() { qb.push_bind(f); }
-                else { qb.push_bind(n.to_string()); }
+            Value::Null => {
+                qb.push("NULL");
             }
-            Value::String(s) => { qb.push_bind(s); }
+            Value::Bool(b) => {
+                qb.push_bind(b);
+            }
+            Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    qb.push_bind(i);
+                } else if let Some(f) = n.as_f64() {
+                    qb.push_bind(f);
+                } else {
+                    qb.push_bind(n.to_string());
+                }
+            }
+            Value::String(s) => {
+                qb.push_bind(s);
+            }
             Value::Array(_) | Value::Object(_) => {
                 qb.push_bind(serde_json::to_string(&v).unwrap_or_default());
             }
@@ -311,19 +379,26 @@ fn push_where_postgres(qb: &mut QueryBuilder<Postgres>, conds: HashMap<String, V
     }
 }
 
-fn push_bind_postgres(
-    sep: &mut sqlx::query_builder::Separated<'_, '_, Postgres, &str>,
-    v: &Value,
-) {
+fn push_bind_postgres(sep: &mut sqlx::query_builder::Separated<'_, '_, Postgres, &str>, v: &Value) {
     match v {
-        Value::Null => { sep.push("NULL"); }
-        Value::Bool(b) => { sep.push_bind(*b); }
-        Value::Number(n) => {
-            if let Some(i) = n.as_i64() { sep.push_bind(i); }
-            else if let Some(f) = n.as_f64() { sep.push_bind(f); }
-            else { sep.push_bind(n.to_string()); }
+        Value::Null => {
+            sep.push("NULL");
         }
-        Value::String(s) => { sep.push_bind(s.clone()); }
+        Value::Bool(b) => {
+            sep.push_bind(*b);
+        }
+        Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                sep.push_bind(i);
+            } else if let Some(f) = n.as_f64() {
+                sep.push_bind(f);
+            } else {
+                sep.push_bind(n.to_string());
+            }
+        }
+        Value::String(s) => {
+            sep.push_bind(s.clone());
+        }
         Value::Array(_) | Value::Object(_) => {
             sep.push_bind(serde_json::to_string(v).unwrap_or_default());
         }

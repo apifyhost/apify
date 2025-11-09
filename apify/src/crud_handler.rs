@@ -96,13 +96,20 @@ impl CRUDHandler {
             }
         }
 
-        let results = self.db_manager.select(
-            table,
-            None,
-            if where_clause.is_empty() { None } else { Some(where_clause) },
-            limit,
-            offset,
-        ).await?;
+        let results = self
+            .db_manager
+            .select(
+                table,
+                None,
+                if where_clause.is_empty() {
+                    None
+                } else {
+                    Some(where_clause)
+                },
+                limit,
+                offset,
+            )
+            .await?;
 
         Ok(Value::Array(results))
     }
@@ -127,13 +134,10 @@ impl CRUDHandler {
         let mut where_clause = HashMap::new();
         where_clause.insert(id_param.clone(), Value::String(id_value.clone()));
 
-        let results = self.db_manager.select(
-            table,
-            None,
-            Some(where_clause),
-            Some(1),
-            None,
-        ).await?;
+        let results = self
+            .db_manager
+            .select(table, None, Some(where_clause), Some(1), None)
+            .await?;
 
         results.into_iter().next().ok_or_else(|| {
             CRUDError::NotFoundError(format!("Record with {} = {} not found", id_param, id_value))

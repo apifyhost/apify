@@ -35,10 +35,20 @@ impl DatabaseRuntimeConfig {
     pub fn sqlite_default() -> Self {
         // Allow overriding DB url via APIFY_DB_URL (useful in tests)
         if let Ok(mut url) = std::env::var("APIFY_DB_URL") {
-            let driver = if url.starts_with("postgres://") { "postgres".to_string() } else { "sqlite".to_string() };
-            if driver == "sqlite" && !url.starts_with("sqlite:") { url = format!("sqlite:{}", url); }
+            let driver = if url.starts_with("postgres://") {
+                "postgres".to_string()
+            } else {
+                "sqlite".to_string()
+            };
+            if driver == "sqlite" && !url.starts_with("sqlite:") {
+                url = format!("sqlite:{}", url);
+            }
             eprintln!("Using database URL from env: {}", url);
-            return Self { driver, url, max_size: 10 };
+            return Self {
+                driver,
+                url,
+                max_size: 10,
+            };
         }
         // Default: file-based sqlite under current directory
         let db_path = std::env::current_dir()
@@ -46,13 +56,19 @@ impl DatabaseRuntimeConfig {
             .unwrap_or_else(|_| "./apify.sqlite".to_string());
         let url = format!("sqlite:{}", db_path);
         eprintln!("Using SQLite database file: {}", url);
-        Self { driver: "sqlite".into(), url, max_size: 10 }
+        Self {
+            driver: "sqlite".into(),
+            url,
+            max_size: 10,
+        }
     }
 }
 
 pub trait DatabaseBackend: Send + Sync {
-    fn initialize_schema<'a>(&'a self, table_schemas: Vec<TableSchema>) -> 
-        core::pin::Pin<Box<dyn core::future::Future<Output = Result<(), DatabaseError>> + Send + 'a>>;
+    fn initialize_schema<'a>(
+        &'a self,
+        table_schemas: Vec<TableSchema>,
+    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<(), DatabaseError>> + Send + 'a>>;
     fn select<'a>(
         &'a self,
         table: &'a str,
@@ -60,23 +76,31 @@ pub trait DatabaseBackend: Send + Sync {
         where_clause: Option<HashMap<String, Value>>,
         limit: Option<u32>,
         offset: Option<u32>,
-    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<Vec<Value>, DatabaseError>> + Send + 'a>>;
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<Vec<Value>, DatabaseError>> + Send + 'a>,
+    >;
     fn insert<'a>(
         &'a self,
         table: &'a str,
         data: HashMap<String, Value>,
-    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<Value, DatabaseError>> + Send + 'a>>;
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<Value, DatabaseError>> + Send + 'a>,
+    >;
     fn update<'a>(
         &'a self,
         table: &'a str,
         data: HashMap<String, Value>,
         where_clause: HashMap<String, Value>,
-    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<Value, DatabaseError>> + Send + 'a>>;
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<Value, DatabaseError>> + Send + 'a>,
+    >;
     fn delete<'a>(
         &'a self,
         table: &'a str,
         where_clause: HashMap<String, Value>,
-    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<u64, DatabaseError>> + Send + 'a>>;
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<u64, DatabaseError>> + Send + 'a>,
+    >;
 }
 
 #[derive(Clone)]
