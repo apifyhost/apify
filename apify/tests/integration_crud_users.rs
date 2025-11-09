@@ -78,28 +78,26 @@ async fn users_crud_flow() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(dir.join("users.yaml"), users_spec)?;
 
     let cfg = format!(
-        r#"listeners:
-  - port: {port}
-    ip: 127.0.0.1
-    protocol: HTTP
-    apis: [ {{ path: ./users.yaml }} ]
-    consumers: [ {{ name: test, keys: [ t-key-001 ] }} ]
-"#
-    );
-    let cfg_path = dir.join("config.yaml");
-    fs::write(&cfg_path, cfg)?;
-
-    // Provide database.yaml with datasource configuration
-    let db_cfg = format!(
         r#"datasource:
   test_db:
     driver: sqlite
     database: {}
     max_pool_size: 5
+consumers:
+  - name: test
+    keys: [ t-key-001 ]
+listeners:
+  - port: {port}
+    ip: 127.0.0.1
+    protocol: HTTP
+    apis:
+      - path: ./users.yaml
+        datasource: test_db
 "#,
         db_file.display()
     );
-    fs::write(dir.join("database.yaml"), db_cfg)?;
+    let cfg_path = dir.join("config.yaml");
+    fs::write(&cfg_path, cfg)?;
 
     // Spawn
     let bin = assert_cmd::cargo::cargo_bin!("apify");
