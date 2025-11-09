@@ -1,0 +1,12 @@
+listeners:
+  - port: 3000
+    ip: 0.0.0.0
+    protocol: HTTP
+    apis:
+      - path: ./openapi/users.yaml
+      - path: ./openapi/books.yaml
+      - path: ./openapi/components_only.yaml
+    consumers:
+      - name: default
+        keys:
+          - dev-key-123

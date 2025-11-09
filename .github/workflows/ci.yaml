@@ -7,10 +7,12 @@ env:
 on:
   push:
     branches:
-    - main
+      - main
+      - "feat/*"
+      - "feature/*"
   pull_request:
     branches:
-    - main
+      - main
 
 jobs:
   check:
@@ -39,6 +41,8 @@ jobs:
       with:
         save-if: ${{ github.ref == 'refs/heads/main' }}
     - name: Run tests
+      env:
+        RUST_BACKTRACE: 1
       run: cargo test --workspace --all-features --all-targets
     - name: Run E2E tests
       run: |

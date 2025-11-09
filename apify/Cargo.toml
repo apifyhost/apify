@@ -1,0 +1,36 @@
+[package]
+name = "apify"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hyper = { workspace = true }
+tokio = { workspace = true }
+http-body-util = { workspace = true }
+hyper-util = { workspace = true }
+socket2 = { workspace = true }
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true }
+regex = "1.10"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# SQLx for DB-agnostic (SQLite + Postgres)
+sqlx = { version = "0", default-features = false, features = [
+    "runtime-tokio",
+    "macros",
+    "any",
+    "sqlite",
+    "postgres",
+    "chrono",
+    "uuid",
+    "json",
+] }
+
+[dev-dependencies]
+assert_cmd = "2"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+tempfile = "3"
+serial_test = "3"

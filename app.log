@@ -1,0 +1,51 @@
+warning: unused variable: `database_config`
+  --> apify/src/app_state.rs:37:9
+   |
+37 |         database_config: Option<DatabaseConfig>,
+   |         ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_database_config`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: function `push_set_sqlite` is never used
+   --> apify/src/database.rs:276:4
+    |
+276 | fn push_set_sqlite(sep: &mut sqlx::query_builder::Separated<'_, '_, Sqlite, &str>, k: String, v: Value) {
+    |    ^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: function `push_where_eq_sqlite` is never used
+   --> apify/src/database.rs:291:4
+    |
+291 | fn push_where_eq_sqlite(sep: &mut sqlx::query_builder::Separated<'_, '_, Sqlite, &str>, k: String, v: Value) {
+    |    ^^^^^^^^^^^^^^^^^^^^
+
+warning: `apify` (lib) generated 3 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.80s
+warning: the following packages contain code that will be rejected by a future version of Rust: sqlx-postgres v0.7.4
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running `target/debug/apify --config apify/config/config.yaml`
+Using config file: apify/config/config.yaml
+Config loaded successfully
+Database config loaded successfully
+Starting 2 worker threads
+OpenAPI config loaded from: ./openapi/users.yaml
+OpenAPI config loaded from: ./openapi/books.yaml
+Starting thread 0 for listener 0 (port: 3000)
+Starting thread 1 for listener 0 (port: 3000)
+Thread 0 bound to http://0.0.0.0:3000
+Thread 0 creating AppState...
+Thread 1 bound to http://0.0.0.0:3000
+Thread 1 creating AppState...
+Using SQLite database file: sqlite:/Users/junxuchen/github/apify/apify.sqlite
+Attempting to connect to SQLite database: sqlite:/Users/junxuchen/github/apify/apify.sqlite
+Using SQLite database file: sqlite:/Users/junxuchen/github/apify/apify.sqlite
+Attempting to connect to SQLite database: sqlite:/Users/junxuchen/github/apify/apify.sqlite
+SQLite database connected successfully
+SQLite database connected successfully
+Database schema initialized successfully
+Thread 1 AppState created successfully
+Thread 1 entering accept loop
+Database schema initialized successfully
+Thread 0 AppState created successfully
+Thread 0 entering accept loop
