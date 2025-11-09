@@ -1,7 +1,7 @@
 //! Network service related (listener creation, service startup)
 
 use super::app_state::AppState;
-use super::config::{ListenerConfig, ApiRef};
+use super::config::ListenerConfig;
 use super::handler::handle_request;
 use super::hyper::server::conn::http1;
 use super::hyper::service::service_fn;

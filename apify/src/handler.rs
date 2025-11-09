@@ -24,6 +24,11 @@ pub async fn handle_request(
     ctx.extensions = parts.extensions; // carry over existing request extensions
     ctx.query_params = extract_query_params(parts.uri.query());
 
+    // Health endpoint shortcut
+    if method == hyper::Method::GET && ctx.path == "/healthz" {
+        return Ok(create_json_response(StatusCode::OK, serde_json::json!({"status":"ok"}).to_string()));
+    }
+
     // Try CRUD handler first if available
     if let Some(crud_handler) = &state.crud_handler {
         // Phase: BodyParse (only for methods that expect body)
@@ -158,20 +163,6 @@ fn extract_query_params(query: Option<&str>) -> HashMap<String, String> {
     params
 }
 
-/// Extract path parameters from route matching
-fn extract_path_params(
-    state: &AppState,
-    path: &str,
-    method: &hyper::Method,
-) -> HashMap<String, String> {
-    // Try to extract path parameters using the CRUD handler's route patterns
-    if let Some(crud_handler) = &state.crud_handler {
-        if let Some(pattern) = crud_handler.api_generator.match_operation(method.as_str(), path) {
-            return crud_handler.api_generator.extract_path_params(pattern, path);
-        }
-    }
-    HashMap::new()
-}
 
 /// Create a JSON response
 fn create_json_response(status: StatusCode, body: String) -> Response<Full<Bytes>> {

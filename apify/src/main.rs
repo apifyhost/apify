@@ -37,7 +37,11 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     };
 
     // Start worker threads (multiple threads per listener, sharing port via SO_REUSEPORT)
-    let num_threads = 2; // Can be made configurable
+    // Allow override via APIFY_THREADS env var (useful for tests)
+    let num_threads: usize = std::env::var("APIFY_THREADS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(2); // default 2
     println!("Starting {} worker threads", num_threads);
 
     let mut handles = Vec::new();

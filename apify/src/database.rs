@@ -34,8 +34,15 @@ pub struct DatabaseConfig {
 
 impl DatabaseConfig {
     pub fn sqlite_default() -> Self {
-        // SQLite connection - use file-based database
-        // SqliteConnectOptions accepts standard sqlite: protocol URLs
+        // Allow overriding DB url via APIFY_DB_URL (useful in tests)
+        if let Ok(mut url) = std::env::var("APIFY_DB_URL") {
+            if !url.starts_with("sqlite:") {
+                url = format!("sqlite:{}", url);
+            }
+            eprintln!("Using SQLite database file: {}", url);
+            return Self { url, max_size: 10 };
+        }
+        // Default: file-based sqlite under current directory
         let db_path = std::env::current_dir()
             .map(|d| d.join("apify.sqlite").to_string_lossy().to_string())
             .unwrap_or_else(|_| "./apify.sqlite".to_string());
