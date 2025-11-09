@@ -52,13 +52,18 @@ impl Module for ResponseHeaders {
         &[Phase::Response]
     }
 
-    fn run(&self, phase: Phase, _ctx: &mut RequestContext, _state: &Arc<AppState>) -> ModuleOutcome {
+    fn run(
+        &self,
+        phase: Phase,
+        _ctx: &mut RequestContext,
+        _state: &Arc<AppState>,
+    ) -> ModuleOutcome {
         debug_assert_eq!(phase, Phase::Response);
 
         // Note: In a real implementation, you would modify the response headers
         // directly in the handler after this phase. For now, this is a placeholder
         // showing where response header modification would occur.
-        
+
         // Future enhancement: Store headers in context for handler to apply
         // For example: ctx.response_headers = Some(self.config.headers.clone());
 

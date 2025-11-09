@@ -8,12 +8,12 @@ use crate::phases::{Phase, RequestContext};
 use std::error::Error;
 use std::sync::Arc;
 
+pub mod body_validator;
 pub mod key_auth;
 pub mod postgres;
-pub mod sqlite;
-pub mod body_validator;
-pub mod response_headers;
 pub mod request_logger;
+pub mod response_headers;
+pub mod sqlite;
 
 /// Result of executing a module hook
 pub enum ModuleOutcome {

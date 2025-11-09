@@ -197,7 +197,11 @@ listeners:
         .body(r#"{"name": "test"}"#)
         .send()
         .await?;
-    assert_eq!(resp.status(), 200, "Valid JSON with Content-Type should work");
+    assert_eq!(
+        resp.status(),
+        200,
+        "Valid JSON with Content-Type should work"
+    );
 
     // Test with missing Content-Type (should still work in current implementation)
     let resp = client
@@ -433,7 +437,7 @@ listeners:
         .await?;
     assert_eq!(create_resp.status(), 200);
     let created: serde_json::Value = create_resp.json().await?;
-    
+
     // Verify create response
     assert_eq!(created["affected_rows"], 1, "Should insert one row");
 
@@ -445,7 +449,7 @@ listeners:
         .await?;
     assert_eq!(list_resp.status(), 200);
     let products: serde_json::Value = list_resp.json().await?;
-    
+
     // Get the first product (should be the one we just created)
     let product_list = products.as_array().expect("Expected array of products");
     assert!(!product_list.is_empty(), "Should have at least one product");

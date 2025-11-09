@@ -3,7 +3,7 @@
 
 use crate::app_state::AppState;
 use crate::hyper::StatusCode;
-use crate::modules::{error_response, Module, ModuleOutcome};
+use crate::modules::{Module, ModuleOutcome, error_response};
 use crate::phases::{Phase, RequestContext};
 use std::sync::Arc;
 

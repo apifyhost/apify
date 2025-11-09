@@ -150,10 +150,10 @@ pub async fn handle_request(
         if let Some(ref val) = ctx.result_json {
             let json_response = serde_json::to_string(val)
                 .map_err(|e| format!("Failed to serialize response: {}", e))?;
-            
+
             // Phase: Log (after response is ready)
             let _ = state.modules.run_phase(Phase::Log, &mut ctx, &state);
-            
+
             return Ok(create_json_response(StatusCode::OK, json_response));
         }
 
