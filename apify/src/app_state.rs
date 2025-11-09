@@ -1,7 +1,7 @@
 //! Application state management and route matching logic
 
 use super::api_generator::APIGenerator;
-use super::config::{DatabaseConfig, MatchRule, OpenAPIConfig, RouteConfig};
+use super::config::{DatabaseConfig, MatchRule, OpenAPIConfig, RouteConfig, ModulesConfig};
 use super::crud_handler::CRUDHandler;
 use super::database::DatabaseManager;
 use super::hyper::Method;
@@ -10,11 +10,14 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Shared application state (route configurations and CRUD handlers)
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AppState {
     routes: Vec<RouteConfig>,
     route_responses: HashMap<String, String>, // route name -> response string
     pub crud_handler: Option<Arc<CRUDHandler>>,
+    pub modules: crate::modules::ModuleRegistry,
+    pub route_modules: HashMap<String, crate::modules::ModuleRegistry>, // path_pattern -> modules
+    pub operation_modules: HashMap<String, crate::modules::ModuleRegistry>, // "METHOD path_pattern" -> modules
 }
 
 impl AppState {
@@ -29,6 +32,9 @@ impl AppState {
             routes,
             route_responses,
             crud_handler: None,
+            modules: Default::default(),
+            route_modules: HashMap::new(),
+            operation_modules: HashMap::new(),
         }
     }
 
@@ -36,7 +42,8 @@ impl AppState {
     pub async fn new_with_crud(
         routes: Option<Vec<RouteConfig>>,
         _database_config: Option<DatabaseConfig>,
-        openapi_configs: Vec<OpenAPIConfig>,
+        openapi_configs: Vec<(OpenAPIConfig, Option<ModulesConfig>)>,
+        listener_modules: Option<ModulesConfig>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let routes = routes.unwrap_or_default();
         let mut route_responses = HashMap::new();
@@ -53,7 +60,7 @@ impl AppState {
                 
                 // Extract table schemas from all OpenAPI specs
                 let mut all_schemas = Vec::new();
-                for openapi_config in &openapi_configs {
+                for (openapi_config, _) in &openapi_configs {
                     let schemas = SchemaGenerator::extract_schemas_from_openapi(&openapi_config.openapi.spec)?;
                     all_schemas.extend(schemas);
                 }
@@ -70,7 +77,7 @@ impl AppState {
                 let mut merged_spec = serde_json::Map::new();
                 let mut merged_paths = serde_json::Map::new();
                 
-                for openapi_config in &openapi_configs {
+                for (openapi_config, _) in &openapi_configs {
                     if let Some(spec_obj) = openapi_config.openapi.spec.as_object() {
                         for (key, value) in spec_obj {
                             if key == "paths" {
@@ -92,18 +99,107 @@ impl AppState {
                 merged_spec.insert("paths".to_string(), serde_json::Value::Object(merged_paths));
                 
                 let merged_value = serde_json::Value::Object(merged_spec);
-                let api_generator = APIGenerator::new(merged_value)?;
+                let api_generator = APIGenerator::new(merged_value.clone())?;
                 Some(Arc::new(CRUDHandler::new(db_manager, api_generator)))
             } else { None }
         };
+
+        // Build listener-level fallback module registry
+        let mut modules_registry = crate::modules::ModuleRegistry::new();
+        if let Some(cfg) = listener_modules {
+            modules_registry = apply_modules_cfg(modules_registry, cfg);
+        }
+
+        // Build per-route module registries from per-API modules
+        let mut route_modules: HashMap<String, crate::modules::ModuleRegistry> = HashMap::new();
+        for (openapi_config, per_api_modules) in &openapi_configs {
+            if let Some(cfg) = per_api_modules.clone() {
+                let mut reg = crate::modules::ModuleRegistry::new();
+                reg = apply_modules_cfg(reg, cfg);
+                if let Some(paths_obj) = openapi_config.openapi.spec.get("paths").and_then(|v| v.as_object()) {
+                    for (path_key, _value) in paths_obj.iter() {
+                        // Assign same registry for all paths in this API
+                        route_modules.insert(path_key.clone(), reg.clone());
+                    }
+                }
+            }
+        }
+
+        // Build per-operation module registries from OpenAPI x-modules on operations
+        let mut operation_modules: HashMap<String, crate::modules::ModuleRegistry> = HashMap::new();
+        if let Some(ch) = &crud_handler {
+            let spec = ch.api_generator.get_spec();
+            if let Some(paths_obj) = spec.get("paths").and_then(|v| v.as_object()) {
+                for (path_key, path_item) in paths_obj.iter() {
+                    if let Some(po) = path_item.as_object() {
+                        for method in ["get","post","put","patch","delete","head","options","trace"].iter() {
+                            if let Some(op) = po.get(*method) {
+                                if let Some(xmods) = op.get("x-modules") {
+                                    if let Some(cfg) = modules_from_value(xmods) {
+                                        let reg = apply_modules_cfg(crate::modules::ModuleRegistry::new(), cfg);
+                                        let key = format!("{} {}", method.to_uppercase(), path_key);
+                                        operation_modules.insert(key, reg);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         Ok(Self {
             routes,
             route_responses,
             crud_handler,
+            modules: modules_registry,
+            route_modules,
+            operation_modules,
         })
     }
 
+}
+
+/// Helper to apply ModulesConfig into a ModuleRegistry
+fn apply_modules_cfg(mut reg: crate::modules::ModuleRegistry, cfg: ModulesConfig) -> crate::modules::ModuleRegistry {
+    use std::sync::Arc;
+    // Access modules
+    if let Some(list) = cfg.access {
+        for name in list {
+            match name.as_str() {
+                "auth_header" => {
+                    reg = reg.with(Arc::new(crate::modules::AuthHeaderModule::new()));
+                }
+                _ => eprintln!("Unknown access module: {}", name),
+            }
+        }
+    }
+    // Rewrite modules placeholder
+    if let Some(list) = cfg.rewrite {
+        for name in list {
+            eprintln!("Unknown rewrite module (not implemented yet): {}", name);
+        }
+    }
+    reg
+}
+
+/// Parse a serde_json value into ModulesConfig if shape matches { access: [..], rewrite: [..] }
+fn modules_from_value(v: &serde_json::Value) -> Option<ModulesConfig> {
+    let mut cfg = ModulesConfig::default();
+    if let Some(obj) = v.as_object() {
+        if let Some(acc) = obj.get("access").and_then(|a| a.as_array()) {
+            let list: Vec<String> = acc.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect();
+            if !list.is_empty() { cfg.access = Some(list); }
+        }
+        if let Some(rw) = obj.get("rewrite").and_then(|a| a.as_array()) {
+            let list: Vec<String> = rw.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect();
+            if !list.is_empty() { cfg.rewrite = Some(list); }
+        }
+    }
+    if cfg.access.is_some() || cfg.rewrite.is_some() { Some(cfg) } else { None }
+}
+
+impl AppState {
     /// Match route based on request path and method
     pub fn match_route(&self, path: &str, method: &Method) -> Option<&String> {
         for route in &self.routes {

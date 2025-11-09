@@ -52,6 +52,8 @@ openapi:
         get:
           summary: "List all users"
           operationId: "listUsers"
+          x-modules:
+            access: ["auth_header"]
           responses:
             "200":
               description: "List of users"
@@ -64,6 +66,8 @@ openapi:
         post:
           summary: "Create a new user"
           operationId: "createUser"
+          x-modules:
+            access: ["auth_header"]
           requestBody:
             required: true
             content:
@@ -81,6 +85,8 @@ openapi:
         get:
           summary: "Get user by ID"
           operationId: "getUser"
+          x-modules:
+            access: ["auth_header"]
           parameters:
             - name: id
               in: path
@@ -99,6 +105,8 @@ openapi:
         put:
           summary: "Update user"
           operationId: "updateUser"
+          x-modules:
+            access: ["auth_header"]
           parameters:
             - name: id
               in: path
@@ -121,6 +129,8 @@ openapi:
         delete:
           summary: "Delete user"
           operationId: "deleteUser"
+          x-modules:
+            access: ["auth_header"]
           parameters:
             - name: id
               in: path

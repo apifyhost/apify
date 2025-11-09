@@ -1,7 +1,7 @@
 //! Network service related (listener creation, service startup)
 
 use super::app_state::AppState;
-use super::config::ListenerConfig;
+use super::config::{ListenerConfig, ApiRef};
 use super::handler::handle_request;
 use super::hyper::server::conn::http1;
 use super::hyper::service::service_fn;
@@ -49,7 +49,7 @@ pub fn start_listener(
     listener_config: ListenerConfig,
     thread_id: usize,
     database_config: Option<super::config::DatabaseConfig>,
-    openapi_configs: Vec<super::config::OpenAPIConfig>,
+    openapi_configs: Vec<(super::config::OpenAPIConfig, Option<super::config::ModulesConfig>)>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Critical: Create single-threaded runtime using new_current_thread
     let rt = tokio::runtime::Builder::new_current_thread() // <-- Restored critical line
@@ -70,6 +70,7 @@ pub fn start_listener(
             listener_config.routes,
             database_config,
             openapi_configs,
+            listener_config.modules,
         ).await {
             Ok(s) => {
                 println!("Thread {} AppState created successfully", thread_id);

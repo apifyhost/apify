@@ -4,6 +4,8 @@ pub mod config;
 pub mod crud_handler;
 pub mod database;
 pub mod handler;
+pub mod phases;
+pub mod modules;
 pub mod schema_generator;
 pub mod server;
 

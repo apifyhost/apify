@@ -1,6 +1,6 @@
 //! Application entry point, responsible for parsing CLI args, loading config, and starting services
 
-use apify::{config::{Config, DatabaseConfig, OpenAPIConfig}, server::start_listener};
+use apify::{config::{Config, DatabaseConfig, OpenAPIConfig, ApiRef, ModulesConfig}, server::start_listener};
 use clap::Parser;
 use std::thread;
 use std::path::Path;
@@ -45,16 +45,28 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     for (listener_idx, listener_config) in config.listeners.into_iter().enumerate() {
         // Load OpenAPI configurations for this listener
         let mut openapi_configs = Vec::new();
-        if let Some(api_files) = &listener_config.apis {
-            for api_file in api_files {
-                let api_path = config_dir.join(api_file);
-                match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
-                    Ok(openapi_config) => {
-                        println!("OpenAPI config loaded from: {}", api_file);
-                        openapi_configs.push(openapi_config);
+        if let Some(api_refs) = &listener_config.apis {
+            for api_ref in api_refs {
+                match api_ref {
+                    ApiRef::Path(p) => {
+                        let api_path = config_dir.join(p);
+                        match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
+                            Ok(openapi_config) => {
+                                println!("OpenAPI config loaded from: {}", p);
+                                openapi_configs.push((openapi_config, None));
+                            }
+                            Err(e) => eprintln!("Error loading OpenAPI config from {}: {}", p, e),
+                        }
                     }
-                    Err(e) => {
-                        eprintln!("Error loading OpenAPI config from {}: {}", api_file, e);
+                    ApiRef::WithModules { path, modules } => {
+                        let api_path = config_dir.join(path);
+                        match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
+                            Ok(openapi_config) => {
+                                println!("OpenAPI config loaded from: {} (with modules)", path);
+                                openapi_configs.push((openapi_config, modules.clone()));
+                            }
+                            Err(e) => eprintln!("Error loading OpenAPI config from {}: {}", path, e),
+                        }
                     }
                 }
             }

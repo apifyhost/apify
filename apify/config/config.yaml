@@ -3,5 +3,6 @@ listeners:
     ip: 0.0.0.0
     protocol: HTTP
     apis:
-    - ./openapi/users.yaml
-    - ./openapi/books.yaml
+      - path: ./openapi/users.yaml
+      - path: ./openapi/books.yaml
+      - path: ./openapi/components_only.yaml

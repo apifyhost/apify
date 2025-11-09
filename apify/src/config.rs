@@ -49,8 +49,9 @@ pub struct ListenerConfig {
     pub port: u16,
     pub ip: String,
     pub protocol: String,
-    pub apis: Option<Vec<String>>, // API file paths
+    pub apis: Option<Vec<ApiRef>>, // API file paths or objects with modules
     pub routes: Option<Vec<RouteConfig>>, // Legacy routes support
+    pub modules: Option<ModulesConfig>, // Listener-level fallback modules (internal, not OpenAPI)
 }
 
 /// Route configuration (name and matching rules)
@@ -80,6 +81,21 @@ pub struct ValidationConfig {
     pub strict_mode: Option<bool>,
     pub validate_request_body: Option<bool>,
     pub validate_response_body: Option<bool>,
+}
+
+/// Phase modules configuration (kept outside OpenAPI to preserve spec compliance)
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct ModulesConfig {
+    pub access: Option<Vec<String>>,  // e.g., ["auth_header", "jwt"]
+    pub rewrite: Option<Vec<String>>, // e.g., ["prefix_strip:/api"] (future)
+}
+
+/// API reference in listener: path string or object with path + per-API modules
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum ApiRef {
+    Path(String),
+    WithModules { path: String, modules: Option<ModulesConfig> },
 }
 
 impl Config {
