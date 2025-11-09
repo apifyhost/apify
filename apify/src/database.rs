@@ -181,7 +181,7 @@ impl DatabaseManager {
         qb.push(table).push(" (");
         qb.push(cols.join(", ")).push(") VALUES (");
         let mut sep = qb.separated(", ");
-        for (_k, v) in &data { push_bind_sqlite(&mut sep, v); }
+        for v in data.values() { push_bind_sqlite(&mut sep, v); }
         qb.push(")");
         let res = qb.build().execute(&self.pool).await.map_err(DatabaseError::QueryError)?;
         Ok(json!({"message": "Record inserted", "affected_rows": res.rows_affected()}))
@@ -275,9 +275,8 @@ fn row_to_json_sqlite(row: &SqliteRow) -> Value {
         if let Ok(v) = row.try_get::<f64, _>(i) { obj.insert(name, serde_json::Number::from_f64(v).map(Value::Number).unwrap_or(Value::Null)); continue; }
         if let Ok(v) = row.try_get::<bool, _>(i) { obj.insert(name, Value::Bool(v)); continue; }
         if let Ok(s) = row.try_get::<String, _>(i) {
-            if (s.starts_with('{') && s.ends_with('}')) || (s.starts_with('[') && s.ends_with(']')) {
-                if let Ok(j) = serde_json::from_str::<Value>(&s) { obj.insert(name, j); continue; }
-            }
+            if ((s.starts_with('{') && s.ends_with('}')) || (s.starts_with('[') && s.ends_with(']')))
+                && let Ok(j) = serde_json::from_str::<Value>(&s) { obj.insert(name, j); continue; }
             obj.insert(name, Value::String(s));
             continue;
         }

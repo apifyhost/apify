@@ -90,15 +90,14 @@ pub async fn handle_request(
             state.route_modules.get(&pattern.path_pattern).cloned()
         } else { active_registry.clone() };
 
-        if let Some(reg) = op_registry.as_ref().or(route_registry.as_ref()).or_else(|| if state.modules.has_phase(Phase::Access) { Some(&state.modules) } else { None }) {
-            if let Some(outcome) = reg.run_phase(Phase::Access, &mut ctx, &state) {
+        if let Some(reg) = op_registry.as_ref().or(route_registry.as_ref()).or_else(|| if state.modules.has_phase(Phase::Access) { Some(&state.modules) } else { None })
+            && let Some(outcome) = reg.run_phase(Phase::Access, &mut ctx, &state) {
                 match outcome {
                     ModuleOutcome::Continue => {},
                     ModuleOutcome::Respond(resp) => { return Ok(resp); },
                     ModuleOutcome::Error(e) => { eprintln!("Module error: {e}"); return Ok(create_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Module error")); }
                 }
             }
-        }
 
         // Phase: Data (CRUD or fallback)
         match crud_handler
@@ -107,7 +106,7 @@ pub async fn handle_request(
         {
             Ok(result) => {
                 ctx.result_json = Some(result);
-                ()
+                
             }
             Err(CRUDError::NotFoundError(_)) => {
                 return Ok(create_error_response(StatusCode::NOT_FOUND, "Resource not found"));
@@ -132,7 +131,7 @@ pub async fn handle_request(
         }
 
         // Should not reach here
-        return Ok(create_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Empty response"));
+        Ok(create_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Empty response"))
     } else {
         // Fallback to original route matching
         let (status, body) = match state.match_route(&ctx.path, &method) {

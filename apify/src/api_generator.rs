@@ -138,12 +138,7 @@ impl APIGenerator {
 
     /// Match a request path and method to determine the operation
     pub fn match_operation(&self, method: &str, path: &str) -> Option<&RoutePattern> {
-        for pattern in &self.route_patterns {
-            if pattern.regex.is_match(path) && pattern.methods.contains(&method.to_uppercase()) {
-                return Some(pattern);
-            }
-        }
-        None
+        self.route_patterns.iter().find(|&pattern| pattern.regex.is_match(path) && pattern.methods.contains(&method.to_uppercase())).map(|v| v as _)
     }
 
     /// Extract path parameters from a matched route

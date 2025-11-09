@@ -8,6 +8,12 @@ use crate::hyper::StatusCode;
 use std::sync::Arc;
 
 pub struct KeyAuthModule;
+impl Default for KeyAuthModule {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl KeyAuthModule { pub fn new() -> Self { Self } }
 
 impl Module for KeyAuthModule {

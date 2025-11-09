@@ -138,15 +138,13 @@ impl AppState {
                 for (path_key, path_item) in paths_obj.iter() {
                     if let Some(po) = path_item.as_object() {
                         for method in ["get","post","put","patch","delete","head","options","trace"].iter() {
-                            if let Some(op) = po.get(*method) {
-                                if let Some(xmods) = op.get("x-modules") {
-                                    if let Some(cfg) = modules_from_value(xmods) {
+                            if let Some(op) = po.get(*method)
+                                && let Some(xmods) = op.get("x-modules")
+                                    && let Some(cfg) = modules_from_value(xmods) {
                                         let reg = apply_modules_cfg(crate::modules::ModuleRegistry::new(), cfg);
                                         let key = format!("{} {}", method.to_uppercase(), path_key);
                                         operation_modules.insert(key, reg);
                                     }
-                                }
-                            }
                         }
                     }
                 }

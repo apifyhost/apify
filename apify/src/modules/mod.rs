@@ -31,9 +31,9 @@ pub struct ModuleRegistry { modules: Vec<Arc<dyn Module>> }
 impl ModuleRegistry {
     pub fn new() -> Self { Self { modules: Vec::new() } }
     pub fn with(mut self, module: Arc<dyn Module>) -> Self { self.modules.push(module); self }
-    pub fn has_phase(&self, phase: Phase) -> bool { self.modules.iter().any(|m| m.phases().iter().any(|p| *p == phase)) }
+    pub fn has_phase(&self, phase: Phase) -> bool { self.modules.iter().any(|m| m.phases().contains(&phase)) }
     pub fn run_phase(&self, phase: Phase, ctx: &mut RequestContext, state: &Arc<AppState>) -> Option<ModuleOutcome> {
-        for m in &self.modules { if m.phases().iter().any(|p| *p == phase) { match m.run(phase, ctx, state) { ModuleOutcome::Continue => {}, other => return Some(other) } } }
+        for m in &self.modules { if m.phases().contains(&phase) { match m.run(phase, ctx, state) { ModuleOutcome::Continue => {}, other => return Some(other) } } }
         None
     }
 }

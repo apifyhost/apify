@@ -60,13 +60,11 @@ impl SchemaGenerator {
         }
 
         // Fallback: derive from components.schemas if no explicit schemas found
-        if schemas.is_empty() {
-            if let Some(derived) = Self::derive_from_components(spec) {
-                if !derived.is_empty() {
+        if schemas.is_empty()
+            && let Some(derived) = Self::derive_from_components(spec)
+                && !derived.is_empty() {
                     return Ok(derived);
                 }
-            }
-        }
 
         Ok(schemas)
     }
