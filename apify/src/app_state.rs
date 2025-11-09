@@ -22,6 +22,10 @@ pub struct AppState {
     pub operation_modules: HashMap<String, crate::modules::ModuleRegistry>, // "METHOD path_pattern" -> modules
     consumers: HashMap<String, ConsumerConfig>,                             // name -> config
     key_to_consumer: HashMap<String, String>, // api_key -> consumer name
+    // database gating flags (like key_auth): operation > route > listener
+    pub allow_database_listener: bool,
+    pub route_allow_database: HashMap<String, bool>, // path_pattern -> allow database
+    pub operation_allow_database: HashMap<String, bool>, // "METHOD path_pattern" -> allow database
 }
 
 impl AppState {
@@ -41,6 +45,9 @@ impl AppState {
             operation_modules: HashMap::new(),
             consumers: HashMap::new(),
             key_to_consumer: HashMap::new(),
+            allow_database_listener: false,
+            route_allow_database: HashMap::new(),
+            operation_allow_database: HashMap::new(),
         }
     }
 
@@ -125,14 +132,12 @@ impl AppState {
                     if let Some(spec_obj) = openapi_config.openapi.spec.as_object() {
                         for (key, value) in spec_obj {
                             if key == "paths" {
-                                // Deep merge paths from all specs
                                 if let Some(paths_obj) = value.as_object() {
                                     for (path_key, path_value) in paths_obj {
                                         merged_paths.insert(path_key.clone(), path_value.clone());
                                     }
                                 }
                             } else {
-                                // For other keys, just use the last value
                                 merged_spec.insert(key.clone(), value.clone());
                             }
                         }
@@ -150,14 +155,19 @@ impl AppState {
             }
         };
 
-        // Build listener-level fallback module registry
+        // Build listener-level fallback module registry and database flag
         let mut modules_registry = crate::modules::ModuleRegistry::new();
+        let mut allow_database_listener = false;
         if let Some(cfg) = listener_modules {
+            if cfg.access.as_ref().is_some_and(|v| v.iter().any(|m| m == "database")) {
+                allow_database_listener = true;
+            }
             modules_registry = apply_modules_cfg(modules_registry, cfg);
         }
 
-        // Build per-route module registries from per-API modules
+        // Build per-route module registries from per-API modules, and db flags
         let mut route_modules: HashMap<String, crate::modules::ModuleRegistry> = HashMap::new();
+        let mut route_allow_database: HashMap<String, bool> = HashMap::new();
         for (openapi_config, per_api_modules) in &openapi_configs {
             if let Some(cfg) = per_api_modules.clone() {
                 let mut reg = crate::modules::ModuleRegistry::new();
@@ -171,6 +181,13 @@ impl AppState {
                     for (path_key, _value) in paths_obj.iter() {
                         // Assign same registry for all paths in this API
                         route_modules.insert(path_key.clone(), reg.clone());
+                        // database allowed if per-api modules include it
+                        let allow_db = per_api_modules
+                            .as_ref()
+                            .and_then(|c| c.access.as_ref())
+                            .map(|v| v.iter().any(|m| m == "database"))
+                            .unwrap_or(false);
+                        route_allow_database.insert(path_key.clone(), allow_db);
                     }
                 }
             }
@@ -178,6 +195,7 @@ impl AppState {
 
         // Build per-operation module registries from OpenAPI x-modules on operations
         let mut operation_modules: HashMap<String, crate::modules::ModuleRegistry> = HashMap::new();
+        let mut operation_allow_database: HashMap<String, bool> = HashMap::new();
         if let Some(ch) = &crud_handler {
             let spec = ch.api_generator.get_spec();
             if let Some(paths_obj) = spec.get("paths").and_then(|v| v.as_object()) {
@@ -192,10 +210,17 @@ impl AppState {
                                 && let Some(xmods) = op.get("x-modules")
                                 && let Some(cfg) = modules_from_value(xmods)
                             {
+                                // compute allow_db before moving cfg
+                                let allow_db = cfg
+                                    .access
+                                    .as_ref()
+                                    .map(|v| v.iter().any(|m| m == "database"))
+                                    .unwrap_or(false);
                                 let reg =
                                     apply_modules_cfg(crate::modules::ModuleRegistry::new(), cfg);
                                 let key = format!("{} {}", method.to_uppercase(), path_key);
-                                operation_modules.insert(key, reg);
+                                operation_modules.insert(key.clone(), reg);
+                                operation_allow_database.insert(key, allow_db);
                             }
                         }
                     }
@@ -222,6 +247,9 @@ impl AppState {
             operation_modules,
             consumers: consumers_map,
             key_to_consumer: key_map,
+            allow_database_listener,
+            route_allow_database,
+            operation_allow_database,
         })
     }
 }
@@ -238,6 +266,10 @@ fn apply_modules_cfg(
             match name.as_str() {
                 "key_auth" => {
                     reg = reg.with(Arc::new(crate::modules::key_auth::KeyAuthModule::new()));
+                }
+                // database is a gating flag only (no runtime module implementation required)
+                "database" => {
+                    // no-op: presence handled elsewhere for gating
                 }
                 _ => eprintln!("Unknown access module: {}", name),
             }
@@ -322,5 +354,19 @@ impl AppState {
         self.key_to_consumer
             .get(key)
             .and_then(|name| self.consumers.get(name))
+    }
+
+    /// Resolve whether database is allowed for this request by precedence: operation > route > listener
+    pub fn is_database_allowed(&self, method: &str, path_pattern: Option<&str>) -> bool {
+        if let Some(p) = path_pattern {
+            let op_key = format!("{} {}", method.to_uppercase(), p);
+            if let Some(v) = self.operation_allow_database.get(&op_key) {
+                return *v;
+            }
+            if let Some(v) = self.route_allow_database.get(p) {
+                return *v;
+            }
+        }
+        self.allow_database_listener
     }
 }

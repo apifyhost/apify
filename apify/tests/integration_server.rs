@@ -59,7 +59,7 @@ async fn key_auth_required_for_users() -> Result<(), Box<dyn std::error::Error>>
         get:
           operationId: listUsers
           x-modules:
-            access: ["key_auth"]
+            access: ["key_auth", "database"]
           responses:
             "200": { description: "ok" }
 "#;

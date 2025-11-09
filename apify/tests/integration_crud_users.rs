@@ -55,24 +55,24 @@ async fn users_crud_flow() -> Result<(), Box<dyn std::error::Error>> {
       /users:
         get:
           operationId: listUsers
-          x-modules: { access: ["key_auth"] }
+          x-modules: { access: ["key_auth", "database"] }
           responses: { "200": { description: "ok" } }
         post:
           operationId: createUser
-          x-modules: { access: ["key_auth"] }
+          x-modules: { access: ["key_auth", "database"] }
           responses: { "200": { description: "ok" } }
       /users/{id}:
         get:
           operationId: getUser
-          x-modules: { access: ["key_auth"] }
+          x-modules: { access: ["key_auth", "database"] }
           responses: { "200": { description: "ok" } }
         put:
           operationId: updateUser
-          x-modules: { access: ["key_auth"] }
+          x-modules: { access: ["key_auth", "database"] }
           responses: { "200": { description: "ok" } }
         delete:
           operationId: deleteUser
-          x-modules: { access: ["key_auth"] }
+          x-modules: { access: ["key_auth", "database"] }
           responses: { "200": { description: "ok" } }
 "#;
     fs::write(dir.join("users.yaml"), users_spec)?;

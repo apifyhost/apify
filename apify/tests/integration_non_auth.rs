@@ -57,7 +57,7 @@ async fn books_is_open_users_is_protected() -> Result<(), Box<dyn std::error::Er
         get:
           operationId: listUsers
           x-modules:
-            access: ["key_auth"]
+            access: ["key_auth", "database"]
           responses: { "200": { description: "ok" } }
 "#;
     fs::write(cfg_dir.join("users.yaml"), users_spec)?;
@@ -77,6 +77,8 @@ async fn books_is_open_users_is_protected() -> Result<(), Box<dyn std::error::Er
       /books:
         get:
           operationId: listBooks
+          x-modules:
+            access: ["database"]
           responses: { "200": { description: "ok" } }
 "#;
     fs::write(cfg_dir.join("books.yaml"), books_spec)?;
