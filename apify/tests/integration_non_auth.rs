@@ -12,8 +12,8 @@ async fn wait_for_ready(host: &str, port: u16, timeout: Duration) -> Result<(), 
     let client = reqwest::Client::builder().no_proxy().build()?;
     let start = std::time::Instant::now();
     while start.elapsed() < timeout {
-        if let Ok(resp) = client.get(format!("http://{}:{}/healthz", host, port)).send().await {
-            if resp.status().as_u16() == 200 { return Ok(()); }
+        if let Ok(resp) = client.get(format!("http://{}:{}/healthz", host, port)).send().await
+            && if resp.status().as_u16() == 200 { return Ok(()); }
         }
         tokio::time::sleep(Duration::from_millis(120)).await;
     }
