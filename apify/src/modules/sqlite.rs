@@ -7,7 +7,7 @@ use sqlx::{QueryBuilder, Sqlite};
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use crate::database::{DatabaseError, DatabaseRuntimeConfig};
+use crate::database::{DatabaseBackend, DatabaseError, DatabaseRuntimeConfig};
 use crate::schema_generator::{SchemaGenerator, TableSchema};
 
 #[derive(Debug, Clone)]
@@ -31,7 +31,7 @@ impl SqliteBackend {
         Ok(Self { pool })
     }
 
-    pub async fn initialize_schema(
+    async fn do_initialize_schema(
         &self,
         table_schemas: Vec<TableSchema>,
     ) -> Result<(), DatabaseError> {
@@ -51,7 +51,7 @@ impl SqliteBackend {
         Ok(())
     }
 
-    pub async fn select(
+    async fn do_select(
         &self,
         table: &str,
         columns: Option<Vec<String>>,
@@ -87,7 +87,7 @@ impl SqliteBackend {
         Ok(rows.into_iter().map(|r| row_to_json_sqlite(&r)).collect())
     }
 
-    pub async fn insert(
+    async fn do_insert(
         &self,
         table: &str,
         data: HashMap<String, Value>,
@@ -114,7 +114,7 @@ impl SqliteBackend {
         Ok(json!({"message": "Record inserted", "affected_rows": res.rows_affected()}))
     }
 
-    pub async fn update(
+    async fn do_update(
         &self,
         table: &str,
         data: HashMap<String, Value>,
@@ -203,7 +203,7 @@ impl SqliteBackend {
         Ok(json!({"message": "Record updated", "affected_rows": res.rows_affected()}))
     }
 
-    pub async fn delete(
+    async fn do_delete(
         &self,
         table: &str,
         where_clause: HashMap<String, Value>,
@@ -252,6 +252,44 @@ impl SqliteBackend {
             .await
             .map_err(DatabaseError::QueryError)?;
         Ok(res.rows_affected())
+    }
+}
+
+impl DatabaseBackend for SqliteBackend {
+    fn initialize_schema<'a>(&'a self, table_schemas: Vec<TableSchema>) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<(), DatabaseError>> + Send + 'a>> {
+        Box::pin(async move { self.do_initialize_schema(table_schemas).await })
+    }
+    fn select<'a>(
+        &'a self,
+        table: &'a str,
+        columns: Option<Vec<String>>,
+        where_clause: Option<HashMap<String, Value>>,
+        limit: Option<u32>,
+        offset: Option<u32>,
+    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<Vec<Value>, DatabaseError>> + Send + 'a>> {
+        Box::pin(async move { self.do_select(table, columns, where_clause, limit, offset).await })
+    }
+    fn insert<'a>(
+        &'a self,
+        table: &'a str,
+        data: HashMap<String, Value>,
+    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<Value, DatabaseError>> + Send + 'a>> {
+        Box::pin(async move { self.do_insert(table, data).await })
+    }
+    fn update<'a>(
+        &'a self,
+        table: &'a str,
+        data: HashMap<String, Value>,
+        where_clause: HashMap<String, Value>,
+    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<Value, DatabaseError>> + Send + 'a>> {
+        Box::pin(async move { self.do_update(table, data, where_clause).await })
+    }
+    fn delete<'a>(
+        &'a self,
+        table: &'a str,
+        where_clause: HashMap<String, Value>,
+    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<u64, DatabaseError>> + Send + 'a>> {
+        Box::pin(async move { self.do_delete(table, where_clause).await })
     }
 }
 

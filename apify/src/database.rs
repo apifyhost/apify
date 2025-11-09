@@ -3,6 +3,7 @@
 use crate::schema_generator::TableSchema;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub enum DatabaseError {
@@ -49,18 +50,61 @@ impl DatabaseRuntimeConfig {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum DatabaseManager {
-    Sqlite(crate::modules::sqlite::SqliteBackend),
-    Postgres(crate::modules::postgres::PostgresBackend),
+pub trait DatabaseBackend: Send + Sync {
+    fn initialize_schema<'a>(&'a self, table_schemas: Vec<TableSchema>) -> 
+        core::pin::Pin<Box<dyn core::future::Future<Output = Result<(), DatabaseError>> + Send + 'a>>;
+    fn select<'a>(
+        &'a self,
+        table: &'a str,
+        columns: Option<Vec<String>>,
+        where_clause: Option<HashMap<String, Value>>,
+        limit: Option<u32>,
+        offset: Option<u32>,
+    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<Vec<Value>, DatabaseError>> + Send + 'a>>;
+    fn insert<'a>(
+        &'a self,
+        table: &'a str,
+        data: HashMap<String, Value>,
+    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<Value, DatabaseError>> + Send + 'a>>;
+    fn update<'a>(
+        &'a self,
+        table: &'a str,
+        data: HashMap<String, Value>,
+        where_clause: HashMap<String, Value>,
+    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<Value, DatabaseError>> + Send + 'a>>;
+    fn delete<'a>(
+        &'a self,
+        table: &'a str,
+        where_clause: HashMap<String, Value>,
+    ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<u64, DatabaseError>> + Send + 'a>>;
+}
+
+#[derive(Clone)]
+pub struct DatabaseManager {
+    backend: Arc<dyn DatabaseBackend>,
+}
+
+impl std::fmt::Debug for DatabaseManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DatabaseManager")
+            .field("backend", &"dyn DatabaseBackend")
+            .finish()
+    }
 }
 
 impl DatabaseManager {
     pub async fn new(config: DatabaseRuntimeConfig) -> Result<Self, DatabaseError> {
-        match config.driver.as_str() {
-            "postgres" => Ok(Self::Postgres(crate::modules::postgres::PostgresBackend::connect(config).await?)),
-            _ => Ok(Self::Sqlite(crate::modules::sqlite::SqliteBackend::connect(config).await?)),
-        }
+        let backend: Arc<dyn DatabaseBackend> = match config.driver.as_str() {
+            "postgres" => {
+                let b = crate::modules::postgres::PostgresBackend::connect(config).await?;
+                Arc::new(b)
+            }
+            _ => {
+                let b = crate::modules::sqlite::SqliteBackend::connect(config).await?;
+                Arc::new(b)
+            }
+        };
+        Ok(Self { backend })
     }
 
     /// Initialize database schema with dynamic table schemas (idempotent, per-table + per-index checks)
@@ -68,10 +112,7 @@ impl DatabaseManager {
         &self,
         table_schemas: Vec<TableSchema>,
     ) -> Result<(), DatabaseError> {
-        match self {
-            DatabaseManager::Sqlite(b) => b.initialize_schema(table_schemas).await,
-            DatabaseManager::Postgres(b) => b.initialize_schema(table_schemas).await,
-        }
+        self.backend.initialize_schema(table_schemas).await
     }
 
     pub async fn select(
@@ -82,10 +123,9 @@ impl DatabaseManager {
         limit: Option<u32>,
         offset: Option<u32>,
     ) -> Result<Vec<Value>, DatabaseError> {
-        match self {
-            DatabaseManager::Sqlite(b) => b.select(table, columns, where_clause, limit, offset).await,
-            DatabaseManager::Postgres(b) => b.select(table, columns, where_clause, limit, offset).await,
-        }
+        self.backend
+            .select(table, columns, where_clause, limit, offset)
+            .await
     }
 
     pub async fn insert(
@@ -98,10 +138,7 @@ impl DatabaseManager {
                 "No data provided for insert".to_string(),
             ));
         }
-        match self {
-            DatabaseManager::Sqlite(b) => b.insert(table, data).await,
-            DatabaseManager::Postgres(b) => b.insert(table, data).await,
-        }
+        self.backend.insert(table, data).await
     }
 
     pub async fn update(
@@ -120,10 +157,7 @@ impl DatabaseManager {
                 "WHERE clause is required for update".to_string(),
             ));
         }
-        match self {
-            DatabaseManager::Sqlite(b) => b.update(table, data, where_clause).await,
-            DatabaseManager::Postgres(b) => b.update(table, data, where_clause).await,
-        }
+        self.backend.update(table, data, where_clause).await
     }
 
     pub async fn delete(
@@ -131,9 +165,6 @@ impl DatabaseManager {
         table: &str,
         where_clause: HashMap<String, Value>,
     ) -> Result<u64, DatabaseError> {
-        match self {
-            DatabaseManager::Sqlite(b) => b.delete(table, where_clause).await,
-            DatabaseManager::Postgres(b) => b.delete(table, where_clause).await,
-        }
+        self.backend.delete(table, where_clause).await
     }
 }
