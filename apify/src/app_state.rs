@@ -1,7 +1,7 @@
 //! Application state management and route matching logic
 
 use super::api_generator::APIGenerator;
-use super::config::{DatabaseConfig, MatchRule, OpenAPIConfig, RouteConfig, ModulesConfig};
+use super::config::{DatabaseConfig, MatchRule, OpenAPIConfig, RouteConfig, ModulesConfig, ConsumerConfig};
 use super::crud_handler::CRUDHandler;
 use super::database::DatabaseManager;
 use super::hyper::Method;
@@ -18,6 +18,8 @@ pub struct AppState {
     pub modules: crate::modules::ModuleRegistry,
     pub route_modules: HashMap<String, crate::modules::ModuleRegistry>, // path_pattern -> modules
     pub operation_modules: HashMap<String, crate::modules::ModuleRegistry>, // "METHOD path_pattern" -> modules
+    consumers: HashMap<String, ConsumerConfig>, // name -> config
+    key_to_consumer: HashMap<String, String>,   // api_key -> consumer name
 }
 
 impl AppState {
@@ -35,6 +37,8 @@ impl AppState {
             modules: Default::default(),
             route_modules: HashMap::new(),
             operation_modules: HashMap::new(),
+            consumers: HashMap::new(),
+            key_to_consumer: HashMap::new(),
         }
     }
 
@@ -44,6 +48,7 @@ impl AppState {
         _database_config: Option<DatabaseConfig>,
         openapi_configs: Vec<(OpenAPIConfig, Option<ModulesConfig>)>,
         listener_modules: Option<ModulesConfig>,
+        consumers: Vec<ConsumerConfig>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let routes = routes.unwrap_or_default();
         let mut route_responses = HashMap::new();
@@ -148,6 +153,14 @@ impl AppState {
             }
         }
 
+        // Build consumers maps
+        let mut consumers_map = HashMap::new();
+        let mut key_map = HashMap::new();
+        for c in consumers {
+            for k in &c.keys { key_map.insert(k.clone(), c.name.clone()); }
+            consumers_map.insert(c.name.clone(), c);
+        }
+
         Ok(Self {
             routes,
             route_responses,
@@ -155,6 +168,8 @@ impl AppState {
             modules: modules_registry,
             route_modules,
             operation_modules,
+            consumers: consumers_map,
+            key_to_consumer: key_map,
         })
     }
 
@@ -167,9 +182,7 @@ fn apply_modules_cfg(mut reg: crate::modules::ModuleRegistry, cfg: ModulesConfig
     if let Some(list) = cfg.access {
         for name in list {
             match name.as_str() {
-                "auth_header" => {
-                    reg = reg.with(Arc::new(crate::modules::AuthHeaderModule::new()));
-                }
+                "key_auth" => { reg = reg.with(Arc::new(crate::modules::key_auth::KeyAuthModule::new())); }
                 _ => eprintln!("Unknown access module: {}", name),
             }
         }
@@ -233,5 +246,9 @@ impl AppState {
             .is_none_or(|rule_method| method.as_str() == rule_method);
 
         path_matches && method_matches
+    }
+
+    pub fn lookup_consumer_by_key(&self, key: &str) -> Option<&ConsumerConfig> {
+        self.key_to_consumer.get(key).and_then(|name| self.consumers.get(name))
     }
 }

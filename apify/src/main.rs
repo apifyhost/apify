@@ -1,6 +1,6 @@
 //! Application entry point, responsible for parsing CLI args, loading config, and starting services
 
-use apify::{config::{Config, DatabaseConfig, OpenAPIConfig, ApiRef, ModulesConfig}, server::start_listener};
+use apify::{config::{Config, DatabaseConfig, OpenAPIConfig, ApiRef}, server::start_listener};
 use clap::Parser;
 use std::thread;
 use std::path::Path;

@@ -52,6 +52,7 @@ pub struct ListenerConfig {
     pub apis: Option<Vec<ApiRef>>, // API file paths or objects with modules
     pub routes: Option<Vec<RouteConfig>>, // Legacy routes support
     pub modules: Option<ModulesConfig>, // Listener-level fallback modules (internal, not OpenAPI)
+    pub consumers: Option<Vec<ConsumerConfig>>, // Authentication consumers
 }
 
 /// Route configuration (name and matching rules)
@@ -96,6 +97,13 @@ pub struct ModulesConfig {
 pub enum ApiRef {
     Path(String),
     WithModules { path: String, modules: Option<ModulesConfig> },
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ConsumerConfig {
+    pub name: String,
+    pub keys: Vec<String>, // API keys bound to this consumer
+    // Future: rate limits, roles, metadata, etc.
 }
 
 impl Config {

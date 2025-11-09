@@ -71,6 +71,7 @@ pub fn start_listener(
             database_config,
             openapi_configs,
             listener_config.modules,
+            listener_config.consumers.unwrap_or_default(),
         ).await {
             Ok(s) => {
                 println!("Thread {} AppState created successfully", thread_id);

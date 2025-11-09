@@ -6,3 +6,7 @@ listeners:
       - path: ./openapi/users.yaml
       - path: ./openapi/books.yaml
       - path: ./openapi/components_only.yaml
+    consumers:
+      - name: default
+        keys:
+          - dev-key-123
