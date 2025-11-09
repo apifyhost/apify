@@ -66,19 +66,29 @@ async fn key_auth_required_for_users() -> Result<(), Box<dyn std::error::Error>>
     let users_path = config_dir.join("users.yaml");
     fs::write(&users_path, users_spec)?;
 
-    // Main config with consumer key
+    // Main config with consumer key and datasource
+    let db_file = config_dir.join("server.sqlite");
     let main_cfg = format!(
-        r#"listeners:
+        r#"datasource:
+  test_db:
+    driver: sqlite
+    database: {}
+    max_pool_size: 5
+
+consumers:
+  - name: test
+    keys:
+      - t-key-001
+
+listeners:
   - port: {port}
     ip: 127.0.0.1
     protocol: HTTP
     apis:
       - path: ./users.yaml
-    consumers:
-      - name: test
-        keys:
-          - t-key-001
-"#
+        datasource: test_db
+"#,
+        db_file.display()
     );
     let main_cfg_path = config_dir.join("config.yaml");
     fs::write(&main_cfg_path, main_cfg)?;

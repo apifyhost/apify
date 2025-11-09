@@ -100,7 +100,7 @@ impl CRUDHandler {
             .db_manager
             .select(
                 table,
-                None, // Select all columns
+                None,
                 if where_clause.is_empty() {
                     None
                 } else {
@@ -136,13 +136,7 @@ impl CRUDHandler {
 
         let results = self
             .db_manager
-            .select(
-                table,
-                None, // Select all columns
-                Some(where_clause),
-                Some(1), // Limit to 1 record
-                None,
-            )
+            .select(table, None, Some(where_clause), Some(1), None)
             .await?;
 
         results.into_iter().next().ok_or_else(|| {

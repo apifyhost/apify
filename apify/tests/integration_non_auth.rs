@@ -82,17 +82,27 @@ async fn books_is_open_users_is_protected() -> Result<(), Box<dyn std::error::Er
     fs::write(cfg_dir.join("books.yaml"), books_spec)?;
 
     let main_cfg = format!(
-        r#"listeners:
+        r#"datasource:
+  test_db:
+    driver: sqlite
+    database: {}
+    max_pool_size: 5
+
+consumers:
+  - name: test
+    keys: [ t-key-001 ]
+
+listeners:
   - port: {port}
     ip: 127.0.0.1
     protocol: HTTP
     apis:
       - path: ./users.yaml
+        datasource: test_db
       - path: ./books.yaml
-    consumers:
-      - name: test
-        keys: [ t-key-001 ]
-"#
+        datasource: test_db
+"#,
+        db_file.display()
     );
     let main_cfg_path = cfg_dir.join("config.yaml");
     fs::write(&main_cfg_path, main_cfg)?;

@@ -9,6 +9,8 @@ use std::error::Error;
 use std::sync::Arc;
 
 pub mod key_auth;
+pub mod postgres;
+pub mod sqlite;
 
 /// Result of executing a module hook
 pub enum ModuleOutcome {

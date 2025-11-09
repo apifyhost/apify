@@ -4,9 +4,31 @@ listeners:
     protocol: HTTP
     apis:
       - path: ./openapi/users.yaml
+        datasource: sqlite1  # Use sqlite1 datasource for users
       - path: ./openapi/books.yaml
+        datasource: sqlite1  # Use sqlite1 datasource for books
       - path: ./openapi/components_only.yaml
-    consumers:
-      - name: default
-        keys:
-          - dev-key-123
+        datasource: pg1  # Use postgress datasource
+      - path: ./openapi/orders.yaml
+        datasource: pg1  # Use postgress datasource for orders
+
+consumers:
+  - name: default
+    keys:
+      - dev-key-123
+
+datasource:
+  pg1:
+    driver: postgres
+    host: localhost
+    port: 5432
+    user: postgres
+    password: postgres
+    database: apify_db
+    ssl_mode: prefer
+    max_pool_size: 10
+  sqlite1:
+    driver: sqlite
+    database: ./apify.sqlite
+    max_pool_size: 5
+

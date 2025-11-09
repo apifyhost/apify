@@ -154,7 +154,7 @@ pub async fn handle_request(
             }
         }
 
-        // Phase: Data (CRUD or fallback)
+        // Phase: Data (CRUD execution)
         match crud_handler
             .handle_request(
                 method.as_str(),

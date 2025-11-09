@@ -78,13 +78,23 @@ async fn users_crud_flow() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(dir.join("users.yaml"), users_spec)?;
 
     let cfg = format!(
-        r#"listeners:
+        r#"datasource:
+  test_db:
+    driver: sqlite
+    database: {}
+    max_pool_size: 5
+consumers:
+  - name: test
+    keys: [ t-key-001 ]
+listeners:
   - port: {port}
     ip: 127.0.0.1
     protocol: HTTP
-    apis: [ {{ path: ./users.yaml }} ]
-    consumers: [ {{ name: test, keys: [ t-key-001 ] }} ]
-"#
+    apis:
+      - path: ./users.yaml
+        datasource: test_db
+"#,
+        db_file.display()
     );
     let cfg_path = dir.join("config.yaml");
     fs::write(&cfg_path, cfg)?;

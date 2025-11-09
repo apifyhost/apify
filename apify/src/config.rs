@@ -9,22 +9,24 @@ use std::net::SocketAddr;
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub listeners: Vec<ListenerConfig>,
+    pub consumers: Option<Vec<ConsumerConfig>>, // Global consumers
+    pub datasource: Option<std::collections::HashMap<String, DatabaseSettings>>, // Global datasources
 }
 
-/// Database configuration structure
+/// Database configuration structure - supports multiple named datasources
 #[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseConfig {
-    pub database: DatabaseSettings,
+    pub datasource: std::collections::HashMap<String, DatabaseSettings>,
 }
 
-/// Database settings
+/// Database settings for a single datasource
 #[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseSettings {
-    pub driver: Option<String>,
-    pub host: String,
-    pub port: u16,
-    pub user: String,
-    pub password: String,
+    pub driver: String,
+    pub host: Option<String>,
+    pub port: Option<u16>,
+    pub user: Option<String>,
+    pub password: Option<String>,
     pub database: String,
     pub ssl_mode: Option<String>,
     pub max_pool_size: Option<usize>,
@@ -90,14 +92,15 @@ pub struct ModulesConfig {
     pub rewrite: Option<Vec<String>>, // e.g., ["prefix_strip:/api"] (future)
 }
 
-/// API reference in listener: path string or object with path + per-API modules
+/// API reference in listener: path string or object with path + per-API modules + datasource
 #[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum ApiRef {
     Path(String),
-    WithModules {
+    WithConfig {
         path: String,
         modules: Option<ModulesConfig>,
+        datasource: Option<String>, // Specify which datasource to use for this API
     },
 }
 

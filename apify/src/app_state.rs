@@ -2,7 +2,7 @@
 
 use super::api_generator::APIGenerator;
 use super::config::{
-    ConsumerConfig, DatabaseConfig, MatchRule, ModulesConfig, OpenAPIConfig, RouteConfig,
+    ConsumerConfig, DatabaseSettings, MatchRule, ModulesConfig, OpenAPIConfig, RouteConfig,
 };
 use super::crud_handler::CRUDHandler;
 use super::database::DatabaseManager;
@@ -47,8 +47,8 @@ impl AppState {
     /// Create new application state with CRUD support
     pub async fn new_with_crud(
         routes: Option<Vec<RouteConfig>>,
-        _database_config: Option<DatabaseConfig>,
-        openapi_configs: Vec<(OpenAPIConfig, Option<ModulesConfig>)>,
+        datasources: Option<HashMap<String, DatabaseSettings>>,
+        openapi_configs: Vec<(OpenAPIConfig, Option<ModulesConfig>, Option<String>)>,
         listener_modules: Option<ModulesConfig>,
         consumers: Vec<ConsumerConfig>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
@@ -59,25 +59,66 @@ impl AppState {
             route_responses.insert(route.name.clone(), format!("hello {}", route.name));
         }
 
-        // For now, always use SQLite backend regardless of provided database config
-        let crud_handler = {
+        // Build CRUD handler if OpenAPI configs exist and datasources are configured
+        let crud_handler = if let Some(ds_map) = datasources.as_ref() {
             if !openapi_configs.is_empty() {
-                let db_cfg = crate::database::DatabaseConfig::sqlite_default();
+                // Determine which datasource to use (from first API config or first available)
+                let datasource_name = openapi_configs
+                    .first()
+                    .and_then(|(_, _, ds_name)| ds_name.clone())
+                    .or_else(|| ds_map.keys().next().cloned())
+                    .ok_or("No datasource specified and none available")?;
+
+                let ds = ds_map.get(&datasource_name).ok_or_else(|| {
+                    format!("Datasource '{}' not found in config", datasource_name)
+                })?;
+
+                // Build database URL
+                let url = match ds.driver.as_str() {
+                    "postgres" => {
+                        format!(
+                            "postgres://{}:{}@{}:{}/{}",
+                            ds.user.as_deref().unwrap_or("postgres"),
+                            ds.password.as_deref().unwrap_or(""),
+                            ds.host.as_deref().unwrap_or("localhost"),
+                            ds.port.unwrap_or(5432),
+                            ds.database
+                        )
+                    }
+                    "sqlite" => {
+                        let path = &ds.database;
+                        if path == ":memory:" {
+                            "sqlite::memory:".to_string()
+                        } else {
+                            format!("sqlite:{}", path)
+                        }
+                    }
+                    _ => return Err(format!("Unsupported database driver: {}", ds.driver).into()),
+                };
+
+                let max_size = ds.max_pool_size.unwrap_or(10) as u32;
+                let db_cfg = crate::database::DatabaseRuntimeConfig {
+                    driver: ds.driver.clone(),
+                    url,
+                    max_size,
+                };
+
                 let db_manager = DatabaseManager::new(db_cfg).await?;
 
                 // Extract table schemas from all OpenAPI specs
                 let mut all_schemas = Vec::new();
-                for (openapi_config, _) in &openapi_configs {
+                for (openapi_config, _, _) in &openapi_configs {
                     let schemas = SchemaGenerator::extract_schemas_from_openapi(
                         &openapi_config.openapi.spec,
                     )?;
                     all_schemas.extend(schemas);
                 }
 
-                // Initialize database schema with extracted table definitions
+                // Always initialize schema if schemas are defined (removed opt-in gating)
                 if !all_schemas.is_empty() {
                     eprintln!(
-                        "Initializing database with {} table schemas",
+                        "Initializing database '{}' with {} table schemas",
+                        datasource_name,
                         all_schemas.len()
                     );
                     db_manager.initialize_schema(all_schemas).await?;
@@ -89,18 +130,16 @@ impl AppState {
                 let mut merged_spec = serde_json::Map::new();
                 let mut merged_paths = serde_json::Map::new();
 
-                for (openapi_config, _) in &openapi_configs {
+                for (openapi_config, _, _) in &openapi_configs {
                     if let Some(spec_obj) = openapi_config.openapi.spec.as_object() {
                         for (key, value) in spec_obj {
                             if key == "paths" {
-                                // Deep merge paths from all specs
                                 if let Some(paths_obj) = value.as_object() {
                                     for (path_key, path_value) in paths_obj {
                                         merged_paths.insert(path_key.clone(), path_value.clone());
                                     }
                                 }
                             } else {
-                                // For other keys, just use the last value
                                 merged_spec.insert(key.clone(), value.clone());
                             }
                         }
@@ -116,6 +155,8 @@ impl AppState {
             } else {
                 None
             }
+        } else {
+            None
         };
 
         // Build listener-level fallback module registry
@@ -126,7 +167,7 @@ impl AppState {
 
         // Build per-route module registries from per-API modules
         let mut route_modules: HashMap<String, crate::modules::ModuleRegistry> = HashMap::new();
-        for (openapi_config, per_api_modules) in &openapi_configs {
+        for (openapi_config, per_api_modules, _) in &openapi_configs {
             if let Some(cfg) = per_api_modules.clone() {
                 let mut reg = crate::modules::ModuleRegistry::new();
                 reg = apply_modules_cfg(reg, cfg);
