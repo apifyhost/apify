@@ -27,12 +27,12 @@
 ### 🔧 **模块化阶段处理**
 请求处理分为 7 个独立阶段：
 1. **HeaderParse** - 提取和验证 HTTP 头
-2. **BodyParse** - 解析和验证请求体
-3. **Rewrite** - URL 重写和转换
-4. **Route** - 匹配请求到 API 操作
-5. **Access** - 认证和授权
-6. **Data** - 执行 CRUD 操作
-7. **Response** - 格式化和返回响应
+2. **BodyParse** - 解析和验证请求体（支持验证模块）
+3. **Route** - 匹配请求到 API 操作
+4. **Access** - 认证和授权
+5. **Data** - 执行 CRUD 操作
+6. **Response** - 格式化和返回响应（支持响应头注入）
+7. **Log** - 请求和响应日志记录
 
 每个阶段都可以配置自定义模块，支持多级灵活配置。
 
@@ -754,6 +754,95 @@ apify/
 ---
 
 ## 📖 高级用法
+
+### 可用模块
+
+Apify 包含多个内置模块用于不同阶段：
+
+#### Access 阶段模块
+
+**`key_auth`** - API Key 认证
+```yaml
+# config.yaml
+consumers:
+  - name: mobile_app
+    keys: ["key-123", "key-456"]
+
+# 在 OpenAPI 规范中
+x-modules:
+  access: ["key_auth"]
+```
+
+示例请求：
+```bash
+curl -H "X-Api-Key: key-123" http://localhost:3000/users
+```
+
+#### BodyParse 阶段模块
+
+**`body_validator`** - 请求体验证
+验证请求体大小和 Content-Type 头。
+
+```rust
+// 使用示例（代码中）
+use apify::modules::body_validator::{BodyValidator, BodyValidatorConfig};
+
+let validator = BodyValidator::new(BodyValidatorConfig {
+    max_body_size: 1024 * 1024, // 1MB 限制
+    enforce_content_type: true,
+});
+```
+
+功能：
+- 强制执行最大请求体大小
+- JSON 的 Content-Type 头验证
+- 返回 413 Payload Too Large 或 415 Unsupported Media Type
+
+#### Response 阶段模块
+
+**`response_headers`** - 自定义响应头
+为所有响应添加自定义头。
+
+```rust
+// 使用示例（代码中）
+use apify::modules::response_headers::ResponseHeaders;
+
+let module = ResponseHeaders::with_headers(vec![
+    ("X-API-Version".to_string(), "v1".to_string()),
+    ("X-Powered-By".to_string(), "Apify".to_string()),
+]);
+```
+
+#### Log 阶段模块
+
+**`request_logger`** - 请求/响应日志
+记录请求和响应的详细信息。
+
+```rust
+// 使用示例（代码中）
+use apify::modules::request_logger::{RequestLogger, RequestLoggerConfig};
+
+// 默认配置
+let logger = RequestLogger::with_defaults();
+
+// 详细日志（包含请求体）
+let logger = RequestLogger::verbose();
+
+// 自定义配置
+let logger = RequestLogger::new(RequestLoggerConfig {
+    log_headers: true,
+    log_body: false,      // 出于安全考虑不记录请求体
+    log_response: true,
+});
+```
+
+输出示例：
+```
+[1699564800123] GET /users/123 - matched_route: Some("/users/{id}")
+  Query params: {"include": "profile"}
+  Path params: {"id": "123"}
+  Response: {"id":123,"name":"张三"}
+```
 
 ### 自定义认证模块
 

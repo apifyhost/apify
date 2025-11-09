@@ -25,14 +25,14 @@ Define your data models in OpenAPI specs with `x-table-schemas`, and Apify autom
 - Extensible module system for custom auth methods
 
 #### 🔧 **Modular Phase-Based Processing**
-Request processing organized into 7 distinct phases:
+Request processing organized into 6 distinct phases:
 1. **HeaderParse** - Extract and validate HTTP headers
-2. **BodyParse** - Parse and validate request body
-3. **Rewrite** - URL rewriting and transformation
-4. **Route** - Match request to API operation
-5. **Access** - Authentication and authorization
-6. **Data** - Execute CRUD operations
-7. **Response** - Format and return response
+2. **BodyParse** - Parse and validate request body (with validation modules)
+3. **Route** - Match request to API operation
+4. **Access** - Authentication and authorization
+5. **Data** - Execute CRUD operations
+6. **Response** - Format and return response (with header injection)
+7. **Log** - Request and response logging
 
 Each phase can have custom modules with flexible configuration at multiple levels.
 
@@ -758,6 +758,95 @@ apify/
 ---
 
 ### 📖 Advanced Usage
+
+#### Available Modules
+
+Apify includes several built-in modules for different phases:
+
+##### Access Phase Modules
+
+**`key_auth`** - API Key Authentication
+```yaml
+# config.yaml
+consumers:
+  - name: mobile_app
+    keys: ["key-123", "key-456"]
+
+# In OpenAPI spec
+x-modules:
+  access: ["key_auth"]
+```
+
+Example request:
+```bash
+curl -H "X-Api-Key: key-123" http://localhost:3000/users
+```
+
+##### BodyParse Phase Modules
+
+**`body_validator`** - Request Body Validation
+Validates request body size and content-type headers.
+
+```rust
+// Usage example (in code)
+use apify::modules::body_validator::{BodyValidator, BodyValidatorConfig};
+
+let validator = BodyValidator::new(BodyValidatorConfig {
+    max_body_size: 1024 * 1024, // 1MB limit
+    enforce_content_type: true,
+});
+```
+
+Features:
+- Maximum body size enforcement
+- Content-Type header validation for JSON
+- Returns 413 Payload Too Large or 415 Unsupported Media Type
+
+##### Response Phase Modules
+
+**`response_headers`** - Custom Response Headers
+Adds custom headers to all responses.
+
+```rust
+// Usage example (in code)
+use apify::modules::response_headers::ResponseHeaders;
+
+let module = ResponseHeaders::with_headers(vec![
+    ("X-API-Version".to_string(), "v1".to_string()),
+    ("X-Powered-By".to_string(), "Apify".to_string()),
+]);
+```
+
+##### Log Phase Modules
+
+**`request_logger`** - Request/Response Logging
+Logs detailed information about requests and responses.
+
+```rust
+// Usage example (in code)
+use apify::modules::request_logger::{RequestLogger, RequestLoggerConfig};
+
+// Default configuration
+let logger = RequestLogger::with_defaults();
+
+// Verbose logging (includes body)
+let logger = RequestLogger::verbose();
+
+// Custom configuration
+let logger = RequestLogger::new(RequestLoggerConfig {
+    log_headers: true,
+    log_body: false,      // Don't log body for security
+    log_response: true,
+});
+```
+
+Output example:
+```
+[1699564800123] GET /users/123 - matched_route: Some("/users/{id}")
+  Query params: {"include": "profile"}
+  Path params: {"id": "123"}
+  Response: {"id":123,"name":"John Doe"}
+```
 
 #### Custom Authentication Module
 

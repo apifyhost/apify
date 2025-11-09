@@ -1,0 +1,142 @@
+# Example configuration demonstrating all available modules
+# This config shows how to use different modules in different phases
+
+datasource:
+  demo_db:
+    driver: sqlite
+    database: ./demo.sqlite
+    max_pool_size: 5
+
+consumers:
+  - name: demo_user
+    keys: 
+      - demo-key-001
+      - demo-key-002
+
+listeners:
+  - port: 3000
+    ip: 127.0.0.1
+    protocol: HTTP
+    
+    # Listener-level modules (apply to all APIs unless overridden)
+    # Note: These are currently configured in code, not YAML
+    # Future versions will support YAML configuration
+    
+    apis:
+      # Example API with Access phase module
+      - path: ./users.yaml
+        datasource: demo_db
+        # Route-level modules can be specified here (future enhancement)
+        # modules:
+        #   access: ["key_auth"]
+        #   log: ["request_logger"]
+
+# ==========================================
+# OpenAPI Spec Example (users.yaml)
+# ==========================================
+# openapi:
+#   spec:
+#     openapi: "3.0.0"
+#     info:
+#       title: "Demo Users API"
+#       version: "1.0.0"
+#     
+#     x-table-schemas:
+#       - table_name: "users"
+#         columns:
+#           - name: "id"
+#             column_type: "INTEGER"
+#             nullable: false
+#             primary_key: true
+#             auto_increment: true
+#           - name: "username"
+#             column_type: "TEXT"
+#             nullable: false
+#             unique: true
+#           - name: "email"
+#             column_type: "TEXT"
+#             nullable: false
+#           - name: "created_at"
+#             column_type: "TIMESTAMP"
+#             default_value: "CURRENT_TIMESTAMP"
+#     
+#     paths:
+#       /users:
+#         get:
+#           operationId: listUsers
+#           # Operation-level modules (highest priority)
+#           x-modules:
+#             access: ["key_auth"]  # Require authentication
+#             # log: ["request_logger"]  # Log all requests
+#           responses:
+#             "200":
+#               description: "List of users"
+#         
+#         post:
+#           operationId: createUser
+#           x-modules:
+#             access: ["key_auth"]
+#             # body_parse: ["body_validator"]  # Validate body size/type
+#           requestBody:
+#             required: true
+#             content:
+#               application/json:
+#                 schema:
+#                   type: object
+#                   properties:
+#                     username:
+#                       type: string
+#                     email:
+#                       type: string
+#           responses:
+#             "201":
+#               description: "User created"
+#       
+#       /users/{id}:
+#         get:
+#           operationId: getUser
+#           x-modules:
+#             access: ["key_auth"]
+#           parameters:
+#             - name: id
+#               in: path
+#               required: true
+#               schema:
+#                 type: integer
+#           responses:
+#             "200":
+#               description: "User details"
+#         
+#         put:
+#           operationId: updateUser
+#           x-modules:
+#             access: ["key_auth"]
+#           parameters:
+#             - name: id
+#               in: path
+#               required: true
+#               schema:
+#                 type: integer
+#           requestBody:
+#             required: true
+#             content:
+#               application/json:
+#                 schema:
+#                   type: object
+#           responses:
+#             "200":
+#               description: "User updated"
+#         
+#         delete:
+#           operationId: deleteUser
+#           x-modules:
+#             access: ["key_auth"]
+#           parameters:
+#             - name: id
+#               in: path
+#               required: true
+#               schema:
+#                 type: integer
+#           responses:
+#             "204":
+#               description: "User deleted"
