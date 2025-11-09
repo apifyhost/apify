@@ -1,0 +1,37 @@
+# Docker ignore file to reduce build context size
+target/
+.git/
+.gitignore
+*.md
+!README.md
+.vscode/
+.idea/
+*.iml
+.DS_Store
+
+# Test artifacts
+*.sqlite
+*.db
+tests/fixtures/
+
+# Documentation
+docs/
+
+# CI/CD
+.github/
+!.github/workflows/
+
+# Local config
+config.local.yaml
+*.local.yaml
+.env
+.env.local
+
+# Logs
+*.log
+
+# Backup files
+*.bak
+*.swp
+*.swo
+*~

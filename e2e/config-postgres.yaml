@@ -1,0 +1,24 @@
+# E2E Test Configuration - PostgreSQL
+datasource:
+  e2e_postgres:
+    driver: postgres
+    host: postgres
+    port: 5432
+    user: apify
+    password: apify_test_password
+    database: apify_e2e
+    ssl_mode: disable
+    max_pool_size: 10
+
+consumers:
+  - name: e2e_test_user
+    keys: 
+      - e2e-test-key-001
+
+listeners:
+  - port: 3000
+    ip: 0.0.0.0
+    protocol: HTTP
+    apis:
+      - path: /app/config/e2e-api.yaml
+        datasource: e2e_postgres

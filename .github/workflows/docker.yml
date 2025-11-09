@@ -1,0 +1,302 @@
+name: Docker Build and E2E Tests
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feat/**'
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - develop
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+      
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+      
+      - name: Export image for testing
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: apify:test
+          cache-from: type=gha
+      
+      - name: Save Docker image
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+        run: |
+          docker save apify:test | gzip > apify-image.tar.gz
+      
+      - name: Upload Docker image artifact
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: apify-image.tar.gz
+          retention-days: 1
+
+  test-sqlite:
+    name: E2E Tests (SQLite)
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: e2e-tests/go.sum
+      
+      - name: Install Go dependencies
+        working-directory: e2e-tests
+        run: |
+          go mod download
+          go install github.com/onsi/ginkgo/v2/ginkgo@latest
+      
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+      
+      - name: Load Docker image
+        run: |
+          docker load < apify-image.tar.gz
+          docker tag apify:test apify-sqlite:latest
+      
+      - name: Create data directory
+        run: mkdir -p data
+      
+      - name: Start Apify with SQLite
+        run: |
+          docker run -d \
+            --name apify-sqlite \
+            -p 3000:3000 \
+            -v $(pwd)/e2e/config-sqlite.yaml:/app/config/config.yaml:ro \
+            -v $(pwd)/e2e/e2e-api.yaml:/app/config/e2e-api.yaml:ro \
+            -v $(pwd)/data:/app/data \
+            -e RUST_LOG=info \
+            apify-sqlite:latest
+      
+      - name: Run E2E tests
+        working-directory: e2e-tests
+        env:
+          BASE_URL: http://localhost:3000
+          API_KEY: e2e-test-key-001
+        run: ginkgo -v --progress
+      
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          docker logs apify-sqlite
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop apify-sqlite || true
+          docker rm apify-sqlite || true
+
+  test-postgres:
+    name: E2E Tests (PostgreSQL)
+    needs: build
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: apify
+          POSTGRES_PASSWORD: apify_test_password
+          POSTGRES_DB: apify_e2e
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: e2e-tests/go.sum
+      
+      - name: Install Go dependencies
+        working-directory: e2e-tests
+        run: |
+          go mod download
+          go install github.com/onsi/ginkgo/v2/ginkgo@latest
+      
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+      
+      - name: Load Docker image
+        run: |
+          docker load < apify-image.tar.gz
+          docker tag apify:test apify-postgres:latest
+      
+      - name: Start Apify with PostgreSQL
+        run: |
+          docker run -d \
+            --name apify-postgres \
+            --network host \
+            -v $(pwd)/e2e/config-postgres.yaml:/app/config/config.yaml:ro \
+            -v $(pwd)/e2e/e2e-api.yaml:/app/config/e2e-api.yaml:ro \
+            -e RUST_LOG=info \
+            apify-postgres:latest
+      
+      - name: Run E2E tests
+        working-directory: e2e-tests
+        env:
+          BASE_URL: http://localhost:3000
+          API_KEY: e2e-test-key-001
+        run: ginkgo -v --progress
+      
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          docker logs apify-postgres
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop apify-postgres || true
+          docker rm apify-postgres || true
+
+  scan:
+    name: Security Scan
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+      
+      - name: Load Docker image
+        run: |
+          docker load < apify-image.tar.gz
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: apify:test
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  publish-release:
+    name: Publish Release Image
+    needs: [test-sqlite, test-postgres]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+      - name: Build and push multi-platform release image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

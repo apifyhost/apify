@@ -1,0 +1,17 @@
+# Test binaries
+*.test
+e2e_test
+
+# Reports
+reports/
+
+# Coverage
+coverage.out
+*.coverprofile
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

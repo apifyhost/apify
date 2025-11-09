@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # PostgreSQL for E2E testing
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: apify
+      POSTGRES_PASSWORD: apify_test_password
+      POSTGRES_DB: apify_e2e
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apify"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Apify with SQLite
+  apify-sqlite:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./e2e/config-sqlite.yaml:/app/config/config.yaml:ro
+      - ./e2e/e2e-api.yaml:/app/config/e2e-api.yaml:ro
+      - sqlite_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    environment:
+      - RUST_LOG=info
+
+  # Apify with PostgreSQL
+  apify-postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./e2e/config-postgres.yaml:/app/config/config.yaml:ro
+      - ./e2e/e2e-api.yaml:/app/config/e2e-api.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    environment:
+      - RUST_LOG=info
+
+volumes:
+  postgres_data:
+  sqlite_data:
