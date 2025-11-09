@@ -21,13 +21,9 @@ jobs:
   build:
     name: Build Docker Image
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     
     outputs:
-      image-tag: ${{ steps.meta.outputs.tags }}
-      image-digest: ${{ steps.build.outputs.digest }}
+      image-tags: ${{ steps.meta.outputs.tags }}
     
     steps:
       - name: Checkout code
@@ -36,18 +32,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: apifyhost/apify
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -56,36 +45,23 @@ jobs:
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
       
-      - name: Build and push Docker image
-        id: build
+      - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          push: false
+          load: true
+          tags: apifyhost/apify:test
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64
-      
-      - name: Export image for testing
-        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          load: true
-          tags: apify:test
-          cache-from: type=gha
       
       - name: Save Docker image
-        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
         run: |
-          docker save apify:test | gzip > apify-image.tar.gz
+          docker save apifyhost/apify:test | gzip > apify-image.tar.gz
       
       - name: Upload Docker image artifact
-        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: docker-image
@@ -121,7 +97,7 @@ jobs:
       - name: Load Docker image
         run: |
           docker load < apify-image.tar.gz
-          docker tag apify:test apify-sqlite:latest
+          docker tag apifyhost/apify:test apify-sqlite:latest
       
       - name: Create data directory
         run: mkdir -p data
@@ -199,7 +175,7 @@ jobs:
       - name: Load Docker image
         run: |
           docker load < apify-image.tar.gz
-          docker tag apify:test apify-postgres:latest
+          docker tag apifyhost/apify:test apify-postgres:latest
       
       - name: Start Apify with PostgreSQL
         run: |
@@ -231,7 +207,7 @@ jobs:
 
   scan:
     name: Security Scan
-    needs: build
+    needs: [test-sqlite, test-postgres]
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     
@@ -251,7 +227,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: apify:test
+          image-ref: apifyhost/apify:test
           format: 'sarif'
           output: 'trivy-results.sarif'
       
@@ -261,6 +237,56 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
 
+  publish:
+    name: Push to Docker Hub
+    needs: [test-sqlite, test-postgres]
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: apifyhost/apify
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+      
+      - name: Build and push multi-arch Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
   publish-release:
     name: Publish Release Image
     needs: [test-sqlite, test-postgres]
@@ -268,27 +294,30 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: read
-      packages: write
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       
-      - name: Log in to Container Registry
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
       
       - name: Extract version from tag
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
       
-      - name: Build and push multi-platform release image
+      - name: Build and push multi-arch release image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -296,7 +325,7 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            apifyhost/apify:${{ steps.version.outputs.VERSION }}
+            apifyhost/apify:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
