@@ -62,8 +62,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Create non-root user
-RUN useradd -m -u 1000 apify
+# Create non-root user (use --force to avoid UID conflict)
+RUN useradd -m -u 1000 apify 2>/dev/null || useradd -m apify
 
 # Set working directory
 WORKDIR /app
