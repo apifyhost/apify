@@ -1,9 +1,18 @@
 # Docker ignore file to reduce build context size
+
+# Build artifacts
 target/
+
+# Git
 .git/
 .gitignore
+
+# Documentation
 *.md
 !README.md
+docs/
+
+# IDE
 .vscode/
 .idea/
 *.iml
@@ -13,13 +22,23 @@ target/
 *.sqlite
 *.db
 tests/fixtures/
+e2e/
+e2e-tests/
 
-# Documentation
-docs/
+# Exclude source code of workspace members except apify
+# Keep all Cargo.toml files for workspace resolution
+sdk/src/
+flow/src/
+asd/src/
+runtime/src/
+plugins/*/src/
 
 # CI/CD
 .github/
-!.github/workflows/
+
+# Scripts
+scripts/
+shell/
 
 # Local config
 config.local.yaml
