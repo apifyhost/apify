@@ -35,11 +35,11 @@ var _ = Describe("Apify CRUD Operations", func() {
 			Timeout: 10 * time.Second,
 		}
 
-		// Wait for service to be ready
+		// Verify service is ready (should already be started by the workflow)
 		Eventually(func() error {
 			resp, err := client.Get(baseURL + "/healthz")
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to connect: %w", err)
 			}
 			defer resp.Body.Close()
 
@@ -47,7 +47,7 @@ var _ = Describe("Apify CRUD Operations", func() {
 				return fmt.Errorf("health check failed with status %d", resp.StatusCode)
 			}
 			return nil
-		}, "30s", "1s").Should(Succeed(), "Service should become ready")
+		}, "10s", "500ms").Should(Succeed(), "Service should be ready")
 	})
 
 	Describe("Health Check", func() {
