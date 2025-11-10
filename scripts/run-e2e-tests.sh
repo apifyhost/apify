@@ -59,7 +59,7 @@ cd ..
 print_header "Testing with SQLite"
 print_info "Starting Apify with SQLite..."
 
-docker-compose up -d apify-sqlite
+docker compose up -d apify-sqlite
 sleep 5
 
 # Wait for health check
@@ -71,8 +71,8 @@ for i in {1..30}; do
     fi
     if [ $i -eq 30 ]; then
         print_error "Service failed to start"
-        docker-compose logs apify-sqlite
-        docker-compose down
+        docker compose logs apify-sqlite
+        docker compose down
         exit 1
     fi
     sleep 1
@@ -90,13 +90,13 @@ fi
 cd ..
 
 print_info "Stopping SQLite container..."
-docker-compose stop apify-sqlite
+docker compose stop apify-sqlite
 
 # Test PostgreSQL
 print_header "Testing with PostgreSQL"
 print_info "Starting Apify with PostgreSQL..."
 
-docker-compose up -d postgres apify-postgres
+docker compose up -d postgres apify-postgres
 sleep 5
 
 # Wait for health check
@@ -108,8 +108,8 @@ for i in {1..30}; do
     fi
     if [ $i -eq 30 ]; then
         print_error "Service failed to start"
-        docker-compose logs apify-postgres
-        docker-compose down
+        docker compose logs apify-postgres
+        docker compose down
         exit 1
     fi
     sleep 1
@@ -128,7 +128,7 @@ cd ..
 
 # Cleanup
 print_header "Cleanup"
-docker-compose down
+docker compose down
 
 # Summary
 print_header "Test Summary"

@@ -26,7 +26,7 @@ log_step() {
 # Cleanup function
 cleanup() {
     log_info "Cleaning up..."
-    docker-compose down -v 2>/dev/null || true
+    docker compose down -v 2>/dev/null || true
     docker rm -f apify-sqlite-test apify-postgres-test 2>/dev/null || true
 }
 

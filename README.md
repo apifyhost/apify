@@ -79,7 +79,7 @@ docker run -d \
   ghcr.io/apifyhost/apify:latest
 
 # Or use Docker Compose
-docker-compose up -d
+docker compose up -d
 ```
 
 See [DOCKER.md](./DOCKER.md) for detailed Docker deployment guide.
@@ -995,8 +995,8 @@ cd e2e-tests
 make deps      # Install dependencies
 make test      # Run tests
 
-# Or use docker-compose
-docker-compose up -d
+# Or use docker compose
+docker compose up -d
 cd e2e-tests && go test -v
 ```
 

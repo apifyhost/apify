@@ -8,12 +8,12 @@ This guide explains how to build and deploy Apify using Docker.
 
 Run with SQLite:
 ```bash
-docker-compose up apify-sqlite
+docker compose up apify-sqlite
 ```
 
 Run with PostgreSQL:
 ```bash
-docker-compose up postgres apify-postgres
+docker compose up postgres apify-postgres
 ```
 
 ### Using Docker CLI
@@ -73,11 +73,11 @@ Run the full E2E test suite:
 
 ```bash
 # Test with SQLite
-docker-compose up -d apify-sqlite
+docker compose up -d apify-sqlite
 ./e2e/test.sh
 
 # Test with PostgreSQL
-docker-compose up -d postgres apify-postgres
+docker compose up -d postgres apify-postgres
 BASE_URL=http://localhost:3001 ./e2e/test.sh
 ```
 
@@ -104,7 +104,7 @@ docker pull ghcr.io/apifyhost/apify:v1.0.0
 
 ### Docker Compose Production Setup
 
-Create a `docker-compose.prod.yml`:
+Create a `docker compose.prod.yml`:
 
 ```yaml
 version: '3.8'
@@ -144,7 +144,7 @@ volumes:
 
 Deploy:
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker compose.prod.yml up -d
 ```
 
 ## Troubleshooting

@@ -29,7 +29,7 @@ go install github.com/onsi/ginkgo/v2/ginkgo@latest
 
 ```bash
 # Start the Apify service (in another terminal)
-docker-compose up -d
+docker compose up -d
 
 # Run tests with default settings
 make test
@@ -125,7 +125,7 @@ docker logs apify-sqlite
 For PostgreSQL tests, ensure the database service is healthy:
 
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 ### Test cache

@@ -93,10 +93,10 @@ jobs:
         run: |
           docker load < apify-image.tar.gz
 
-      - name: Start Apify with SQLite using docker-compose
+      - name: Start Apify with SQLite using docker compose
         run: |
-          docker-compose up -d apify-sqlite
-          docker-compose ps
+          docker compose up -d apify-sqlite
+          docker compose ps
 
       - name: Wait for service to be ready
         run: |
@@ -110,7 +110,7 @@ jobs:
             sleep 2
           done
           echo "Service failed to start within timeout"
-          docker-compose logs apify-sqlite
+          docker compose logs apify-sqlite
           exit 1
 
       - name: Run E2E tests
@@ -123,12 +123,12 @@ jobs:
       - name: Show logs on failure
         if: failure()
         run: |
-          docker-compose logs apify-sqlite
+          docker compose logs apify-sqlite
 
       - name: Cleanup
         if: always()
         run: |
-          docker-compose down -v
+          docker compose down -v
 
   test-postgres:
     name: E2E Tests (PostgreSQL)
@@ -160,10 +160,10 @@ jobs:
         run: |
           docker load < apify-image.tar.gz
 
-      - name: Start Apify with PostgreSQL using docker-compose
+      - name: Start Apify with PostgreSQL using docker compose
         run: |
-          docker-compose up -d postgres apify-postgres
-          docker-compose ps
+          docker compose up -d postgres apify-postgres
+          docker compose ps
 
       - name: Wait for service to be ready
         run: |
@@ -177,7 +177,7 @@ jobs:
             sleep 2
           done
           echo "Service failed to start within timeout"
-          docker-compose logs apify-postgres
+          docker compose logs apify-postgres
           exit 1
 
       - name: Run E2E tests
@@ -190,13 +190,13 @@ jobs:
       - name: Show logs on failure
         if: failure()
         run: |
-          docker-compose logs apify-postgres
-          docker-compose logs postgres
+          docker compose logs apify-postgres
+          docker compose logs postgres
       
       - name: Cleanup
         if: always()
         run: |
-          docker-compose down -v
+          docker compose down -v
 
   scan:
     name: Security Scan
