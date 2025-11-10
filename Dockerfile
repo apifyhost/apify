@@ -1,6 +1,6 @@
 # Multi-stage build for minimal image size
 # Stage 1: Build stage
-FROM rust:nightly-slim-bookworm AS builder
+FROM rust:slim-trixie AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
