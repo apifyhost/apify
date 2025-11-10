@@ -112,7 +112,7 @@ jobs:
         env:
           BASE_URL: http://localhost:3000
           API_KEY: e2e-test-key-001
-        run: ginkgo -v --progress
+        run: ginkgo -v
       
       - name: Show logs on failure
         if: failure()
@@ -185,7 +185,7 @@ jobs:
         env:
           BASE_URL: http://localhost:3000
           API_KEY: e2e-test-key-001
-        run: ginkgo -v --progress
+        run: ginkgo -v
       
       - name: Show logs on failure
         if: failure()

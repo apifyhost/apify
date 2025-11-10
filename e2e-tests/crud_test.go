@@ -294,14 +294,15 @@ var _ = Describe("Apify CRUD Operations", func() {
 
 	Describe("Large Payload Handling", func() {
 		It("should handle large description fields", func() {
-			largeDescription := string(make([]byte, 1000))
+			// Create a large description (1000 'x' characters)
+			largeDescription := make([]byte, 1000)
 			for i := range largeDescription {
-				largeDescription = "x" + largeDescription[1:]
+				largeDescription[i] = 'x'
 			}
 
 			payload := map[string]interface{}{
 				"name":        "Large Item",
-				"description": largeDescription,
+				"description": string(largeDescription),
 			}
 
 			jsonData, err := json.Marshal(payload)

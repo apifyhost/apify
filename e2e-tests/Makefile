@@ -15,7 +15,7 @@ test: ## Run tests
 
 test-verbose: ## Run tests with detailed output
 	@echo "Running E2E tests with verbose output..."
-	ginkgo -v --progress
+	ginkgo -v
 
 clean: ## Clean test artifacts
 	@echo "Cleaning test artifacts..."
