@@ -92,26 +92,16 @@ jobs:
       - name: Load Docker image
         run: |
           docker load < apify-image.tar.gz
-          docker tag apifyhost/apify:test apify-sqlite:latest
 
-      - name: Create data directory
-        run: mkdir -p data
-
-      - name: Start Apify with SQLite
+      - name: Start Apify with SQLite using docker-compose
         run: |
-          docker run -d \
-            --name apify-sqlite \
-            -p 3000:3000 \
-            -v $(pwd)/e2e/config-sqlite.yaml:/app/config/config.yaml:ro \
-            -v $(pwd)/e2e/e2e-api.yaml:/app/config/e2e-api.yaml:ro \
-            -v $(pwd)/data:/app/data \
-            -e RUST_LOG=info \
-            apify-sqlite:latest
+          docker-compose up -d apify-sqlite
+          docker-compose ps
 
       - name: Wait for service to be ready
         run: |
           echo "Waiting for Apify to start..."
-          for i in {1..60}; do
+          for i in {1..30}; do
             if curl -sf http://localhost:3000/healthz > /dev/null 2>&1; then
               echo "Service is ready!"
               exit 0
@@ -120,7 +110,7 @@ jobs:
             sleep 2
           done
           echo "Service failed to start within timeout"
-          docker logs apify-sqlite
+          docker-compose logs apify-sqlite
           exit 1
 
       - name: Run E2E tests
@@ -133,33 +123,17 @@ jobs:
       - name: Show logs on failure
         if: failure()
         run: |
-          docker logs apify-sqlite
+          docker-compose logs apify-sqlite
 
       - name: Cleanup
         if: always()
         run: |
-          docker stop apify-sqlite || true
-          docker rm apify-sqlite || true
+          docker-compose down -v
 
   test-postgres:
     name: E2E Tests (PostgreSQL)
     needs: build
     runs-on: ubuntu-latest
-    
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: apify
-          POSTGRES_PASSWORD: apify_test_password
-          POSTGRES_DB: apify_e2e
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
 
     steps:
       - name: Checkout code
@@ -186,48 +160,43 @@ jobs:
         run: |
           docker load < apify-image.tar.gz
 
-      - name: Start Apify with PostgreSQL
+      - name: Start Apify with PostgreSQL using docker-compose
         run: |
-          docker run -d \
-            --name apify-postgres \
-            --network host \
-            -v $(pwd)/e2e/config-postgres.yaml:/app/config/config.yaml:ro \
-            -v $(pwd)/e2e/e2e-api.yaml:/app/config/e2e-api.yaml:ro \
-            -e RUST_LOG=info \
-            apifyhost/apify:test
+          docker-compose up -d postgres apify-postgres
+          docker-compose ps
 
       - name: Wait for service to be ready
         run: |
           echo "Waiting for Apify to start..."
-          for i in {1..10}; do
-            if curl -sf http://localhost:3000/healthz > /dev/null 2>&1; then
+          for i in {1..30}; do
+            if curl -sf http://localhost:3001/healthz > /dev/null 2>&1; then
               echo "Service is ready!"
               exit 0
             fi
             echo "Attempt $i: Service not ready yet..."
-            sleep 1
+            sleep 2
           done
           echo "Service failed to start within timeout"
-          docker logs apify-postgres
+          docker-compose logs apify-postgres
           exit 1
 
       - name: Run E2E tests
         working-directory: e2e-tests
         env:
-          BASE_URL: http://localhost:3000
+          BASE_URL: http://localhost:3001
           API_KEY: e2e-test-key-001
         run: ginkgo -v
       
       - name: Show logs on failure
         if: failure()
         run: |
-          docker logs apify-postgres
+          docker-compose logs apify-postgres
+          docker-compose logs postgres
       
       - name: Cleanup
         if: always()
         run: |
-          docker stop apify-postgres || true
-          docker rm apify-postgres || true
+          docker-compose down -v
 
   scan:
     name: Security Scan

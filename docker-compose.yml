@@ -20,9 +20,7 @@ services:
 
   # Apify with SQLite
   apify-sqlite:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: apifyhost/apify:test
     ports:
       - "3000:3000"
     volumes:
@@ -40,9 +38,7 @@ services:
 
   # Apify with PostgreSQL
   apify-postgres:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: apifyhost/apify:test
     ports:
       - "3001:3000"
     volumes:
