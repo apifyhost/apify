@@ -7,7 +7,7 @@ openapi:
       description: "API for end-to-end testing"
     
     x-table-schemas:
-      - table_name: "test_items"
+      - table_name: "items"
         columns:
           - name: "id"
             column_type: "INTEGER"
@@ -47,6 +47,7 @@ openapi:
         get:
           operationId: listItems
           summary: "List all items"
+          x-table-name: "items"
           x-modules:
             access: ["key_auth"]
           responses:
@@ -56,6 +57,7 @@ openapi:
         post:
           operationId: createItem
           summary: "Create a new item"
+          x-table-name: "items"
           x-modules:
             access: ["key_auth"]
           requestBody:
@@ -80,6 +82,7 @@ openapi:
         get:
           operationId: getItem
           summary: "Get item by ID"
+          x-table-name: "items"
           x-modules:
             access: ["key_auth"]
           parameters:
@@ -97,6 +100,7 @@ openapi:
         put:
           operationId: updateItem
           summary: "Update an item"
+          x-table-name: "items"
           x-modules:
             access: ["key_auth"]
           parameters:
@@ -120,6 +124,7 @@ openapi:
         delete:
           operationId: deleteItem
           summary: "Delete an item"
+          x-table-name: "items"
           x-modules:
             access: ["key_auth"]
           parameters:

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL for E2E testing
   postgres:
@@ -35,6 +33,7 @@ services:
       start_period: 5s
     environment:
       - RUST_LOG=info
+      - APIFY_THREADS=1
 
   # Apify with PostgreSQL
   apify-postgres:
@@ -55,6 +54,7 @@ services:
       start_period: 10s
     environment:
       - RUST_LOG=info
+      - APIFY_THREADS=1
 
 volumes:
   postgres_data:
