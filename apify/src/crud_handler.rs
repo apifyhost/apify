@@ -44,10 +44,10 @@ impl CRUDHandler {
         if let Ok(i) = s.parse::<i64>() {
             return Value::Number(i.into());
         }
-        if let Ok(f) = s.parse::<f64>() {
-            if let Some(n) = serde_json::Number::from_f64(f) {
-                return Value::Number(n);
-            }
+        if let Ok(f) = s.parse::<f64>()
+            && let Some(n) = serde_json::Number::from_f64(f)
+        {
+            return Value::Number(n);
         }
         Value::String(s.to_string())
     }

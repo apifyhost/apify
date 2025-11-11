@@ -299,36 +299,35 @@ impl SchemaGenerator {
         let mut column_defs = Vec::new();
         for col in &schema.columns {
             // Special handling: INTEGER primary key with auto_increment -> SERIAL PRIMARY KEY
-            let mut col_def = if col.primary_key
-                && col.auto_increment
-                && Self::is_integer_type(&col.column_type)
-            {
-                format!("    {} SERIAL PRIMARY KEY", col.name)
-            } else {
-                let mut tmp = format!(
-                    "    {} {}",
-                    col.name,
-                    Self::map_type_to_postgres(&col.column_type)
-                );
+            let col_def =
+                if col.primary_key && col.auto_increment && Self::is_integer_type(&col.column_type)
+                {
+                    format!("    {} SERIAL PRIMARY KEY", col.name)
+                } else {
+                    let mut tmp = format!(
+                        "    {} {}",
+                        col.name,
+                        Self::map_type_to_postgres(&col.column_type)
+                    );
 
-                if col.primary_key {
-                    tmp.push_str(" PRIMARY KEY");
-                }
+                    if col.primary_key {
+                        tmp.push_str(" PRIMARY KEY");
+                    }
 
-                if !col.nullable && !col.primary_key {
-                    tmp.push_str(" NOT NULL");
-                }
+                    if !col.nullable && !col.primary_key {
+                        tmp.push_str(" NOT NULL");
+                    }
 
-                if col.unique && !col.primary_key {
-                    tmp.push_str(" UNIQUE");
-                }
+                    if col.unique && !col.primary_key {
+                        tmp.push_str(" UNIQUE");
+                    }
 
-                if let Some(default) = &col.default_value {
-                    tmp.push_str(&format!(" DEFAULT {}", default));
-                }
+                    if let Some(default) = &col.default_value {
+                        tmp.push_str(&format!(" DEFAULT {}", default));
+                    }
 
-                tmp
-            };
+                    tmp
+                };
 
             column_defs.push(col_def);
         }

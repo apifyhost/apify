@@ -2,8 +2,8 @@
 
 use serde_json::{Value, json};
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
-use sqlx::{Column, Postgres, QueryBuilder, Row};
 use sqlx::types::chrono;
+use sqlx::{Column, Postgres, QueryBuilder, Row};
 use std::collections::HashMap;
 
 use crate::database::{DatabaseBackend, DatabaseError, DatabaseRuntimeConfig};
@@ -104,8 +104,8 @@ impl PostgresBackend {
             .fetch_one(&self.pool)
             .await
             .map_err(DatabaseError::QueryError)?;
-    let inserted = row_to_json_postgres(&row);
-    Ok(json!({"message": "Record inserted", "affected_rows": 1, "record": inserted}))
+        let inserted = row_to_json_postgres(&row);
+        Ok(json!({"message": "Record inserted", "affected_rows": 1, "record": inserted}))
     }
 
     async fn do_update(
