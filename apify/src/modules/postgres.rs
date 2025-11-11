@@ -355,6 +355,16 @@ fn row_to_json_postgres(row: &PgRow) -> Value {
             );
             continue;
         }
+        // Handle REAL (f32) separately in case it's not covered by f64
+        if let Ok(v) = row.try_get::<f32, _>(i) {
+            obj.insert(
+                name,
+                serde_json::Number::from_f64(v as f64)
+                    .map(Value::Number)
+                    .unwrap_or(Value::Null),
+            );
+            continue;
+        }
         if let Ok(v) = row.try_get::<bool, _>(i) {
             obj.insert(name, Value::Bool(v));
             continue;
