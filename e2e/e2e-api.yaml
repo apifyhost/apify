@@ -13,18 +13,32 @@ openapi:
             column_type: "INTEGER"
             nullable: false
             primary_key: true
+            unique: false
             auto_increment: true
           - name: "name"
             column_type: "TEXT"
             nullable: false
+            primary_key: false
+            unique: false
+            auto_increment: false
           - name: "description"
             column_type: "TEXT"
             nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
           - name: "price"
             column_type: "REAL"
             nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
           - name: "created_at"
             column_type: "TIMESTAMP"
+            nullable: false
+            primary_key: false
+            unique: false
+            auto_increment: false
             default_value: "CURRENT_TIMESTAMP"
         indexes: []
     
