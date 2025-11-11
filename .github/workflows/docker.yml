@@ -233,6 +233,7 @@ jobs:
     name: Push to Docker Hub
     needs: [test-sqlite, test-postgres]
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
     permissions:
       contents: read
 
@@ -282,6 +283,7 @@ jobs:
     name: Publish Release Image
     needs: [test-sqlite, test-postgres]
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: read
 
