@@ -2,6 +2,7 @@
 
 use serde_json::{Value, json};
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
+use sqlx::types::chrono;
 use sqlx::{Column, Postgres, QueryBuilder, Row};
 use std::collections::HashMap;
 
@@ -97,13 +98,14 @@ impl PostgresBackend {
         for v in data.values() {
             push_bind_postgres(&mut sep, v);
         }
-        qb.push(")");
-        let res = qb
+        qb.push(") RETURNING *");
+        let row = qb
             .build()
-            .execute(&self.pool)
+            .fetch_one(&self.pool)
             .await
             .map_err(DatabaseError::QueryError)?;
-        Ok(json!({"message": "Record inserted", "affected_rows": res.rows_affected()}))
+        let inserted = row_to_json_postgres(&row);
+        Ok(json!({"message": "Record inserted", "affected_rows": 1, "record": inserted}))
     }
 
     async fn do_update(
@@ -308,6 +310,19 @@ fn row_to_json_postgres(row: &PgRow) -> Value {
             obj.insert(name, v);
             continue;
         }
+        // Temporal types -> string
+        if let Ok(v) = row.try_get::<chrono::NaiveDateTime, _>(i) {
+            obj.insert(name, Value::String(v.to_string()));
+            continue;
+        }
+        if let Ok(v) = row.try_get::<chrono::NaiveDate, _>(i) {
+            obj.insert(name, Value::String(v.to_string()));
+            continue;
+        }
+        if let Ok(v) = row.try_get::<chrono::NaiveTime, _>(i) {
+            obj.insert(name, Value::String(v.to_string()));
+            continue;
+        }
         if let Ok(v) = row.try_get::<String, _>(i) {
             if ((v.starts_with('{') && v.ends_with('}'))
                 || (v.starts_with('[') && v.ends_with(']')))
@@ -323,10 +338,28 @@ fn row_to_json_postgres(row: &PgRow) -> Value {
             obj.insert(name, Value::Number(v.into()));
             continue;
         }
+        if let Ok(v) = row.try_get::<i32, _>(i) {
+            obj.insert(name, Value::Number(v.into()));
+            continue;
+        }
+        if let Ok(v) = row.try_get::<i16, _>(i) {
+            obj.insert(name, Value::Number((v as i64).into()));
+            continue;
+        }
         if let Ok(v) = row.try_get::<f64, _>(i) {
             obj.insert(
                 name,
                 serde_json::Number::from_f64(v)
+                    .map(Value::Number)
+                    .unwrap_or(Value::Null),
+            );
+            continue;
+        }
+        // Handle REAL (f32) separately in case it's not covered by f64
+        if let Ok(v) = row.try_get::<f32, _>(i) {
+            obj.insert(
+                name,
+                serde_json::Number::from_f64(v as f64)
                     .map(Value::Number)
                     .unwrap_or(Value::Null),
             );

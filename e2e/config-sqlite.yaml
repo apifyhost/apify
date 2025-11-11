@@ -1,0 +1,19 @@
+# E2E Test Configuration - SQLite
+datasource:
+  e2e_sqlite:
+    driver: sqlite
+    database: /app/data/e2e_test.sqlite
+    max_pool_size: 5
+
+consumers:
+  - name: e2e_test_user
+    keys: 
+      - e2e-test-key-001
+
+listeners:
+  - port: 3000
+    ip: 0.0.0.0
+    protocol: HTTP
+    apis:
+      - path: /app/config/e2e-api.yaml
+        datasource: e2e_sqlite

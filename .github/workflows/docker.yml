@@ -1,0 +1,323 @@
+name: Docker Build and E2E Tests
+
+on:
+  push:
+    branches:
+      - main
+      - 'release/**'
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - 'release/**'
+
+jobs:
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+
+    outputs:
+      image-tags: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: apifyhost/apify
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: apifyhost/apify:test
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Save Docker image
+        run: |
+          docker save apifyhost/apify:test | gzip > apify-image.tar.gz
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: apify-image.tar.gz
+          retention-days: 1
+
+  test-sqlite:
+    name: E2E Tests (SQLite)
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: e2e-tests/go.sum
+
+      - name: Install Go dependencies
+        working-directory: e2e-tests
+        run: |
+          go mod download
+          go install github.com/onsi/ginkgo/v2/ginkgo@latest
+
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - name: Load Docker image
+        run: |
+          docker load < apify-image.tar.gz
+
+      - name: Start Apify with SQLite using docker compose
+        run: |
+          docker compose up -d apify-sqlite
+          docker compose ps
+
+      - name: Wait for service to be ready
+        run: |
+          echo "Waiting for Apify to start..."
+          for i in {1..30}; do
+            if curl -sf http://localhost:3000/healthz > /dev/null 2>&1; then
+              echo "Service is ready!"
+              exit 0
+            fi
+            echo "Attempt $i: Service not ready yet..."
+            sleep 2
+          done
+          echo "Service failed to start within timeout"
+          docker compose logs apify-sqlite
+          exit 1
+
+      - name: Run E2E tests
+        working-directory: e2e-tests
+        env:
+          BASE_URL: http://localhost:3000
+          API_KEY: e2e-test-key-001
+        run: ginkgo -v
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          docker compose logs apify-sqlite
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down -v
+
+  test-postgres:
+    name: E2E Tests (PostgreSQL)
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: e2e-tests/go.sum
+      
+      - name: Install Go dependencies
+        working-directory: e2e-tests
+        run: |
+          go mod download
+          go install github.com/onsi/ginkgo/v2/ginkgo@latest
+
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - name: Load Docker image
+        run: |
+          docker load < apify-image.tar.gz
+
+      - name: Start Apify with PostgreSQL using docker compose
+        run: |
+          docker compose up -d postgres apify-postgres
+          docker compose ps
+
+      - name: Wait for service to be ready
+        run: |
+          echo "Waiting for Apify to start..."
+          for i in {1..30}; do
+            if curl -sf http://localhost:3001/healthz > /dev/null 2>&1; then
+              echo "Service is ready!"
+              exit 0
+            fi
+            echo "Attempt $i: Service not ready yet..."
+            sleep 2
+          done
+          echo "Service failed to start within timeout"
+          docker compose logs apify-postgres
+          exit 1
+
+      - name: Run E2E tests
+        working-directory: e2e-tests
+        env:
+          BASE_URL: http://localhost:3001
+          API_KEY: e2e-test-key-001
+        run: ginkgo -v
+      
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          docker compose logs apify-postgres
+          docker compose logs postgres
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down -v
+
+  scan:
+    name: Security Scan
+    needs: [test-sqlite, test-postgres]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - name: Load Docker image
+        run: |
+          docker load < apify-image.tar.gz
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: apifyhost/apify:test
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  publish:
+    name: Push to Docker Hub
+    needs: [test-sqlite, test-postgres]
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: apifyhost/apify
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push multi-arch Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  publish-release:
+    name: Publish Release Image
+    needs: [test-sqlite, test-postgres]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build and push multi-arch release image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            apifyhost/apify:${{ steps.version.outputs.VERSION }}
+            apifyhost/apify:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

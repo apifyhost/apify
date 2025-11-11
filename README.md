@@ -60,11 +60,31 @@ Each phase can have custom modules with flexible configuration at multiple level
 
 #### Prerequisites
 
-- **Rust** 1.70 or higher
+- **Rust** 1.70 or higher (for building from source)
+- **Docker** (recommended for quick start)
 - **SQLite** (included) or **PostgreSQL** server
 - Basic knowledge of OpenAPI/Swagger
 
-#### Installation
+#### Quick Start with Docker (Recommended)
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/apifyhost/apify:latest
+
+# Run with SQLite
+docker run -d \
+  -p 3000:3000 \
+  -v $(pwd)/config:/app/config:ro \
+  -v apify-data:/app/data \
+  ghcr.io/apifyhost/apify:latest
+
+# Or use Docker Compose
+docker compose up -d
+```
+
+See [DOCKER.md](./DOCKER.md) for detailed Docker deployment guide.
+
+#### Installation from Source
 
 1. **Clone the repository**
    ```bash
@@ -878,6 +898,7 @@ listeners:
 
 #### Performance Tuning
 
+**From Source:**
 ```bash
 # Increase worker threads
 APIFY_THREADS=8 ./apify -c config.yaml
@@ -887,6 +908,109 @@ datasource:
   main:
     max_pool_size: 50  # More connections
 ```
+
+**With Docker:**
+```bash
+docker run -d \
+  -e APIFY_THREADS=8 \
+  -e RUST_LOG=info \
+  ghcr.io/apifyhost/apify:latest
+```
+
+#### Docker Deployment
+
+**Using Docker Compose (Recommended):**
+
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: apify
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: apify
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  apify:
+    image: ghcr.io/apifyhost/apify:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./config:/app/config:ro
+    environment:
+      - RUST_LOG=info
+      - APIFY_THREADS=4
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+```
+
+**Building Custom Image:**
+
+```bash
+# Build
+docker build -t apify:custom .
+
+# Run
+docker run -d \
+  -p 3000:3000 \
+  -v $(pwd)/config:/app/config:ro \
+  apify:custom
+```
+
+See [DOCKER.md](./DOCKER.md) for comprehensive Docker documentation.
+
+---
+
+### 🧪 Testing
+
+#### Unit and Integration Tests
+
+```bash
+# Run all tests
+cargo test
+
+# Run specific test
+cargo test --test integration_modules
+
+# Run with output
+cargo test -- --nocapture
+```
+
+#### E2E Tests
+
+The E2E test suite is written in Go using the Ginkgo BDD framework for better maintainability and readability.
+
+```bash
+# Quick start with Docker
+./scripts/local-docker-test.sh
+
+# Run tests manually
+cd e2e-tests
+make deps      # Install dependencies
+make test      # Run tests
+
+# Or use docker compose
+docker compose up -d
+cd e2e-tests && go test -v
+```
+
+The E2E test suite validates:
+- ✅ SQLite database operations
+- ✅ PostgreSQL database operations  
+- ✅ CRUD operations (Create, Read, Update, Delete)
+- ✅ Authentication and authorization
+- ✅ API key validation
+- ✅ Error handling
+- ✅ Large payload handling
+- ✅ Content-Type validation
+
+See [e2e-tests/README.md](./e2e-tests/README.md) for detailed testing documentation.
 
 ---
 

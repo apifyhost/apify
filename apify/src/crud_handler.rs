@@ -39,6 +39,18 @@ pub struct CRUDHandler {
 }
 
 impl CRUDHandler {
+    /// Try to coerce a string into a numeric JSON value when appropriate (i64 or f64), else keep as string
+    fn coerce_string_to_json_value(s: &str) -> Value {
+        if let Ok(i) = s.parse::<i64>() {
+            return Value::Number(i.into());
+        }
+        if let Ok(f) = s.parse::<f64>()
+            && let Some(n) = serde_json::Number::from_f64(f)
+        {
+            return Value::Number(n);
+        }
+        Value::String(s.to_string())
+    }
     pub fn new(db_manager: DatabaseManager, api_generator: APIGenerator) -> Self {
         Self {
             db_manager,
@@ -132,7 +144,10 @@ impl CRUDHandler {
         })?;
 
         let mut where_clause = HashMap::new();
-        where_clause.insert(id_param.clone(), Value::String(id_value.clone()));
+        where_clause.insert(
+            id_param.clone(),
+            Self::coerce_string_to_json_value(id_value),
+        );
 
         let results = self
             .db_manager
@@ -211,7 +226,10 @@ impl CRUDHandler {
         })?;
 
         let mut where_clause = HashMap::new();
-        where_clause.insert(id_param.clone(), Value::String(id_value.clone()));
+        where_clause.insert(
+            id_param.clone(),
+            Self::coerce_string_to_json_value(id_value),
+        );
 
         let result = self
             .db_manager
@@ -238,7 +256,10 @@ impl CRUDHandler {
         })?;
 
         let mut where_clause = HashMap::new();
-        where_clause.insert(id_param.clone(), Value::String(id_value.clone()));
+        where_clause.insert(
+            id_param.clone(),
+            Self::coerce_string_to_json_value(id_value),
+        );
 
         let affected_rows = self.db_manager.delete(table, where_clause).await?;
 
