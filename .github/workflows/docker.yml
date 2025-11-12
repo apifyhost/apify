@@ -204,6 +204,9 @@ jobs:
     name: Security Scan
     needs: [test-sqlite, test-postgres]
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
 
     steps:
       - name: Checkout code
@@ -267,7 +270,7 @@ jobs:
     name: Publish Release Image
     needs: [test-sqlite, test-postgres]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: read
 
