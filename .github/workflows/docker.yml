@@ -49,14 +49,14 @@ jobs:
           file: ./Dockerfile
           push: false
           load: true
-          tags: apifyhost/apify:test
+          tags: apifyhost/apify:latest
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Save Docker image
         run: |
-          docker save apifyhost/apify:test | gzip > apify-image.tar.gz
+          docker save apifyhost/apify:latest | gzip > apify-image.tar.gz
 
       - name: Upload Docker image artifact
         uses: actions/upload-artifact@v4
@@ -242,7 +242,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: apifyhost/apify:test
+          image-ref: apifyhost/apify:latest
           format: 'sarif'
           output: 'trivy-results.sarif'
 
@@ -281,7 +281,7 @@ jobs:
 
       - name: Tag and push as dev
         run: |
-          docker tag apifyhost/apify:test apifyhost/apify:dev
+          docker tag apifyhost/apify:latest apifyhost/apify:dev
           docker push apifyhost/apify:dev
 
   publish-release:
@@ -375,6 +375,11 @@ jobs:
           
           # Copy necessary files
           cp docker-compose.yml quickstart-package/
+          sed -i "s|apifyhost/apify:latest|apifyhost/apify:${{ steps.version.outputs.VERSION }}|g" quickstart-package/docker-compose.yml
+          sed -i "s|apifyhost/apify:test|apifyhost/apify:${{ steps.version.outputs.VERSION }}|g" quickstart-package/docker-compose.yml
+          
+          echo "Updated docker-compose.yml with image tag: ${{ steps.version.outputs.VERSION }}"
+          grep "image: apifyhost/apify:" quickstart-package/docker-compose.yml || true
           cp quickstart.sh quickstart-package/
           cp -r config quickstart-package/
           cp -r observability quickstart-package/

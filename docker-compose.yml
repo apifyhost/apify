@@ -16,7 +16,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   apify-sqlite:
-    image: apifyhost/apify:test
+    image: apifyhost/apify:latest
     ports:
       - "3000:3000"
       - "9090:9090"
@@ -43,7 +43,7 @@ services:
       - APIFY_THREADS=1
 
   apify-postgres:
-    image: apifyhost/apify:test
+    image: apifyhost/apify:latest
     ports:
       - "3001:3000"
       - "9091:9090"
