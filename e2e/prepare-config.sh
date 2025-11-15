@@ -1,13 +1,14 @@
 #!/bin/bash
 # Prepare configuration for E2E testing
-# Usage: ./prepare-config.sh [sqlite|postgres]
+# Usage: ./prepare-config.sh [sqlite|postgres] [config_file]
 
 set -e
 
 DB_TYPE=${1:-sqlite}
-CONFIG_FILE="/app/config/config.yaml"
+CONFIG_FILE=${2:-/app/config/config.yaml}
 
 echo "Preparing E2E configuration for: $DB_TYPE"
+echo "Config file: $CONFIG_FILE"
 
 case "$DB_TYPE" in
   sqlite)

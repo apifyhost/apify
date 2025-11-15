@@ -1,5 +1,4 @@
 services:
-  # PostgreSQL for E2E testing
   postgres:
     image: postgres:16-alpine
     environment:
@@ -9,27 +8,29 @@ services:
     ports:
       - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U apify"]
+      test: ["CMD-SHELL", "pg_isready -U apify -d apify_e2e"]
       interval: 5s
       timeout: 5s
       retries: 5
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  # Apify with SQLite
   apify-sqlite:
     image: apifyhost/apify:test
     ports:
       - "3000:3000"
-      - "9090:9090"  # Metrics endpoint
+      - "9090:9090"
     volumes:
-      - ./config:/app/config:rw
+      - ./config:/app/config-template:ro
       - ./e2e/prepare-config.sh:/app/prepare-config.sh:ro
       - sqlite_data:/app/data
     entrypoint: ["/bin/sh", "-c"]
     command: >
-      /app/prepare-config.sh sqlite &&
-      apify -c /app/config/config.yaml
+      mkdir -p /tmp/config/openapi &&
+      cp /app/config-template/config.yaml /tmp/config/ &&
+      cp /app/config-template/openapi/items.yaml /tmp/config/openapi/ &&
+      /app/prepare-config.sh sqlite /tmp/config/config.yaml &&
+      apify -c /tmp/config/config.yaml
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
       interval: 5s
@@ -40,19 +41,21 @@ services:
       - RUST_LOG=info
       - APIFY_THREADS=1
 
-  # Apify with PostgreSQL
   apify-postgres:
     image: apifyhost/apify:test
     ports:
       - "3001:3000"
-      - "9091:9090"  # Metrics endpoint
+      - "9091:9090"
     volumes:
-      - ./config:/app/config:rw
+      - ./config:/app/config-template:ro
       - ./e2e/prepare-config.sh:/app/prepare-config.sh:ro
     entrypoint: ["/bin/sh", "-c"]
     command: >
-      /app/prepare-config.sh postgres &&
-      apify -c /app/config/config.yaml
+      mkdir -p /tmp/config/openapi &&
+      cp /app/config-template/config.yaml /tmp/config/ &&
+      cp /app/config-template/openapi/items.yaml /tmp/config/openapi/ &&
+      /app/prepare-config.sh postgres /tmp/config/config.yaml &&
+      apify -c /tmp/config/config.yaml
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,7 +69,6 @@ services:
       - RUST_LOG=info
       - APIFY_THREADS=1
 
-  # Jaeger for distributed tracing
   jaeger:
     image: jaegertracing/all-in-one:latest
     ports:
@@ -76,7 +78,6 @@ services:
     environment:
       - COLLECTOR_OTLP_ENABLED=true
 
-  # Prometheus for metrics collection
   prometheus:
     image: prom/prometheus:latest
     ports:
@@ -91,7 +92,6 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--web.enable-lifecycle'
 
-  # Grafana for visualization
   grafana:
     image: grafana/grafana:latest
     ports:
