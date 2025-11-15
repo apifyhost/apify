@@ -25,7 +25,7 @@ services:
       - ./e2e/prepare-config.sh:/app/prepare-config.sh:ro
       - sqlite_data:/app/data
     entrypoint: ["/bin/sh", "-c"]
-    command: >
+    command: |
       mkdir -p /tmp/config/openapi &&
       cp /app/config-template/config.yaml /tmp/config/ &&
       cp /app/config-template/openapi/items.yaml /tmp/config/openapi/ &&
@@ -50,7 +50,7 @@ services:
       - ./config:/app/config-template:ro
       - ./e2e/prepare-config.sh:/app/prepare-config.sh:ro
     entrypoint: ["/bin/sh", "-c"]
-    command: >
+    command: |
       mkdir -p /tmp/config/openapi &&
       cp /app/config-template/config.yaml /tmp/config/ &&
       cp /app/config-template/openapi/items.yaml /tmp/config/openapi/ &&
