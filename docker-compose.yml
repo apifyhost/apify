@@ -25,12 +25,13 @@ services:
       - ./e2e/prepare-config.sh:/app/prepare-config.sh:ro
       - sqlite_data:/app/data
     entrypoint: ["/bin/sh", "-c"]
-    command: |
-      mkdir -p /tmp/config/openapi &&
-      cp /app/config-template/config.yaml /tmp/config/ &&
-      cp /app/config-template/openapi/items.yaml /tmp/config/openapi/ &&
-      /app/prepare-config.sh sqlite /tmp/config/config.yaml &&
-      apify -c /tmp/config/config.yaml
+    command:
+      - |
+        mkdir -p /tmp/config/openapi &&
+        cp /app/config-template/config.yaml /tmp/config/ &&
+        cp /app/config-template/openapi/items.yaml /tmp/config/openapi/ &&
+        /app/prepare-config.sh sqlite /tmp/config/config.yaml &&
+        apify -c /tmp/config/config.yaml
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
       interval: 5s
@@ -50,12 +51,13 @@ services:
       - ./config:/app/config-template:ro
       - ./e2e/prepare-config.sh:/app/prepare-config.sh:ro
     entrypoint: ["/bin/sh", "-c"]
-    command: |
-      mkdir -p /tmp/config/openapi &&
-      cp /app/config-template/config.yaml /tmp/config/ &&
-      cp /app/config-template/openapi/items.yaml /tmp/config/openapi/ &&
-      /app/prepare-config.sh postgres /tmp/config/config.yaml &&
-      apify -c /tmp/config/config.yaml
+    command:
+      - |
+        mkdir -p /tmp/config/openapi &&
+        cp /app/config-template/config.yaml /tmp/config/ &&
+        cp /app/config-template/openapi/items.yaml /tmp/config/openapi/ &&
+        /app/prepare-config.sh postgres /tmp/config/config.yaml &&
+        apify -c /tmp/config/config.yaml
     depends_on:
       postgres:
         condition: service_healthy
