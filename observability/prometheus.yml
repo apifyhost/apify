@@ -1,0 +1,28 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'apify-cluster'
+    environment: 'development'
+
+scrape_configs:
+  # Apify SQLite instance
+  - job_name: 'apify-sqlite'
+    static_configs:
+      - targets: ['apify-sqlite:9090']
+        labels:
+          instance: 'apify-sqlite'
+          database: 'sqlite'
+
+  # Apify PostgreSQL instance
+  - job_name: 'apify-postgres'
+    static_configs:
+      - targets: ['apify-postgres:9090']
+        labels:
+          instance: 'apify-postgres'
+          database: 'postgres'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

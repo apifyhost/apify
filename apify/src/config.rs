@@ -11,6 +11,16 @@ pub struct Config {
     pub listeners: Vec<ListenerConfig>,
     pub consumers: Option<Vec<ConsumerConfig>>, // Global consumers
     pub datasource: Option<std::collections::HashMap<String, DatabaseSettings>>, // Global datasources
+    pub observability: Option<ObservabilityConfig>, // Observability settings
+}
+
+/// Observability configuration
+#[derive(Debug, Deserialize, Clone)]
+pub struct ObservabilityConfig {
+    pub log_level: Option<String>,     // trace, debug, info, warn, error
+    pub otlp_endpoint: Option<String>, // OpenTelemetry collector endpoint (e.g., http://localhost:4317)
+    pub metrics_enabled: Option<bool>, // Enable Prometheus metrics endpoint
+    pub metrics_port: Option<u16>,     // Port for metrics endpoint (default: 9090)
 }
 
 /// Database configuration structure - supports multiple named datasources

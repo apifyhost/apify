@@ -2,6 +2,7 @@
 
 use apify::{
     config::{ApiRef, Config, OpenAPIConfig},
+    observability::{init_metrics, init_tracing, shutdown_tracing},
     server::start_listener,
 };
 use clap::Parser;
@@ -20,16 +21,31 @@ struct Cli {
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Parse command-line arguments
     let cli = Cli::parse();
-    println!("Using config file: {}", cli.config);
 
     // Load main configuration from specified file path
     let config = Config::from_file(&cli.config)?;
-    println!("Config loaded successfully");
+
+    // Initialize observability (logging, tracing, metrics)
+    let otlp_endpoint = config
+        .observability
+        .as_ref()
+        .and_then(|o| o.otlp_endpoint.as_deref());
+    let log_level = config
+        .observability
+        .as_ref()
+        .and_then(|o| o.log_level.as_deref());
+
+    init_tracing("apify", otlp_endpoint, log_level)?;
+
+    tracing::info!(
+        config_file = %cli.config,
+        "Configuration loaded successfully"
+    );
 
     // Use datasources from config if available
     let datasources = config.datasource.clone();
     if let Some(ref ds) = datasources {
-        println!("Found {} datasource(s) in config", ds.len());
+        tracing::info!(datasource_count = ds.len(), "Datasources configured");
     }
 
     // Use consumers from config (global or listener-level)
@@ -41,11 +57,37 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(2); // default 2
-    println!("Starting {} worker threads", num_threads);
 
-    let mut handles = Vec::new();
+    tracing::info!(worker_threads = num_threads, "Initializing worker threads");
+    init_metrics(num_threads);
+
+    let mut handles: Vec<thread::JoinHandle<Result<(), Box<dyn std::error::Error + Send + Sync>>>> =
+        Vec::new();
 
     let config_dir = Path::new(&cli.config).parent().unwrap_or(Path::new("."));
+
+    // Start metrics server if enabled
+    let metrics_enabled = config
+        .observability
+        .as_ref()
+        .and_then(|o| o.metrics_enabled)
+        .unwrap_or(true); // Default enabled
+    let metrics_port = config
+        .observability
+        .as_ref()
+        .and_then(|o| o.metrics_port)
+        .unwrap_or(9090);
+
+    if metrics_enabled {
+        let metrics_handle = thread::spawn(
+            move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+                start_metrics_server(metrics_port)?;
+                Ok(())
+            },
+        );
+        handles.push(metrics_handle);
+        tracing::info!(port = metrics_port, "Metrics endpoint started");
+    }
 
     for (listener_idx, listener_config) in config.listeners.into_iter().enumerate() {
         // Merge global consumers with listener-specific consumers
@@ -63,10 +105,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         let api_path = config_dir.join(p);
                         match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
                             Ok(openapi_config) => {
-                                println!("OpenAPI config loaded from: {}", p);
+                                tracing::info!(path = %p, "OpenAPI config loaded");
                                 openapi_configs.push((openapi_config, None, None));
                             }
-                            Err(e) => eprintln!("Error loading OpenAPI config from {}: {}", p, e),
+                            Err(e) => {
+                                tracing::error!(path = %p, error = %e, "Failed to load OpenAPI config")
+                            }
                         }
                     }
                     ApiRef::WithConfig {
@@ -78,19 +122,20 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
                             Ok(openapi_config) => {
                                 let ds_info = if let Some(ds_name) = datasource {
-                                    println!(
-                                        "OpenAPI config loaded from: {} (datasource: {})",
-                                        path, ds_name
+                                    tracing::info!(
+                                        path = %path,
+                                        datasource = %ds_name,
+                                        "OpenAPI config loaded with datasource"
                                     );
                                     Some(ds_name.clone())
                                 } else {
-                                    println!("OpenAPI config loaded from: {}", path);
+                                    tracing::info!(path = %path, "OpenAPI config loaded");
                                     None
                                 };
                                 openapi_configs.push((openapi_config, modules.clone(), ds_info));
                             }
                             Err(e) => {
-                                eprintln!("Error loading OpenAPI config from {}: {}", path, e)
+                                tracing::error!(path = %path, error = %e, "Failed to load OpenAPI config")
                             }
                         }
                     }
@@ -105,9 +150,11 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let consumers_clone = all_consumers.clone();
             let handle = thread::spawn(
                 move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-                    println!(
-                        "Starting thread {} for listener {} (port: {})",
-                        thread_id, listener_idx, listener_config_clone.port
+                    tracing::info!(
+                        thread_id = thread_id,
+                        listener_idx = listener_idx,
+                        port = listener_config_clone.port,
+                        "Starting worker thread"
                     );
                     start_listener(
                         listener_config_clone,
@@ -127,18 +174,72 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     for (idx, handle) in handles.into_iter().enumerate() {
         match handle.join() {
             Ok(Ok(())) => {
-                eprintln!("Thread {} exited normally", idx);
+                tracing::info!(thread_idx = idx, "Thread exited normally");
             }
             Ok(Err(e)) => {
-                eprintln!("Thread {} execution error: {}", idx, e);
+                tracing::error!(thread_idx = idx, error = %e, "Thread execution error");
             }
             Err(e) => {
-                eprintln!("Thread {} panicked: {:?}", idx, e);
+                tracing::error!(thread_idx = idx, error = ?e, "Thread panicked");
             }
         }
     }
 
-    eprintln!("All threads exited, main process terminating");
+    tracing::info!("All threads exited, shutting down");
+    shutdown_tracing();
 
     Ok(())
+}
+
+/// Start metrics HTTP server
+fn start_metrics_server(port: u16) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use apify::{
+        http_body_util::Full,
+        hyper::{
+            Request, Response, StatusCode, body::Bytes, server::conn::http1, service::service_fn,
+        },
+        hyper_util::rt::TokioIo,
+        observability::export_metrics,
+        tokio::{self, net::TcpListener},
+    };
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+
+    rt.block_on(async {
+        let addr: std::net::SocketAddr = format!("0.0.0.0:{}", port).parse()?;
+        let listener = TcpListener::bind(addr).await?;
+        tracing::info!(address = %addr, "Metrics server listening");
+
+        loop {
+            let (stream, _) = listener.accept().await?;
+            let io = TokioIo::new(stream);
+
+            tokio::task::spawn(async move {
+                let service = service_fn(|_req: Request<hyper::body::Incoming>| async {
+                    match export_metrics() {
+                        Ok(body) => Ok::<_, hyper::Error>(
+                            Response::builder()
+                                .status(StatusCode::OK)
+                                .header("Content-Type", "text/plain; version=0.0.4")
+                                .body(Full::new(Bytes::from(body)))
+                                .unwrap(),
+                        ),
+                        Err(e) => {
+                            tracing::error!(error = %e, "Failed to export metrics");
+                            Ok(Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .body(Full::new(Bytes::from("Error exporting metrics")))
+                                .unwrap())
+                        }
+                    }
+                });
+
+                if let Err(err) = http1::Builder::new().serve_connection(io, service).await {
+                    tracing::error!(error = ?err, "Metrics connection error");
+                }
+            });
+        }
+    })
 }
