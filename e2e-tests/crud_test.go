@@ -176,7 +176,9 @@ var _ = Describe("Apify CRUD Operations", func() {
 			Expect(testItem).NotTo(BeNil(), "Should find 'Test Item' in the list")
 
 			// Store the item's ID for later tests
-			itemID = int64(testItem["id"].(float64))
+			id, ok := testItem["id"].(float64)
+			Expect(ok).To(BeTrue(), "Item should have a valid ID")
+			itemID = int64(id)
 			Expect(itemID).To(BeNumerically(">", 0))
 			Expect(testItem["name"]).To(Equal("Test Item"))
 		})

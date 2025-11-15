@@ -157,12 +157,16 @@ var _ = Describe("Observability Features", Ordered, func() {
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
 			
-			// Extract the created item ID for cleanup
+			// Extract the created item ID for cleanup (if successful)
 			var createdItem map[string]interface{}
 			json.NewDecoder(resp.Body).Decode(&createdItem)
 			resp.Body.Close()
 			
-			itemID := int64(createdItem["id"].(float64))
+			// Get item ID if creation was successful
+			var itemID int64
+			if id, ok := createdItem["id"].(float64); ok {
+				itemID = int64(id)
+			}
 
 			// Wait for metrics
 			time.Sleep(100 * time.Millisecond)
@@ -176,7 +180,7 @@ var _ = Describe("Observability Features", Ordered, func() {
 			Expect(err).NotTo(HaveOccurred())
 			metricsText := string(body)
 
-			// Verify DB metrics exist
+			// Verify DB metrics exist (even failed operations should be tracked)
 			Expect(metricsText).To(ContainSubstring("apify_db_queries_total"))
 			Expect(metricsText).To(ContainSubstring("apify_db_query_duration_seconds"))
 
@@ -184,12 +188,14 @@ var _ = Describe("Observability Features", Ordered, func() {
 			Expect(metricsText).To(ContainSubstring(`operation="insert"`))
 			Expect(metricsText).To(ContainSubstring(`table="items"`))
 			
-			// Cleanup: Delete the test item to avoid interfering with CRUD tests
-			deleteReq, _ := http.NewRequest("DELETE", fmt.Sprintf("%s/items/%d", baseURL, itemID), nil)
-			deleteReq.Header.Set("X-API-Key", apiKey)
-			deleteResp, err := client.Do(deleteReq)
-			if err == nil {
-				deleteResp.Body.Close()
+			// Cleanup: Delete the test item if it was created successfully
+			if itemID > 0 {
+				deleteReq, _ := http.NewRequest("DELETE", fmt.Sprintf("%s/items/%d", baseURL, itemID), nil)
+				deleteReq.Header.Set("X-API-Key", apiKey)
+				deleteResp, err := client.Do(deleteReq)
+				if err == nil {
+					deleteResp.Body.Close()
+				}
 			}
 		})
 
