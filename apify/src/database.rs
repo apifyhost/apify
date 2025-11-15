@@ -148,7 +148,7 @@ impl DatabaseManager {
         limit: Option<u32>,
         offset: Option<u32>,
     ) -> Result<Vec<Value>, DatabaseError> {
-        let metrics = DbMetrics::new("SELECT", table);
+        let metrics = DbMetrics::new("select", table);
         let result = self
             .backend
             .select(table, columns, where_clause, limit, offset)
@@ -168,7 +168,7 @@ impl DatabaseManager {
                 "No data provided for insert".to_string(),
             ));
         }
-        let metrics = DbMetrics::new("INSERT", table);
+        let metrics = DbMetrics::new("insert", table);
         let result = self.backend.insert(table, data).await;
         let status = if result.is_ok() { "success" } else { "error" };
         metrics.record(status);
@@ -191,7 +191,7 @@ impl DatabaseManager {
                 "WHERE clause is required for update".to_string(),
             ));
         }
-        let metrics = DbMetrics::new("UPDATE", table);
+        let metrics = DbMetrics::new("update", table);
         let result = self.backend.update(table, data, where_clause).await;
         let status = if result.is_ok() { "success" } else { "error" };
         metrics.record(status);
@@ -203,7 +203,7 @@ impl DatabaseManager {
         table: &str,
         where_clause: HashMap<String, Value>,
     ) -> Result<u64, DatabaseError> {
-        let metrics = DbMetrics::new("DELETE", table);
+        let metrics = DbMetrics::new("delete", table);
         let result = self.backend.delete(table, where_clause).await;
         let status = if result.is_ok() { "success" } else { "error" };
         metrics.record(status);
