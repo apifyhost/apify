@@ -4,7 +4,7 @@
 
 set -e
 
-RELEASE_TAG="${RELEASE_TAG:-quickstart-0.1.0}"
+RELEASE_TAG="${RELEASE_TAG:0.1.0}"
 DOWNLOAD_URL="https://github.com/apifyhost/apify/releases/download/${RELEASE_TAG}/apify-quickstart-${RELEASE_TAG}.tar.gz"
 INSTALL_DIR="apify-quickstart-${RELEASE_TAG}"
 
