@@ -26,12 +26,10 @@ services:
       - ./config:/app/config:rw
       - ./e2e/prepare-config.sh:/app/prepare-config.sh:ro
       - sqlite_data:/app/data
+    entrypoint: ["/bin/sh", "-c"]
     command: >
-      sh -c "
-        cp -r /app/config /tmp/config &&
-        /app/prepare-config.sh sqlite &&
-        apify -c /app/config/config.yaml
-      "
+      /app/prepare-config.sh sqlite &&
+      apify -c /app/config/config.yaml
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
       interval: 5s
@@ -51,12 +49,10 @@ services:
     volumes:
       - ./config:/app/config:rw
       - ./e2e/prepare-config.sh:/app/prepare-config.sh:ro
+    entrypoint: ["/bin/sh", "-c"]
     command: >
-      sh -c "
-        cp -r /app/config /tmp/config &&
-        /app/prepare-config.sh postgres &&
-        apify -c /app/config/config.yaml
-      "
+      /app/prepare-config.sh postgres &&
+      apify -c /app/config/config.yaml
     depends_on:
       postgres:
         condition: service_healthy
