@@ -1,13 +1,16 @@
 # E2E Test Configuration - SQLite
+# Used by Docker Compose for testing
+
 datasource:
-  e2e_sqlite:
+  default:
     driver: sqlite
     database: /app/data/e2e_test.sqlite
     max_pool_size: 5
 
 consumers:
-  - name: e2e_test_user
+  - name: default
     keys: 
+      - dev-key-123
       - e2e-test-key-001
 
 listeners:
@@ -15,5 +18,11 @@ listeners:
     ip: 0.0.0.0
     protocol: HTTP
     apis:
-      - path: /app/config/e2e-api.yaml
-        datasource: e2e_sqlite
+      - path: /app/config/openapi/items.yaml
+        datasource: default
+
+observability:
+  log_level: "info"
+  otlp_endpoint: null
+  metrics_enabled: true
+  metrics_port: 9090

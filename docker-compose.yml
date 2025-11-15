@@ -24,7 +24,7 @@ services:
       - "9090:9090"  # Metrics endpoint
     volumes:
       - ./e2e/config-sqlite.yaml:/app/config/config.yaml:ro
-      - ./e2e/e2e-api.yaml:/app/config/e2e-api.yaml:ro
+      - ./config/openapi:/app/config/openapi:ro
       - sqlite_data:/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
@@ -44,7 +44,7 @@ services:
       - "9091:9090"  # Metrics endpoint
     volumes:
       - ./e2e/config-postgres.yaml:/app/config/config.yaml:ro
-      - ./e2e/e2e-api.yaml:/app/config/e2e-api.yaml:ro
+      - ./config/openapi:/app/config/openapi:ro
     depends_on:
       postgres:
         condition: service_healthy

@@ -139,10 +139,18 @@ openapi:
             "404":
               description: "Item not found"
 
-      /health:
+      /healthz:
         get:
           operationId: healthCheck
           summary: "Health check endpoint"
           responses:
             "200":
               description: "Service is healthy"
+              content:
+                application/json:
+                  schema:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: "ok"
