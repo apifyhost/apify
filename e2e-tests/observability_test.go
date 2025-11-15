@@ -156,7 +156,13 @@ var _ = Describe("Observability Features", Ordered, func() {
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
-			defer resp.Body.Close()
+			
+			// Extract the created item ID for cleanup
+			var createdItem map[string]interface{}
+			json.NewDecoder(resp.Body).Decode(&createdItem)
+			resp.Body.Close()
+			
+			itemID := int64(createdItem["id"].(float64))
 
 			// Wait for metrics
 			time.Sleep(100 * time.Millisecond)
@@ -177,6 +183,14 @@ var _ = Describe("Observability Features", Ordered, func() {
 			// Should have operation labels
 			Expect(metricsText).To(ContainSubstring(`operation="insert"`))
 			Expect(metricsText).To(ContainSubstring(`table="items"`))
+			
+			// Cleanup: Delete the test item to avoid interfering with CRUD tests
+			deleteReq, _ := http.NewRequest("DELETE", fmt.Sprintf("%s/items/%d", baseURL, itemID), nil)
+			deleteReq.Header.Set("X-API-Key", apiKey)
+			deleteResp, err := client.Do(deleteReq)
+			if err == nil {
+				deleteResp.Body.Close()
+			}
 		})
 
 		It("should include histogram buckets for request duration", func() {

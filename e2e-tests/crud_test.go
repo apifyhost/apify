@@ -165,10 +165,20 @@ var _ = Describe("Apify CRUD Operations", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(items).NotTo(BeEmpty())
 
-			// Store the first item's ID for later tests
-			itemID = int64(items[0]["id"].(float64))
+			// Find the item we created by name
+			var testItem map[string]interface{}
+			for _, item := range items {
+				if item["name"] == "Test Item" {
+					testItem = item
+					break
+				}
+			}
+			Expect(testItem).NotTo(BeNil(), "Should find 'Test Item' in the list")
+
+			// Store the item's ID for later tests
+			itemID = int64(testItem["id"].(float64))
 			Expect(itemID).To(BeNumerically(">", 0))
-			Expect(items[0]["name"]).To(Equal("Test Item"))
+			Expect(testItem["name"]).To(Equal("Test Item"))
 		})
 
 		It("should get item by ID", func() {
