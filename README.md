@@ -2,7 +2,12 @@
 
 **Make everything as API** - A flexible, high-performance API framework that automatically generates CRUD operations from OpenAPI specifications.
 
-[中文文档](./README.zh-CN.md)
+[![Docker](https://img.shields.io/badge/docker-latest-blue)](https://hub.docker.com/r/apifyhost/apify)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+
+🚀 **Quick Start:** `curl -fsSL https://raw.githubusercontent.com/apifyhost/apify/main/quickstart.sh | bash`
+
+[中文文档](./README.zh-CN.md) | [Getting Started](#-getting-started) | [API Usage](#-api-usage-guide) | [Configuration](#-configuration-guide)
 
 ---
 
@@ -58,6 +63,42 @@ Each phase can have custom modules with flexible configuration at multiple level
 
 ### 🚀 Getting Started
 
+#### Quickstart (Recommended)
+
+The fastest way to get Apify running:
+
+```bash
+# Download and run the quickstart script
+curl -fsSL https://raw.githubusercontent.com/apifyhost/apify/main/quickstart.sh | bash
+```
+
+Or download a specific release version:
+
+```bash
+# Download the quickstart package
+curl -L https://github.com/apifyhost/apify/releases/download/v0.1.0/apify-quickstart-v0.1.0.tar.gz | tar xz
+cd apify-quickstart-v0.1.0
+
+# Make the script executable and run
+chmod +x quickstart.sh
+./quickstart.sh
+```
+
+The quickstart script will:
+- ✅ Download and extract all necessary files
+- ✅ Pull the Docker image
+- ✅ Start Apify with SQLite
+- ✅ Display access URLs and quick commands
+
+**Quickstart Commands:**
+```bash
+./quickstart.sh install   # Download and install (default)
+./quickstart.sh start     # Start services
+./quickstart.sh stop      # Stop services
+./quickstart.sh status    # Check service status
+./quickstart.sh destroy   # Remove installation
+```
+
 #### Prerequisites
 
 - **Rust** 1.70 or higher (for building from source)
@@ -65,18 +106,18 @@ Each phase can have custom modules with flexible configuration at multiple level
 - **SQLite** (included) or **PostgreSQL** server
 - Basic knowledge of OpenAPI/Swagger
 
-#### Quick Start with Docker (Recommended)
+#### Manual Docker Setup
 
 ```bash
 # Pull the latest image
-docker pull ghcr.io/apifyhost/apify:latest
+docker pull apifyhost/apify:latest
 
 # Run with SQLite
 docker run -d \
   -p 3000:3000 \
   -v $(pwd)/config:/app/config:ro \
   -v apify-data:/app/data \
-  ghcr.io/apifyhost/apify:latest
+  apifyhost/apify:latest
 
 # Or use Docker Compose
 docker compose up -d
