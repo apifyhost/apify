@@ -5,6 +5,7 @@ use super::crud_handler::CRUDError;
 use super::hyper::{Request, Response, StatusCode};
 use super::{Arc, http_body_util::Full, hyper::body::Bytes};
 use crate::modules::ModuleOutcome;
+use crate::observability::RequestMetrics;
 use crate::phases::{Phase, RequestContext};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -12,11 +13,33 @@ use std::error::Error;
 
 /// Handle HTTP request and generate response
 // Updated error type to cover all possible errors
+#[tracing::instrument(skip(req, state), fields(http.method = %req.method(), http.uri = %req.uri()))]
 pub async fn handle_request(
     req: Request<hyper::body::Incoming>,
     state: Arc<AppState>,
 ) -> Result<Response<Full<Bytes>>, Box<dyn Error + Send + Sync>> {
     let (parts, body_stream) = req.into_parts();
+    let method = parts.method.clone();
+    let path = parts.uri.path().to_string();
+
+    // Start metrics tracking
+    let metrics = RequestMetrics::new(method.as_str(), &path);
+
+    // Inner handler that returns response
+    let response = handle_request_inner(parts, body_stream, state).await?;
+
+    // Record metrics before returning
+    metrics.record(response.status().as_u16());
+
+    Ok(response)
+}
+
+/// Internal request handler (separated to ensure metrics are recorded)
+async fn handle_request_inner(
+    parts: hyper::http::request::Parts,
+    body_stream: hyper::body::Incoming,
+    state: Arc<AppState>,
+) -> Result<Response<Full<Bytes>>, Box<dyn Error + Send + Sync>> {
     let method = parts.method.clone();
 
     // Phase: HeaderParse (and build initial context)

@@ -1,5 +1,6 @@
 //! Database facade delegating to backend implementations in modules/.
 
+use crate::observability::metrics::DbMetrics;
 use crate::schema_generator::TableSchema;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -147,9 +148,14 @@ impl DatabaseManager {
         limit: Option<u32>,
         offset: Option<u32>,
     ) -> Result<Vec<Value>, DatabaseError> {
-        self.backend
+        let metrics = DbMetrics::new("select", table);
+        let result = self
+            .backend
             .select(table, columns, where_clause, limit, offset)
-            .await
+            .await;
+        let status = if result.is_ok() { "success" } else { "error" };
+        metrics.record(status);
+        result
     }
 
     pub async fn insert(
@@ -162,7 +168,11 @@ impl DatabaseManager {
                 "No data provided for insert".to_string(),
             ));
         }
-        self.backend.insert(table, data).await
+        let metrics = DbMetrics::new("insert", table);
+        let result = self.backend.insert(table, data).await;
+        let status = if result.is_ok() { "success" } else { "error" };
+        metrics.record(status);
+        result
     }
 
     pub async fn update(
@@ -181,7 +191,11 @@ impl DatabaseManager {
                 "WHERE clause is required for update".to_string(),
             ));
         }
-        self.backend.update(table, data, where_clause).await
+        let metrics = DbMetrics::new("update", table);
+        let result = self.backend.update(table, data, where_clause).await;
+        let status = if result.is_ok() { "success" } else { "error" };
+        metrics.record(status);
+        result
     }
 
     pub async fn delete(
@@ -189,6 +203,10 @@ impl DatabaseManager {
         table: &str,
         where_clause: HashMap<String, Value>,
     ) -> Result<u64, DatabaseError> {
-        self.backend.delete(table, where_clause).await
+        let metrics = DbMetrics::new("delete", table);
+        let result = self.backend.delete(table, where_clause).await;
+        let status = if result.is_ok() { "success" } else { "error" };
+        metrics.record(status);
+        result
     }
 }

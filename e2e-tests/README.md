@@ -41,6 +41,15 @@ make test
 # Run with verbose output and progress
 make test-verbose
 
+# Run only CRUD tests
+make test-crud
+
+# Run only observability tests
+make test-observability
+
+# Run all tests
+make test-all
+
 # Or directly
 ginkgo -v --progress
 ```
@@ -57,11 +66,12 @@ Tests can be configured via environment variables:
 
 - `BASE_URL`: URL of the Apify service (default: `http://localhost:3000`)
 - `API_KEY`: API key for authentication (default: `e2e-test-key-001`)
+- `METRICS_PORT`: Port for Prometheus metrics endpoint (default: `9090`)
 
 Example:
 
 ```bash
-BASE_URL=http://localhost:8080 API_KEY=my-key go test -v
+BASE_URL=http://localhost:8080 API_KEY=my-key METRICS_PORT=9090 go test -v
 ```
 
 ## Test Structure
@@ -79,8 +89,14 @@ The tests are organized using Ginkgo's BDD-style syntax:
 1. **Health Check**: Verifies service availability
 2. **Authentication**: Tests API key validation
 3. **CRUD Operations**: Complete create, read, update, delete flow
-4. **Large Payload Handling**: Tests with large data
-5. **Content-Type Validation**: Ensures proper header handling
+4. **Observability**: Prometheus metrics, structured logging, tracing
+   - Metrics endpoint availability
+   - HTTP request metrics
+   - Database query metrics
+   - Metric labels and histograms
+   - Performance under load
+5. **Large Payload Handling**: Tests with large data
+6. **Content-Type Validation**: Ensures proper header handling
 
 ## CI/CD Integration
 
@@ -102,6 +118,9 @@ The workflow:
 - `make deps`: Install dependencies
 - `make test`: Run tests
 - `make test-verbose`: Run tests with detailed output
+- `make test-crud`: Run CRUD tests only
+- `make test-observability`: Run observability tests only
+- `make test-all`: Run all tests with full configuration
 - `make clean`: Clean test artifacts
 
 ## Troubleshooting
