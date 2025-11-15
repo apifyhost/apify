@@ -991,13 +991,13 @@ The E2E test suite is written in Go using the Ginkgo BDD framework for better ma
 ./scripts/local-docker-test.sh
 
 # Run tests manually
-cd e2e-tests
+cd e2e
 make deps      # Install dependencies
 make test      # Run tests
 
 # Or use docker compose
 docker compose up -d
-cd e2e-tests && go test -v
+cd e2e && go test -v
 ```
 
 The E2E test suite validates:
@@ -1010,7 +1010,7 @@ The E2E test suite validates:
 - ✅ Large payload handling
 - ✅ Content-Type validation
 
-See [e2e-tests/README.md](./e2e-tests/README.md) for detailed testing documentation.
+See [e2e/README.md](./e2e/README.md) for detailed testing documentation.
 
 ---
 

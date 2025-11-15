@@ -1,0 +1,57 @@
+# Apify Configuration
+# Main configuration file for development and testing
+
+# API Listeners
+listeners:
+  - port: 3000
+    ip: 0.0.0.0
+    protocol: HTTP
+    apis:
+      - path: ./openapi/items.yaml
+        datasource: sqlite  # Change to 'postgres' for PostgreSQL
+
+# Authentication consumers
+consumers:
+  - name: default
+    keys:
+      - dev-key-123
+      - e2e-test-key-001
+
+# Data sources
+datasource:
+  # SQLite datasource (default for local development)
+  sqlite:
+    driver: sqlite
+    database: ./apify.sqlite
+    max_pool_size: 5
+  
+  # PostgreSQL datasource
+  postgres:
+    driver: postgres
+    host: localhost
+    port: 5432
+    user: postgres
+    password: postgres
+    database: apify_db
+    ssl_mode: prefer
+    max_pool_size: 10
+
+# Observability configuration (optional)
+observability:
+  # Log level: trace, debug, info, warn, error
+  # Can be overridden with RUST_LOG environment variable
+  log_level: "info"
+  
+  # OpenTelemetry OTLP endpoint for distributed tracing
+  # Set to null or omit to disable tracing
+  # Example: "http://localhost:4317" for local Jaeger
+  otlp_endpoint: null
+  
+  # Enable Prometheus metrics endpoint
+  # Default: true
+  metrics_enabled: true
+  
+  # Port for Prometheus metrics HTTP endpoint
+  # Access metrics at http://localhost:9090/metrics
+  # Default: 9090
+  metrics_port: 9090

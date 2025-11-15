@@ -11,55 +11,28 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /app
 
-# Copy manifests (workspace root and all members)
+# Copy manifests
 COPY Cargo.toml Cargo.lock ./
-COPY apify/Cargo.toml ./apify/
-COPY sdk/Cargo.toml ./sdk/
-COPY flow/Cargo.toml ./flow/
-COPY asd/Cargo.toml ./asd/
-COPY runtime/Cargo.toml ./runtime/
-COPY plugins/http_server/Cargo.toml ./plugins/http_server/
-COPY plugins/echo/Cargo.toml ./plugins/echo/
-COPY plugins/amqp/Cargo.toml ./plugins/amqp/
-COPY plugins/log/Cargo.toml ./plugins/log/
-COPY plugins/sleep/Cargo.toml ./plugins/sleep/
-COPY plugins/http_request/Cargo.toml ./plugins/http_request/
-COPY plugins/postgres/Cargo.toml ./plugins/postgres/
-COPY plugins/cli/Cargo.toml ./plugins/cli/
-COPY plugins/rpc/Cargo.toml ./plugins/rpc/
-COPY plugins/jwt/Cargo.toml ./plugins/jwt/
-COPY plugins/cache/Cargo.toml ./plugins/cache/
 
 # Create dummy source files to cache dependencies
-RUN mkdir -p apify/src sdk/src flow/src asd/src runtime/src \
-    plugins/http_server/src plugins/echo/src plugins/amqp/src \
-    plugins/log/src plugins/sleep/src plugins/http_request/src \
-    plugins/postgres/src plugins/cli/src plugins/rpc/src \
-    plugins/jwt/src plugins/cache/src && \
-    echo "fn main() {}" > apify/src/main.rs && \
-    echo "pub fn dummy() {}" > apify/src/lib.rs && \
-    echo "pub fn dummy() {}" > sdk/src/lib.rs && \
-    echo "pub fn dummy() {}" > flow/src/lib.rs && \
-    echo "pub fn dummy() {}" > asd/src/lib.rs && \
-    echo "fn main() {}" > runtime/src/main.rs && \
-    for plugin in http_server echo amqp log sleep http_request postgres cli rpc jwt cache; do \
-        echo "pub fn dummy() {}" > plugins/$plugin/src/lib.rs; \
-    done
+RUN mkdir -p src && \
+    echo "fn main() {}" > src/main.rs && \
+    echo "pub fn dummy() {}" > src/lib.rs
 
 # Build dependencies (this layer will be cached)
-RUN cargo build --release --package apify
+RUN cargo build --release
 
 # Remove dummy build artifacts (keep dependencies)
 RUN rm -rf target/release/.fingerprint/apify-* \
     target/release/deps/apify-* \
     target/release/deps/libapify-* && \
-    rm -rf apify/src/*
+    rm -rf src/*
 
-# Copy only apify source code (the only one we need)
-COPY apify/src ./apify/src
+# Copy actual source code
+COPY src ./src
 
 # Build the actual application
-RUN cargo build --release --package apify
+RUN cargo build --release
 
 # Stage 2: Runtime stage with minimal Ubuntu
 FROM ubuntu:24.04

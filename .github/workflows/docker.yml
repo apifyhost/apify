@@ -78,10 +78,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
-          cache-dependency-path: e2e-tests/go.sum
+          cache-dependency-path: e2e/go.sum
 
       - name: Install Go dependencies
-        working-directory: e2e-tests
+        working-directory: e2e
         run: |
           go mod download
           go install github.com/onsi/ginkgo/v2/ginkgo@latest
@@ -116,7 +116,7 @@ jobs:
           exit 1
 
       - name: Run E2E tests
-        working-directory: e2e-tests
+        working-directory: e2e
         env:
           BASE_URL: http://localhost:3000
           API_KEY: e2e-test-key-001
@@ -124,7 +124,7 @@ jobs:
         run: ginkgo -v
 
       - name: Run observability tests
-        working-directory: e2e-tests
+        working-directory: e2e
         env:
           BASE_URL: http://localhost:3000
           API_KEY: e2e-test-key-001
@@ -154,10 +154,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
-          cache-dependency-path: e2e-tests/go.sum
+          cache-dependency-path: e2e/go.sum
       
       - name: Install Go dependencies
-        working-directory: e2e-tests
+        working-directory: e2e
         run: |
           go mod download
           go install github.com/onsi/ginkgo/v2/ginkgo@latest
@@ -192,7 +192,7 @@ jobs:
           exit 1
 
       - name: Run E2E tests
-        working-directory: e2e-tests
+        working-directory: e2e
         env:
           BASE_URL: http://localhost:3001
           API_KEY: e2e-test-key-001
@@ -200,7 +200,7 @@ jobs:
         run: ginkgo -v
       
       - name: Run observability tests
-        working-directory: e2e-tests
+        working-directory: e2e
         env:
           BASE_URL: http://localhost:3001
           API_KEY: e2e-test-key-001
@@ -344,3 +344,146 @@ jobs:
             apifyhost/apify:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  publish-quickstart:
+    name: Package and Upload Quickstart Bundle
+    needs: [test-sqlite, test-postgres]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/quickstart-')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION='${{ github.event.release.tag_name }}'
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Packaging version: $VERSION"
+
+      - name: Create quickstart package
+        run: |
+          # Create temporary directory for packaging
+          mkdir -p quickstart-package
+          
+          # Copy necessary files
+          cp docker-compose.yml quickstart-package/
+          cp quickstart.sh quickstart-package/
+          cp -r config quickstart-package/
+          cp -r observability quickstart-package/
+          cp README.md quickstart-package/
+          cp LICENSE quickstart-package/
+          
+          # Create a simple README for quickstart
+          cat > quickstart-package/QUICKSTART.md << 'EOF'
+          # Apify Quickstart Package
+          
+          This package contains everything you need to run Apify using Docker Compose.
+          
+          ## Prerequisites
+          
+          - Docker and Docker Compose installed
+          - curl (for health checks)
+          
+          ## Quick Start
+          
+          ```bash
+          # Make the script executable
+          chmod +x quickstart.sh
+          
+          # Run Apify
+          ./quickstart.sh
+          ```
+          
+          The script will:
+          1. Start Apify with SQLite using Docker Compose
+          2. Wait for the service to be ready
+          3. Display the listening addresses
+          
+          ## Manual Start
+          
+          If you prefer to start manually:
+          
+          ```bash
+          # Start with SQLite
+          docker compose up -d apify-sqlite
+          
+          # Start with PostgreSQL
+          docker compose up -d postgres apify-postgres
+          
+          # View logs
+          docker compose logs -f
+          
+          # Stop services
+          docker compose down
+          ```
+          
+          ## Access
+          
+          - API: http://localhost:3000
+          - Metrics: http://localhost:9090/metrics
+          - Health: http://localhost:3000/healthz
+          
+          ## Configuration
+          
+          Configuration files are in the `config/` directory:
+          - `config/config.yaml` - Main configuration
+          - `config/openapi/items.yaml` - OpenAPI specification
+          
+          ## Observability
+          
+          Optional observability stack (Prometheus, Grafana, Jaeger):
+          
+          ```bash
+          docker compose up -d jaeger prometheus grafana
+          ```
+          
+          - Grafana: http://localhost:3002 (admin/admin)
+          - Jaeger UI: http://localhost:16686
+          - Prometheus: http://localhost:9092
+          
+          ## Documentation
+          
+          See README.md for full documentation.
+          EOF
+          
+          # Create tarball
+          cd quickstart-package
+          tar -czf ../apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz .
+          cd ..
+          
+          # Verify the package
+          echo "Package contents:"
+          tar -tzf apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz | head -20
+
+      - name: Generate SHA256 checksum
+        run: |
+          sha256sum apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz > apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz.sha256
+          cat apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz.sha256
+
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz
+            apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload as artifact
+        if: github.event_name != 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quickstart-package
+          path: |
+            apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz
+            apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz.sha256
+          retention-days: 30
