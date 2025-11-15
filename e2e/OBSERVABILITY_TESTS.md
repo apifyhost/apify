@@ -38,8 +38,8 @@ docker compose up -d postgres apify-postgres
 
 ```bash
 # 使用便捷脚本
-cd e2e-tests
-./test-observability.sh
+cd e2e
+./test.sh observability
 
 # 或使用 make
 make test-observability
@@ -114,7 +114,7 @@ BASE_URL=http://localhost:3001 METRICS_PORT=9091 ./test-observability.sh
 
 ```yaml
 - name: Run observability tests
-  working-directory: e2e-tests
+  working-directory: e2e
   env:
     BASE_URL: http://localhost:3000
     API_KEY: e2e-test-key-001

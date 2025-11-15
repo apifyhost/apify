@@ -80,8 +80,8 @@
 docker compose up -d apify-sqlite
 
 # 2. 运行可观测性测试
-cd e2e-tests
-./test-observability.sh
+cd e2e
+./test.sh observability
 ```
 
 ### Make 命令
@@ -102,15 +102,17 @@ BASE_URL=http://localhost:3000 METRICS_PORT=9090 ginkgo -v --focus="Observabilit
 BASE_URL=http://localhost:3001 METRICS_PORT=9091 ginkgo -v --focus="Observability"
 ```
 
-## 📁 新增文件
+## 📁 项目文件
 
 ```
-e2e-tests/
-├── observability_test.go          # 可观测性测试套件 (新增)
-├── test-observability.sh          # 便捷测试脚本 (新增)
-├── OBSERVABILITY_TESTS.md         # 测试文档 (新增)
-├── Makefile                       # 更新
-└── README.md                      # 更新
+e2e/
+├── observability_test.go          # 可观测性测试套件
+├── crud_test.go                   # CRUD 测试套件
+├── test.sh                        # 统一测试脚本
+├── prepare-config.sh              # 配置准备脚本
+├── OBSERVABILITY_TESTS.md         # 测试文档
+├── Makefile                       # Make 构建文件
+└── README.md                      # 测试说明
 
 .github/workflows/
 └── docker.yml                     # 更新 (添加可观测性测试步骤)

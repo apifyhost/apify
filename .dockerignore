@@ -23,7 +23,6 @@ docs/
 *.db
 tests/fixtures/
 e2e/
-e2e-tests/
 
 # Exclude source code of workspace members except apify
 # Keep all Cargo.toml files for workspace resolution

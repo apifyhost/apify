@@ -1,12 +1,12 @@
 # E2E Tests
 
-End-to-end tests for the Apify framework using Go and Ginkgo/Gomega.
+End-to-end tests for Apify with both quick smoke tests (bash/curl) and comprehensive test suites (Go/Ginkgo).
 
 ## Prerequisites
 
-- Go 1.21 or higher
-- Docker (for running the Apify service)
-- Ginkgo CLI (optional, for enhanced test output)
+- **For Quick Tests**: curl, bash
+- **For Comprehensive Tests**: Go 1.21+, Docker
+- **Optional**: Ginkgo CLI for enhanced test output
 
 ## Installation
 
@@ -25,30 +25,48 @@ go install github.com/onsi/ginkgo/v2/ginkgo@latest
 
 ## Running Tests
 
-### Quick Start
+### Quick Smoke Test (Recommended for CI/Local)
+
+Fast health check using curl:
 
 ```bash
-# Start the Apify service (in another terminal)
-docker compose up -d
+# Quick smoke test (no Go required)
+make test-quick
 
-# Run tests with default settings
-make test
+# Or directly
+./test.sh quick
 ```
 
-### Using Ginkgo CLI
+### Comprehensive Tests (Go/Ginkgo)
+
+Full test suite with detailed assertions:
 
 ```bash
-# Run with verbose output and progress
-make test-verbose
-
-# Run only CRUD tests
-make test-crud
-
-# Run only observability tests
-make test-observability
+# Start the service first
+docker compose up -d apify-sqlite
 
 # Run all tests
-make test-all
+make test
+
+# Run with verbose output
+make test-verbose
+
+# Run specific test suites
+make test-crud           # CRUD operations only
+make test-observability  # Observability/metrics only
+```
+
+### Using the Unified Test Script
+
+The `test.sh` script supports multiple modes:
+
+```bash
+./test.sh              # All Go tests (default)
+./test.sh quick        # Quick smoke test
+./test.sh observability # Observability tests only
+./test.sh crud         # CRUD tests only
+./test.sh help         # Show usage
+```
 
 # Or directly
 ginkgo -v --progress

@@ -1,4 +1,4 @@
-module github.com/apifyhost/apify/e2e-tests
+module github.com/apifyhost/apify/e2e
 
 go 1.23.0
 

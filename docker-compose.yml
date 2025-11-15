@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: apify_test_password
       POSTGRES_DB: apify_e2e
     ports:
-      - "5432:5432"
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U apify"]
       interval: 5s
