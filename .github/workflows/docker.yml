@@ -375,6 +375,11 @@ jobs:
           
           # Copy necessary files
           cp docker-compose.yml quickstart-package/
+          sed -i "s|apifyhost/apify:latest|apifyhost/apify:${{ steps.version.outputs.VERSION }}|g" quickstart-package/docker-compose.yml
+          sed -i "s|apifyhost/apify:test|apifyhost/apify:${{ steps.version.outputs.VERSION }}|g" quickstart-package/docker-compose.yml
+          
+          echo "Updated docker-compose.yml with image tag: ${{ steps.version.outputs.VERSION }}"
+          grep "image: apifyhost/apify:" quickstart-package/docker-compose.yml || true
           cp quickstart.sh quickstart-package/
           cp -r config quickstart-package/
           cp -r observability quickstart-package/
