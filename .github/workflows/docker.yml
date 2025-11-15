@@ -120,7 +120,16 @@ jobs:
         env:
           BASE_URL: http://localhost:3000
           API_KEY: e2e-test-key-001
+          METRICS_PORT: 9090
         run: ginkgo -v
+
+      - name: Run observability tests
+        working-directory: e2e-tests
+        env:
+          BASE_URL: http://localhost:3000
+          API_KEY: e2e-test-key-001
+          METRICS_PORT: 9090
+        run: ginkgo -v --focus="Observability"
 
       - name: Show logs on failure
         if: failure()
@@ -187,8 +196,17 @@ jobs:
         env:
           BASE_URL: http://localhost:3001
           API_KEY: e2e-test-key-001
+          METRICS_PORT: 9091
         run: ginkgo -v
       
+      - name: Run observability tests
+        working-directory: e2e-tests
+        env:
+          BASE_URL: http://localhost:3001
+          API_KEY: e2e-test-key-001
+          METRICS_PORT: 9091
+        run: ginkgo -v --focus="Observability"
+
       - name: Show logs on failure
         if: failure()
         run: |

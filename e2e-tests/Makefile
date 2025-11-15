@@ -1,4 +1,4 @@
-.PHONY: help deps test test-verbose clean
+.PHONY: help deps test test-verbose test-observability clean
 
 help: ## Show this help message
 	@echo "Available targets:"
@@ -15,6 +15,20 @@ test: ## Run tests
 
 test-verbose: ## Run tests with detailed output
 	@echo "Running E2E tests with verbose output..."
+	ginkgo -v
+
+test-observability: ## Run observability tests only
+	@echo "Running observability tests..."
+	ginkgo -v --focus="Observability"
+
+test-crud: ## Run CRUD tests only
+	@echo "Running CRUD tests..."
+	ginkgo -v --focus="CRUD"
+
+test-all: ## Run all tests including observability
+	@echo "Running all tests..."
+	BASE_URL=$${BASE_URL:-http://localhost:3000} \
+	METRICS_PORT=$${METRICS_PORT:-9090} \
 	ginkgo -v
 
 clean: ## Clean test artifacts
