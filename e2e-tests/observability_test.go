@@ -146,8 +146,7 @@ var _ = Describe("Observability Features", Ordered, func() {
 			itemData := map[string]interface{}{
 				"name":        "metrics-test-item",
 				"description": "Testing metrics",
-				"price":       99.99,
-				"in_stock":    true,
+				"price":       99.99
 			}
 			jsonData, _ := json.Marshal(itemData)
 
