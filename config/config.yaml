@@ -8,7 +8,7 @@ listeners:
     protocol: HTTP
     apis:
       - path: ./openapi/items.yaml
-        datasource: default
+        datasource: sqlite  # Change to 'postgres' for PostgreSQL
 
 # Authentication consumers
 consumers:
@@ -19,21 +19,22 @@ consumers:
 
 # Data sources
 datasource:
-  default:
+  # SQLite datasource (default for local development)
+  sqlite:
     driver: sqlite
     database: ./apify.sqlite
     max_pool_size: 5
   
-  # PostgreSQL example (commented out)
-  # postgres:
-  #   driver: postgres
-  #   host: localhost
-  #   port: 5432
-  #   user: postgres
-  #   password: postgres
-  #   database: apify_db
-  #   ssl_mode: prefer
-  #   max_pool_size: 10
+  # PostgreSQL datasource
+  postgres:
+    driver: postgres
+    host: localhost
+    port: 5432
+    user: postgres
+    password: postgres
+    database: apify_db
+    ssl_mode: prefer
+    max_pool_size: 10
 
 # Observability configuration (optional)
 observability:
