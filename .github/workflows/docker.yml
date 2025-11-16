@@ -336,7 +336,7 @@ jobs:
     name: Package and Upload Quickstart Bundle
     needs: [test-sqlite, test-postgres]
     runs-on: ubuntu-latest
-    # if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/quickstart-')
+    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/quickstart-')
     permissions:
       contents: write
 
@@ -448,7 +448,7 @@ jobs:
           
           # Set proper permissions
           chmod +x quickstart-package/quickstart.sh
-          chmod -R 644 quickstart-package/config
+          find quickstart-package/config -type f -exec chmod 644 {} \;
           find quickstart-package/config -type d -exec chmod 755 {} \;
           
           # Create tarball
