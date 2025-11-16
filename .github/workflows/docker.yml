@@ -118,7 +118,7 @@ jobs:
       - name: Run E2E tests
         working-directory: e2e
         env:
-          BASE_URL: http://localhost:3001
+          BASE_URL: http://localhost:3000
           API_KEY: e2e-test-key-001
           METRICS_PORT: 9091
         run: ginkgo -v
@@ -189,7 +189,7 @@ jobs:
       - name: Run E2E tests
         working-directory: e2e
         env:
-          BASE_URL: http://localhost:3000
+          BASE_URL: http://localhost:3001
           API_KEY: e2e-test-key-001
           METRICS_PORT: 9092
         run: ginkgo -v
