@@ -31,9 +31,7 @@ pub fn init_logging(log_level: Option<&str>) {
         .with_filter(filter);
 
     // Initialize with just logging layer
-    tracing_subscriber::registry()
-        .with(fmt_layer)
-        .init();
+    tracing_subscriber::registry().with(fmt_layer).init();
 }
 
 /// Initialize tracing with OpenTelemetry support (must be called from within Tokio runtime)
@@ -85,7 +83,7 @@ pub async fn init_tracing_with_otel(
 
     // Get the tracer before setting as global
     let tracer = provider.tracer(service_name.to_string());
-    
+
     // Set as global provider
     opentelemetry::global::set_tracer_provider(provider);
 
