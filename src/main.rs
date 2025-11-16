@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Load main configuration from specified file path
     let config = Config::from_file(&cli.config)?;
 
-    // Initialize observability (logging, tracing, metrics)
+    // Get observability configuration
     let otlp_endpoint = config
         .observability
         .as_ref()
@@ -35,6 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .as_ref()
         .and_then(|o| o.log_level.as_deref());
 
+    // Initialize tracing (will defer OpenTelemetry if configured)
     init_tracing("apify", otlp_endpoint, log_level)?;
 
     tracing::info!(
@@ -203,7 +204,7 @@ fn start_metrics_server(
             Request, Response, StatusCode, body::Bytes, server::conn::http1, service::service_fn,
         },
         hyper_util::rt::TokioIo,
-        observability::{export_metrics, init_opentelemetry},
+        observability::{export_metrics, init_tracing_with_otel},
         tokio::{self, net::TcpListener},
     };
 
@@ -213,11 +214,12 @@ fn start_metrics_server(
 
     rt.block_on(async {
         // Initialize OpenTelemetry now that we're in Tokio runtime
+        // This replaces the basic logging-only subscriber with one that has OpenTelemetry layer
         if let Some(ref endpoint) = otlp_endpoint {
-            if let Err(e) = init_opentelemetry("apify", endpoint).await {
+            if let Err(e) = init_tracing_with_otel("apify", endpoint, None).await {
                 tracing::warn!(
                     error = %e,
-                    "Failed to initialize OpenTelemetry, continuing without tracing"
+                    "Failed to initialize OpenTelemetry, continuing without distributed tracing"
                 );
             }
         }

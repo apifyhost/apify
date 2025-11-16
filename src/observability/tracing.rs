@@ -14,7 +14,6 @@ use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::Subs
 /// - Environment-based log level filtering
 ///
 /// Call this first in main() before any async operations.
-/// Then call init_opentelemetry() inside a Tokio runtime if needed.
 pub fn init_logging(log_level: Option<&str>) {
     // Build filter from environment or default
     let filter = EnvFilter::try_from_default_env()
@@ -32,21 +31,42 @@ pub fn init_logging(log_level: Option<&str>) {
         .with_filter(filter);
 
     // Initialize with just logging layer
-    tracing_subscriber::registry().with(fmt_layer).init();
+    tracing_subscriber::registry()
+        .with(fmt_layer)
+        .init();
 }
 
-/// Initialize OpenTelemetry tracing (must be called from within Tokio runtime)
+/// Initialize tracing with OpenTelemetry support (must be called from within Tokio runtime)
 ///
 /// This sets up:
+/// - Structured JSON logging to stdout
 /// - OTLP span exporter using tonic/gRPC
 /// - Tracing provider with service metadata
-/// - Global tracer provider registration
+/// - OpenTelemetry tracing layer
 ///
-/// IMPORTANT: Must be called after Tokio runtime is initialized
-pub async fn init_opentelemetry(
+/// IMPORTANT: Must be called from within a Tokio runtime
+/// IMPORTANT: Will replace any existing global subscriber
+pub async fn init_tracing_with_otel(
     service_name: &str,
     otlp_endpoint: &str,
+    log_level: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Build filter from environment or default
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new(log_level.unwrap_or("info")));
+
+    // JSON formatter for structured logging
+    let fmt_layer = fmt::layer()
+        .json()
+        .with_target(true)
+        .with_thread_ids(true)
+        .with_thread_names(true)
+        .with_level(true)
+        .with_file(true)
+        .with_line_number(true)
+        .with_filter(filter);
+
+    // Initialize OpenTelemetry OTLP exporter
     let exporter = opentelemetry_otlp::SpanExporter::builder()
         .with_tonic()
         .with_endpoint(otlp_endpoint)
@@ -63,7 +83,22 @@ pub async fn init_opentelemetry(
         )
         .build();
 
-    opentelemetry::global::set_tracer_provider(provider.clone());
+    // Get the tracer before setting as global
+    let tracer = provider.tracer(service_name.to_string());
+    
+    // Set as global provider
+    opentelemetry::global::set_tracer_provider(provider);
+
+    // Create OpenTelemetry layer with the tracer
+    let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
+
+    // Initialize the subscriber with both layers
+    // This will replace any existing subscriber
+    tracing::subscriber::set_global_default(
+        tracing_subscriber::registry()
+            .with(fmt_layer)
+            .with(otel_layer)
+    )?;
 
     tracing::info!(
         service = service_name,
