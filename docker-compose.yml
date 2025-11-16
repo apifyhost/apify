@@ -16,7 +16,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   apify-sqlite:
-    image: apifyhost/apify:test
+    image: apifyhost/apify:latest
     ports:
       - "3000:3000"
       - "9090:9090"
@@ -30,7 +30,7 @@ services:
         mkdir -p /tmp/config/openapi &&
         cp /app/config-template/config.yaml /tmp/config/ &&
         cp /app/config-template/openapi/items.yaml /tmp/config/openapi/ &&
-        /app/prepare-config.sh sqlite /tmp/config/config.yaml &&
+        sh /app/prepare-config.sh sqlite /tmp/config/config.yaml &&
         apify -c /tmp/config/config.yaml
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
@@ -43,7 +43,7 @@ services:
       - APIFY_THREADS=1
 
   apify-postgres:
-    image: apifyhost/apify:test
+    image: apifyhost/apify:latest
     ports:
       - "3001:3000"
       - "9091:9090"
@@ -56,7 +56,7 @@ services:
         mkdir -p /tmp/config/openapi &&
         cp /app/config-template/config.yaml /tmp/config/ &&
         cp /app/config-template/openapi/items.yaml /tmp/config/openapi/ &&
-        /app/prepare-config.sh postgres /tmp/config/config.yaml &&
+        sh /app/prepare-config.sh postgres /tmp/config/config.yaml &&
         apify -c /tmp/config/config.yaml
     depends_on:
       postgres:

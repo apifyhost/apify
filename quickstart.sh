@@ -4,7 +4,7 @@
 
 set -e
 
-RELEASE_TAG="${RELEASE_TAG:-quickstart-0.1.0}"
+RELEASE_TAG="${RELEASE_TAG:-0.1.0}"
 DOWNLOAD_URL="https://github.com/apifyhost/apify/releases/download/${RELEASE_TAG}/apify-quickstart-${RELEASE_TAG}.tar.gz"
 INSTALL_DIR="apify-quickstart-${RELEASE_TAG}"
 
@@ -65,6 +65,63 @@ ensure_curl() {
 
 
 install_apify() {
+  # Check if running in a directory with existing files
+  if [ -f "docker-compose.yml" ] && [ -f "quickstart.sh" ]; then
+    echo_warning "Found existing docker-compose.yml in current directory"
+    echo "Using local files instead of downloading..."
+    
+    echo "Pulling latest Docker images..."
+    docker compose pull apify-sqlite || echo_warning "Pull failed, will use existing image"
+    
+    echo "Starting Apify with SQLite..."
+    docker compose up -d apify-sqlite
+
+    echo "Waiting for service to be ready..."
+    if wait_for_service "Apify" "http://127.0.0.1:3000/healthz"; then
+      echo_pass "Apify is ready!"
+      return 0
+    else
+      echo_fail "Failed to start Apify"
+      echo "Checking logs..."
+      docker compose logs apify-sqlite
+      return 1
+    fi
+  fi
+
+  # Check if INSTALL_DIR already exists
+  if [ -d "$INSTALL_DIR" ]; then
+    echo_warning "Found existing installation directory: $INSTALL_DIR"
+    echo -n "Do you want to use it? [Y/n] "
+    read -r response
+    case "$response" in
+      [nN][oO]|[nN])
+        echo "Continuing with fresh download..."
+        rm -rf "$INSTALL_DIR"
+        ;;
+      *)
+        echo "Using existing installation..."
+        cd "$INSTALL_DIR"
+        
+        echo "Pulling latest Docker images..."
+        docker compose pull apify-sqlite || echo_warning "Pull failed, will use existing image"
+        
+        echo "Starting Apify with SQLite..."
+        docker compose up -d apify-sqlite
+
+        echo "Waiting for service to be ready..."
+        if wait_for_service "Apify" "http://127.0.0.1:3000/healthz"; then
+          echo_pass "Apify is ready!"
+          return 0
+        else
+          echo_fail "Failed to start Apify"
+          echo "Checking logs..."
+          docker compose logs apify-sqlite
+          return 1
+        fi
+        ;;
+    esac
+  fi
+  
   echo "Downloading Apify ${RELEASE_TAG}..."
   
   if ! curl -fSL "$DOWNLOAD_URL" -o "${RELEASE_TAG}.tar.gz"; then
@@ -83,6 +140,9 @@ install_apify() {
   echo_pass "Extracted to $INSTALL_DIR"
   
   cd "$INSTALL_DIR"
+  
+  echo "Pulling Docker images..."
+  docker compose pull apify-sqlite || echo_warning "Pull failed, will use existing image"
   
   echo "Starting Apify with SQLite..."
   docker compose up -d apify-sqlite
