@@ -35,8 +35,15 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .as_ref()
         .and_then(|o| o.log_level.as_deref());
 
-    // Initialize tracing (will defer OpenTelemetry if configured)
-    init_tracing("apify", otlp_endpoint, log_level)?;
+    // If OpenTelemetry is configured, we need to defer ALL tracing initialization
+    // to the metrics server thread (which has Tokio runtime)
+    // Otherwise, initialize basic logging here
+    if otlp_endpoint.is_none() {
+        init_tracing("apify", None, log_level)?;
+    } else {
+        // Print to stderr since tracing isn't initialized yet
+        eprintln!("Deferring tracing initialization to Tokio runtime (OpenTelemetry enabled)");
+    }
 
     tracing::info!(
         config_file = %cli.config,
@@ -81,14 +88,20 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     if metrics_enabled {
         let otlp_endpoint_for_thread = otlp_endpoint.map(|s| s.to_string());
+        let log_level_for_thread = log_level.map(|s| s.to_string());
         let metrics_handle = thread::spawn(
             move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-                start_metrics_server(metrics_port, otlp_endpoint_for_thread)?;
+                start_metrics_server(metrics_port, otlp_endpoint_for_thread, log_level_for_thread)?;
                 Ok(())
             },
         );
         handles.push(metrics_handle);
-        tracing::info!(port = metrics_port, "Metrics endpoint started");
+        
+        if otlp_endpoint.is_some() {
+            eprintln!("Metrics endpoint will start on port {} with OpenTelemetry tracing", metrics_port);
+        } else {
+            tracing::info!(port = metrics_port, "Metrics endpoint started");
+        }
     }
 
     for (listener_idx, listener_config) in config.listeners.into_iter().enumerate() {
@@ -197,6 +210,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 fn start_metrics_server(
     port: u16,
     otlp_endpoint: Option<String>,
+    log_level: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use apify::{
         http_body_util::Full,
@@ -204,7 +218,7 @@ fn start_metrics_server(
             Request, Response, StatusCode, body::Bytes, server::conn::http1, service::service_fn,
         },
         hyper_util::rt::TokioIo,
-        observability::{export_metrics, init_tracing_with_otel},
+        observability::{export_metrics, init_tracing_with_otel, init_logging},
         tokio::{self, net::TcpListener},
     };
 
@@ -213,15 +227,17 @@ fn start_metrics_server(
         .build()?;
 
     rt.block_on(async {
-        // Initialize OpenTelemetry now that we're in Tokio runtime
-        // This replaces the basic logging-only subscriber with one that has OpenTelemetry layer
+        // Initialize tracing now that we're in Tokio runtime
         if let Some(ref endpoint) = otlp_endpoint {
-            if let Err(e) = init_tracing_with_otel("apify", endpoint, None).await {
-                tracing::warn!(
-                    error = %e,
-                    "Failed to initialize OpenTelemetry, continuing without distributed tracing"
-                );
+            // Initialize with OpenTelemetry support
+            if let Err(e) = init_tracing_with_otel("apify", endpoint, log_level.as_deref()).await {
+                // Fallback to basic logging
+                eprintln!("Failed to initialize OpenTelemetry: {}, falling back to basic logging", e);
+                init_logging(log_level.as_deref());
             }
+        } else {
+            // Just basic logging (shouldn't reach here if main() already initialized)
+            init_logging(log_level.as_deref());
         }
 
         let addr: std::net::SocketAddr = format!("0.0.0.0:{}", port).parse()?;

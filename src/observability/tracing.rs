@@ -93,12 +93,10 @@ pub async fn init_tracing_with_otel(
     let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
 
     // Initialize the subscriber with both layers
-    // This will replace any existing subscriber
-    tracing::subscriber::set_global_default(
-        tracing_subscriber::registry()
-            .with(fmt_layer)
-            .with(otel_layer)
-    )?;
+    tracing_subscriber::registry()
+        .with(fmt_layer)
+        .with(otel_layer)
+        .init();
 
     tracing::info!(
         service = service_name,
