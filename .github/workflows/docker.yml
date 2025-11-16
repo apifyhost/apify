@@ -104,7 +104,7 @@ jobs:
         run: |
           echo "Waiting for Apify to start..."
           for i in {1..30}; do
-            if curl -sf http://localhost:3001/healthz > /dev/null 2>&1; then
+            if curl -sf http://localhost:3000/healthz > /dev/null 2>&1; then
               echo "Service is ready!"
               exit 0
             fi
@@ -175,7 +175,7 @@ jobs:
         run: |
           echo "Waiting for Apify to start..."
           for i in {1..30}; do
-            if curl -sf http://localhost:3000/healthz > /dev/null 2>&1; then
+            if curl -sf http://localhost:3001/healthz > /dev/null 2>&1; then
               echo "Service is ready!"
               exit 0
             fi
@@ -336,7 +336,6 @@ jobs:
     name: Package and Upload Quickstart Bundle
     needs: [test-sqlite, test-postgres]
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/quickstart-')
     permissions:
       contents: write
 
@@ -349,8 +348,11 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "release" ]; then
             VERSION='${{ github.event.release.tag_name }}'
-          else
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF#refs/tags/}"
+          else
+            # For PR/branch builds, use a test version
+            VERSION="test-$(git rev-parse --short HEAD)"
           fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Packaging version: $VERSION"
@@ -464,6 +466,41 @@ jobs:
         run: |
           sha256sum apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz > apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz.sha256
           cat apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz.sha256
+
+      - name: Test quickstart package
+        run: |
+          # Extract package to /tmp for testing
+          cd /tmp
+          tar -xzf $GITHUB_WORKSPACE/apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz
+          
+          # Verify all required files exist
+          echo "Checking required files..."
+          test -f docker-compose.yml || { echo "Missing docker-compose.yml"; exit 1; }
+          test -f quickstart.sh || { echo "Missing quickstart.sh"; exit 1; }
+          test -f QUICKSTART.md || { echo "Missing QUICKSTART.md"; exit 1; }
+          test -d config || { echo "Missing config directory"; exit 1; }
+          test -f config/config.yaml || { echo "Missing config.yaml"; exit 1; }
+          test -f config/openapi/items.yaml || { echo "Missing items.yaml"; exit 1; }
+          
+          # Verify quickstart.sh is executable
+          test -x quickstart.sh || { echo "quickstart.sh is not executable"; exit 1; }
+          
+          # Verify config file permissions
+          ls -la config/
+          ls -la config/openapi/
+          
+          # Verify docker-compose.yml has correct image tag
+          echo "Checking image tag in docker-compose.yml..."
+          grep "image: apifyhost/apify:${{ steps.version.outputs.VERSION }}" docker-compose.yml || {
+            echo "Image tag not updated correctly"
+            grep "image: apifyhost/apify:" docker-compose.yml
+            exit 1
+          }
+          
+          # Verify docker-compose config is valid
+          docker compose config > /dev/null || { echo "Invalid docker-compose.yml"; exit 1; }
+          
+          echo "✅ Quickstart package validation passed!"
 
       - name: Upload to Release
         if: github.event_name == 'release'
