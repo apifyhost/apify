@@ -18,8 +18,8 @@ services:
   apify-sqlite:
     image: apifyhost/apify:latest
     ports:
-      - "3000:3000"
-      - "9090:9090"
+      - "3001:3000"
+      - "9092:9090"
     volumes:
       - ./config:/app/config-template:ro
       - ./e2e/prepare-config.sh:/app/prepare-config.sh:ro
@@ -46,7 +46,7 @@ services:
   apify-postgres:
     image: apifyhost/apify:latest
     ports:
-      - "3001:3000"
+      - "3000:3000"
       - "9091:9090"
     volumes:
       - ./config:/app/config-template:ro
@@ -85,7 +85,7 @@ services:
   prometheus:
     image: prom/prometheus:latest
     ports:
-      - "9092:9090"
+      - "9090:9090"
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
