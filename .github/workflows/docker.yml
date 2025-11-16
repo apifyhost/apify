@@ -336,7 +336,7 @@ jobs:
     name: Package and Upload Quickstart Bundle
     needs: [test-sqlite, test-postgres]
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/quickstart-')
+    # if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/quickstart-')
     permissions:
       contents: write
 
