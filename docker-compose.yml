@@ -82,11 +82,11 @@ services:
     environment:
       - COLLECTOR_OTLP_ENABLED=true
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:16686"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-      start_period: 5s
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:16686 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   prometheus:
     image: prom/prometheus:latest
@@ -102,11 +102,11 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--web.enable-lifecycle'
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-      start_period: 5s
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:9090/-/healthy || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   grafana:
     image: grafana/grafana:latest

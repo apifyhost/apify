@@ -7,11 +7,11 @@ datasources:
     uid: prometheus
     url: http://prometheus:9090
     isDefault: true
-    editable: true
+    editable: false
 
   - name: Jaeger
     type: jaeger
     access: proxy
     uid: jaeger
     url: http://jaeger:16686
-    editable: true
+    editable: false
