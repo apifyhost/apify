@@ -459,6 +459,11 @@ jobs:
           See README.md for full documentation.
           EOF
           
+          # Set proper permissions
+          chmod +x quickstart-package/quickstart.sh
+          chmod -R 644 quickstart-package/config
+          find quickstart-package/config -type d -exec chmod 755 {} \;
+          
           # Create tarball
           cd quickstart-package
           tar -czf ../apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz .
