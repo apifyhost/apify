@@ -469,8 +469,10 @@ jobs:
 
       - name: Test quickstart package
         run: |
-          # Extract package to /tmp for testing
-          cd /tmp
+          # Create test directory and extract package
+          TEST_DIR=$(mktemp -d)
+          echo "Testing in: $TEST_DIR"
+          cd "$TEST_DIR"
           tar -xzf $GITHUB_WORKSPACE/apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz
           
           # Verify all required files exist
@@ -501,6 +503,10 @@ jobs:
           docker compose config > /dev/null || { echo "Invalid docker-compose.yml"; exit 1; }
           
           echo "✅ Quickstart package validation passed!"
+          
+          # Cleanup
+          cd /
+          rm -rf "$TEST_DIR"
 
       - name: Upload to Release
         if: github.event_name == 'release'
