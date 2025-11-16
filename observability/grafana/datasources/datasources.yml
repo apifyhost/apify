@@ -4,6 +4,7 @@ datasources:
   - name: Prometheus
     type: prometheus
     access: proxy
+    uid: prometheus
     url: http://prometheus:9090
     isDefault: true
     editable: true
@@ -11,5 +12,6 @@ datasources:
   - name: Jaeger
     type: jaeger
     access: proxy
+    uid: jaeger
     url: http://jaeger:16686
     editable: true
