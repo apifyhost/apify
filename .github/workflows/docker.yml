@@ -65,82 +65,6 @@ jobs:
           path: apify-image.tar.gz
           retention-days: 1
 
-  test-sqlite:
-    name: E2E Tests (SQLite)
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.21'
-          cache-dependency-path: e2e/go.sum
-
-      - name: Install Go dependencies
-        working-directory: e2e
-        run: |
-          go mod download
-          go install github.com/onsi/ginkgo/v2/ginkgo@latest
-
-      - name: Download Docker image
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-image
-
-      - name: Load Docker image
-        run: |
-          docker load < apify-image.tar.gz
-
-      - name: Start Apify with SQLite using docker compose
-        run: |
-          docker compose up -d apify-sqlite
-          docker compose ps
-
-      - name: Wait for service to be ready
-        run: |
-          echo "Waiting for Apify to start..."
-          for i in {1..30}; do
-            if curl -sf http://localhost:3000/healthz > /dev/null 2>&1; then
-              echo "Service is ready!"
-              exit 0
-            fi
-            echo "Attempt $i: Service not ready yet..."
-            sleep 2
-          done
-          echo "Service failed to start within timeout"
-          docker compose logs apify-sqlite
-          exit 1
-
-      - name: Run E2E tests
-        working-directory: e2e
-        env:
-          BASE_URL: http://localhost:3000
-          API_KEY: e2e-test-key-001
-          METRICS_PORT: 9090
-        run: ginkgo -v
-
-      - name: Run observability tests
-        working-directory: e2e
-        env:
-          BASE_URL: http://localhost:3000
-          API_KEY: e2e-test-key-001
-          METRICS_PORT: 9090
-        run: ginkgo -v --focus="Observability"
-
-      - name: Show logs on failure
-        if: failure()
-        run: |
-          docker compose logs apify-sqlite
-
-      - name: Cleanup
-        if: always()
-        run: |
-          docker compose down -v
-
   test-postgres:
     name: E2E Tests (PostgreSQL)
     needs: build
@@ -173,7 +97,78 @@ jobs:
 
       - name: Start Apify with PostgreSQL using docker compose
         run: |
-          docker compose up -d postgres apify-postgres
+          docker compose up -d
+          docker compose ps
+
+      - name: Wait for service to be ready
+        run: |
+          echo "Waiting for Apify to start..."
+          for i in {1..30}; do
+            if curl -sf http://localhost:3000/healthz > /dev/null 2>&1; then
+              echo "Service is ready!"
+              exit 0
+            fi
+            echo "Attempt $i: Service not ready yet..."
+            sleep 2
+          done
+          echo "Service failed to start within timeout"
+          docker compose logs apify-postgres
+          exit 1
+
+      - name: Run E2E tests
+        working-directory: e2e
+        env:
+          BASE_URL: http://localhost:3000
+          API_KEY: e2e-test-key-001
+          METRICS_PORT: 9091
+        run: ginkgo -v
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          docker compose logs apify-postgres
+          docker compose logs postgres
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose down -v
+
+
+  test-sqlite:
+    name: E2E Tests (SQLite)
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: e2e/go.sum
+
+      - name: Install Go dependencies
+        working-directory: e2e
+        run: |
+          go mod download
+          go install github.com/onsi/ginkgo/v2/ginkgo@latest
+
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - name: Load Docker image
+        run: |
+          docker load < apify-image.tar.gz
+
+      - name: Start Apify with SQLite using docker compose
+        run: |
+          sed -i 's/postgres1/sqlite1/g' ./config/config.yaml
+          docker compose up -d
           docker compose ps
 
       - name: Wait for service to be ready
@@ -188,7 +183,7 @@ jobs:
             sleep 2
           done
           echo "Service failed to start within timeout"
-          docker compose logs apify-postgres
+          docker compose logs apify-sqlite
           exit 1
 
       - name: Run E2E tests
@@ -196,27 +191,19 @@ jobs:
         env:
           BASE_URL: http://localhost:3001
           API_KEY: e2e-test-key-001
-          METRICS_PORT: 9091
+          METRICS_PORT: 9092
         run: ginkgo -v
-      
-      - name: Run observability tests
-        working-directory: e2e
-        env:
-          BASE_URL: http://localhost:3001
-          API_KEY: e2e-test-key-001
-          METRICS_PORT: 9091
-        run: ginkgo -v --focus="Observability"
 
       - name: Show logs on failure
         if: failure()
         run: |
-          docker compose logs apify-postgres
-          docker compose logs postgres
-      
+          docker compose logs apify-sqlite
+
       - name: Cleanup
         if: always()
         run: |
           docker compose down -v
+
 
   scan:
     name: Security Scan
@@ -349,7 +336,6 @@ jobs:
     name: Package and Upload Quickstart Bundle
     needs: [test-sqlite, test-postgres]
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/quickstart-')
     permissions:
       contents: write
 
@@ -362,8 +348,11 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "release" ]; then
             VERSION='${{ github.event.release.tag_name }}'
-          else
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             VERSION="${GITHUB_REF#refs/tags/}"
+          else
+            # For PR/branch builds, use a test version
+            VERSION="test-$(git rev-parse --short HEAD)"
           fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Packaging version: $VERSION"
@@ -459,6 +448,11 @@ jobs:
           See README.md for full documentation.
           EOF
           
+          # Set proper permissions
+          chmod +x quickstart-package/quickstart.sh
+          find quickstart-package/config -type f -exec chmod 644 {} \;
+          find quickstart-package/config -type d -exec chmod 755 {} \;
+          
           # Create tarball
           cd quickstart-package
           tar -czf ../apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz .
@@ -472,6 +466,47 @@ jobs:
         run: |
           sha256sum apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz > apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz.sha256
           cat apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz.sha256
+
+      - name: Test quickstart package
+        run: |
+          # Create test directory and extract package
+          TEST_DIR=$(mktemp -d)
+          echo "Testing in: $TEST_DIR"
+          cd "$TEST_DIR"
+          tar -xzf $GITHUB_WORKSPACE/apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz
+          
+          # Verify all required files exist
+          echo "Checking required files..."
+          test -f docker-compose.yml || { echo "Missing docker-compose.yml"; exit 1; }
+          test -f quickstart.sh || { echo "Missing quickstart.sh"; exit 1; }
+          test -f QUICKSTART.md || { echo "Missing QUICKSTART.md"; exit 1; }
+          test -d config || { echo "Missing config directory"; exit 1; }
+          test -f config/config.yaml || { echo "Missing config.yaml"; exit 1; }
+          test -f config/openapi/items.yaml || { echo "Missing items.yaml"; exit 1; }
+          
+          # Verify quickstart.sh is executable
+          test -x quickstart.sh || { echo "quickstart.sh is not executable"; exit 1; }
+          
+          # Verify config file permissions
+          ls -la config/
+          ls -la config/openapi/
+          
+          # Verify docker-compose.yml has correct image tag
+          echo "Checking image tag in docker-compose.yml..."
+          grep "image: apifyhost/apify:${{ steps.version.outputs.VERSION }}" docker-compose.yml || {
+            echo "Image tag not updated correctly"
+            grep "image: apifyhost/apify:" docker-compose.yml
+            exit 1
+          }
+          
+          # Verify docker-compose config is valid
+          docker compose config > /dev/null || { echo "Invalid docker-compose.yml"; exit 1; }
+          
+          echo "✅ Quickstart package validation passed!"
+          
+          # Cleanup
+          cd /
+          rm -rf "$TEST_DIR"
 
       - name: Upload to Release
         if: github.event_name == 'release'

@@ -67,6 +67,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD ["/usr/local/bin/apify", "--version"] || exit 1
 
-# Default command
-ENTRYPOINT ["/usr/local/bin/apify"]
-CMD ["-c", "/app/config/config.yaml"]
+# Use CMD instead of ENTRYPOINT to allow easy override
+CMD ["/usr/local/bin/apify", "-c", "/app/config/config.yaml"]
