@@ -79,9 +79,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .unwrap_or(9090);
 
     if metrics_enabled {
+        let otlp_endpoint_for_thread = otlp_endpoint.map(|s| s.to_string());
         let metrics_handle = thread::spawn(
             move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-                start_metrics_server(metrics_port)?;
+                start_metrics_server(metrics_port, otlp_endpoint_for_thread)?;
                 Ok(())
             },
         );
@@ -192,14 +193,17 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 }
 
 /// Start metrics HTTP server
-fn start_metrics_server(port: u16) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn start_metrics_server(
+    port: u16,
+    otlp_endpoint: Option<String>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use apify::{
         http_body_util::Full,
         hyper::{
             Request, Response, StatusCode, body::Bytes, server::conn::http1, service::service_fn,
         },
         hyper_util::rt::TokioIo,
-        observability::export_metrics,
+        observability::{export_metrics, init_opentelemetry},
         tokio::{self, net::TcpListener},
     };
 
@@ -208,6 +212,16 @@ fn start_metrics_server(port: u16) -> Result<(), Box<dyn std::error::Error + Sen
         .build()?;
 
     rt.block_on(async {
+        // Initialize OpenTelemetry now that we're in Tokio runtime
+        if let Some(ref endpoint) = otlp_endpoint {
+            if let Err(e) = init_opentelemetry("apify", endpoint).await {
+                tracing::warn!(
+                    error = %e,
+                    "Failed to initialize OpenTelemetry, continuing without tracing"
+                );
+            }
+        }
+
         let addr: std::net::SocketAddr = format!("0.0.0.0:{}", port).parse()?;
         let listener = TcpListener::bind(addr).await?;
         tracing::info!(address = %addr, "Metrics server listening");

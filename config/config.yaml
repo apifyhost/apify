@@ -37,7 +37,7 @@ observability:
   # OpenTelemetry OTLP endpoint for distributed tracing
   # Set to null or omit to disable tracing
   # Example: "http://localhost:4317" for local Jaeger
-  otlp_endpoint: null
+  otlp_endpoint: http://jaeger:4317
 
   # Enable Prometheus metrics endpoint
   # Default: true
