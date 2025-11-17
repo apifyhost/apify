@@ -70,11 +70,8 @@ install_apify() {
     echo_warning "Found existing docker-compose.yml in current directory"
     echo "Using local files instead of downloading..."
     
-    echo "Pulling latest Docker images..."
-    docker compose pull apify-sqlite || echo_warning "Pull failed, will use existing image"
-    
-    echo "Starting Apify with SQLite..."
-    docker compose up -d apify-sqlite
+    echo "Starting Apify..."
+    docker compose up -d
 
     echo "Waiting for service to be ready..."
     if wait_for_service "Apify" "http://127.0.0.1:3000/healthz"; then
@@ -83,7 +80,7 @@ install_apify() {
     else
       echo_fail "Failed to start Apify"
       echo "Checking logs..."
-      docker compose logs apify-sqlite
+      docker compose logs
       return 1
     fi
   fi
@@ -101,12 +98,9 @@ install_apify() {
       *)
         echo "Using existing installation..."
         cd "$INSTALL_DIR"
-        
-        echo "Pulling latest Docker images..."
-        docker compose pull apify-sqlite || echo_warning "Pull failed, will use existing image"
-        
-        echo "Starting Apify with SQLite..."
-        docker compose up -d apify-sqlite
+
+        echo "Starting Apify..."
+        docker compose up -d
 
         echo "Waiting for service to be ready..."
         if wait_for_service "Apify" "http://127.0.0.1:3000/healthz"; then
@@ -115,37 +109,34 @@ install_apify() {
         else
           echo_fail "Failed to start Apify"
           echo "Checking logs..."
-          docker compose logs apify-sqlite
+          docker compose logs
           return 1
         fi
         ;;
     esac
   fi
-  
+
   echo "Downloading Apify ${RELEASE_TAG}..."
-  
+
   if ! curl -fSL "$DOWNLOAD_URL" -o "${RELEASE_TAG}.tar.gz"; then
     echo_fail "Failed to download Apify from ${DOWNLOAD_URL}"
     echo_warning "You can also run this script in a directory with existing docker-compose.yml"
     return 1
   fi
-  
+
   echo_pass "Downloaded successfully"
 
   echo "Extracting package..."
   mkdir -p "$INSTALL_DIR"
   tar -xzf "${RELEASE_TAG}.tar.gz" -C "$INSTALL_DIR"
   rm "${RELEASE_TAG}.tar.gz"
-  
+
   echo_pass "Extracted to $INSTALL_DIR"
-  
+
   cd "$INSTALL_DIR"
-  
-  echo "Pulling Docker images..."
-  docker compose pull apify-sqlite || echo_warning "Pull failed, will use existing image"
-  
-  echo "Starting Apify with SQLite..."
-  docker compose up -d apify-sqlite
+
+  echo "Starting Apify..."
+  docker compose up -d
 
   echo "Waiting for service to be ready..."
   if wait_for_service "Apify" "http://127.0.0.1:3000/healthz"; then
@@ -154,7 +145,7 @@ install_apify() {
   else
     echo_fail "Failed to start Apify"
     echo "Checking logs..."
-    docker compose logs apify-sqlite
+    docker compose logs
     return 1
   fi
 }
@@ -166,17 +157,17 @@ start_apify() {
     echo_fail "No Apify installation found. Run '$0 install' first."
     return 1
   fi
-  
+
   echo "Starting Apify..."
-  docker compose up -d apify-sqlite
-  
+  docker compose up -d
+
   if wait_for_service "Apify" "http://127.0.0.1:3000/healthz"; then
     echo_pass "Apify started successfully!"
     output_listen_address
     return 0
   else
     echo_fail "Failed to start Apify"
-    docker compose logs apify-sqlite
+    docker compose logs
     return 1
   fi
 }
@@ -214,10 +205,10 @@ status_apify() {
     echo_fail "No Apify installation found"
     return 1
   fi
-  
+
   echo "Apify service status:"
   docker compose ps
-  
+
   echo ""
   echo "Testing health endpoint..."
   if curl -sf http://127.0.0.1:3000/healthz > /dev/null 2>&1; then
@@ -257,7 +248,7 @@ output_listen_address() {
   echo "   Health:  http://localhost:3000/healthz"
   echo "   Metrics: http://localhost:9090/metrics"
   echo ""
-  
+
   if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     ips=$(ip -4 addr | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v 127.0.0.1 | head -3)
   elif [[ "$OSTYPE" == "darwin"* ]]; then
@@ -271,16 +262,16 @@ output_listen_address() {
     done
     echo ""
   fi
-  
+
   echo "💡 Quick commands:"
-  echo "   View logs:  docker compose logs -f apify-sqlite"
+  echo "   View logs:  docker compose logs -f"
   echo "   Stop:       docker compose down"
-  echo "   Restart:    docker compose restart apify-sqlite"
+  echo "   Restart:    docker compose restart"
 }
 
 main() {
   local command="${1:-install}"
-  
+
   case "$command" in
     help|-h|--help)
       usage
