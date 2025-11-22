@@ -18,7 +18,7 @@ openapi:
           bearerFormat: JWT
         OpenID:
           type: openIdConnect
-          openIdConnectUrl: https://keycloak.local/realms/apify/.well-known/openid-configuration
+          openIdConnectUrl: "${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:apify}/.well-known/openid-configuration"
 
     x-table-schemas:
       - table_name: "items"

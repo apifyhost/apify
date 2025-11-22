@@ -191,7 +191,11 @@ impl OpenAPIConfig {
     pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let content = fs::read_to_string(path)
             .map_err(|e| format!("Failed to read OpenAPI config file: {}", e))?;
-        let config = serde_yaml::from_str(&content)
+        
+        // Expand environment variables
+        let expanded = expand_env_vars(&content);
+        
+        let config = serde_yaml::from_str(&expanded)
             .map_err(|e| format!("Failed to parse OpenAPI config file: {}", e))?;
         Ok(config)
     }

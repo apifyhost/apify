@@ -153,21 +153,6 @@ jobs:
         run: |
           curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration | jq .
 
-      - name: Add OAuth provider to config
-        run: |
-          cat >> config/config.yaml << 'EOF'
-
-          oauth_providers:
-            - name: keycloak
-              issuer: "http://localhost:8080/realms/apify"
-              client_id: "apify-test-client"
-              client_secret: "apify-test-secret"
-              audience: "apify-api"
-              use_introspection: true
-          EOF
-          echo "Updated config.yaml:"
-          cat config/config.yaml
-
       - name: Download Docker image
         uses: actions/download-artifact@v4
         with:
@@ -327,19 +312,9 @@ jobs:
         run: |
           docker load < apify-image.tar.gz
 
-      - name: Update config for SQLite and add OAuth provider
+      - name: Update config for SQLite
         run: |
           sed -i 's/postgres1/sqlite1/g' ./config/config.yaml
-          cat >> config/config.yaml << 'EOF'
-
-          oauth_providers:
-            - name: keycloak
-              issuer: "http://localhost:8080/realms/apify"
-              client_id: "apify-test-client"
-              client_secret: "apify-test-secret"
-              audience: "apify-api"
-              use_introspection: true
-          EOF
           echo "Updated config.yaml:"
           cat config/config.yaml
 
