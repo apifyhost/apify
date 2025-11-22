@@ -215,11 +215,10 @@ impl AppState {
                                 let mut cfg: ModulesConfig = ModulesConfig::default();
 
                                 // 1. Legacy x-modules extension
-                                if let Some(xmods) = op.get("x-modules") {
-                                    if let Some(parsed) = modules_from_value(xmods) {
+                                if let Some(xmods) = op.get("x-modules")
+                                    && let Some(parsed) = modules_from_value(xmods) {
                                         cfg = parsed;
                                     }
-                                }
 
                                 // 2. Security requirement objects (operation-level overrides global)
                                 let mut access_from_security: Vec<String> = Vec::new();
