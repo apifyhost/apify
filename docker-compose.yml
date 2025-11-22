@@ -26,8 +26,8 @@ services:
     environment:
       - RUST_LOG=info
       - APIFY_THREADS=2
-      # OAuth/OIDC configuration
-      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://keycloak:8080}
+      # OAuth/OIDC configuration - use localhost to match Keycloak's KC_HOSTNAME
+      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://localhost:8080}
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-apify}
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-apify-test-client}
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-apify-test-secret}
@@ -45,8 +45,8 @@ services:
     environment:
       - RUST_LOG=info
       - APIFY_THREADS=2
-      # OAuth/OIDC configuration
-      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://keycloak:8080}
+      # OAuth/OIDC configuration - use localhost to match Keycloak's KC_HOSTNAME
+      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://localhost:8080}
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-apify}
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-apify-test-client}
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-apify-test-secret}

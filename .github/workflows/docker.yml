@@ -94,11 +94,14 @@ jobs:
       - name: Start Keycloak
         run: |
           # Connect to docker compose default network
+          # Set hostname to localhost so tokens have consistent issuer URL
           docker run -d --name keycloak \
             --network apify_default \
             -p 8080:8080 \
             -e KEYCLOAK_ADMIN=admin \
             -e KEYCLOAK_ADMIN_PASSWORD=admin \
+            -e KC_HOSTNAME=localhost \
+            -e KC_HOSTNAME_STRICT=false \
             quay.io/keycloak/keycloak:24.0 start-dev
 
       - name: Wait for Keycloak
@@ -250,11 +253,14 @@ jobs:
       - name: Start Keycloak
         run: |
           # Connect to docker compose default network
+          # Set hostname to localhost so tokens have consistent issuer URL
           docker run -d --name keycloak \
             --network apify_default \
             -p 8080:8080 \
             -e KEYCLOAK_ADMIN=admin \
             -e KEYCLOAK_ADMIN_PASSWORD=admin \
+            -e KC_HOSTNAME=localhost \
+            -e KC_HOSTNAME_STRICT=false \
             quay.io/keycloak/keycloak:24.0 start-dev
 
       - name: Wait for Keycloak
