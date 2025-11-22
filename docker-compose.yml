@@ -109,3 +109,8 @@ volumes:
   sqlite_data:
   prometheus_data:
   grafana_data:
+
+networks:
+  default:
+    name: apify_default
+    driver: bridge

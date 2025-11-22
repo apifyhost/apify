@@ -86,6 +86,11 @@ jobs:
           go mod download
           go install github.com/onsi/ginkgo/v2/ginkgo@latest
 
+      - name: Create Docker Compose network
+        run: |
+          # Create the network that docker compose will use
+          docker network create apify_default || true
+
       - name: Start Keycloak
         run: |
           # Connect to docker compose default network
@@ -236,6 +241,11 @@ jobs:
         run: |
           go mod download
           go install github.com/onsi/ginkgo/v2/ginkgo@latest
+
+      - name: Create Docker Compose network
+        run: |
+          # Create the network that docker compose will use
+          docker network create apify_default || true
 
       - name: Start Keycloak
         run: |
