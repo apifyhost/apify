@@ -86,6 +86,65 @@ jobs:
           go mod download
           go install github.com/onsi/ginkgo/v2/ginkgo@latest
 
+      - name: Start Keycloak
+        run: |
+          docker run -d --name keycloak \
+            --network host \
+            -e KEYCLOAK_ADMIN=admin \
+            -e KEYCLOAK_ADMIN_PASSWORD=admin \
+            quay.io/keycloak/keycloak:24.0 start-dev
+
+      - name: Wait for Keycloak
+        run: |
+          echo "Waiting for Keycloak to start..."
+          for i in {1..60}; do
+            if curl -sf http://localhost:8080/health/ready > /dev/null 2>&1; then
+              echo "Keycloak is ready!"
+              exit 0
+            fi
+            echo "Attempt $i: Keycloak not ready yet..."
+            sleep 3
+          done
+          echo "Keycloak failed to start"
+          docker logs keycloak
+          exit 1
+
+      - name: Get Keycloak admin token
+        id: keycloak_token
+        run: |
+          TOKEN=$(curl -sf -X POST http://localhost:8080/realms/master/protocol/openid-connect/token \
+            -d "grant_type=password" \
+            -d "client_id=admin-cli" \
+            -d "username=admin" \
+            -d "password=admin" | jq -r .access_token)
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Import Keycloak realm
+        run: |
+          curl -sf -X POST http://localhost:8080/admin/realms \
+            -H "Authorization: Bearer ${{ steps.keycloak_token.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d @config/keycloak/realm-export.json
+
+      - name: Verify realm imported
+        run: |
+          curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration | jq .
+
+      - name: Add OAuth provider to config
+        run: |
+          cat >> config/config.yaml << 'EOF'
+
+          oauth_providers:
+            - name: keycloak
+              issuer: "http://localhost:8080/realms/apify"
+              client_id: "apify-test-client"
+              client_secret: "apify-test-secret"
+              audience: "apify-api"
+              use_introspection: true
+          EOF
+          echo "Updated config.yaml:"
+          cat config/config.yaml
+
       - name: Download Docker image
         uses: actions/download-artifact@v4
         with:
@@ -115,24 +174,36 @@ jobs:
           docker compose logs apify-postgres
           exit 1
 
-      - name: Run E2E tests
+      - name: Run E2E tests (including OAuth)
         working-directory: e2e
         env:
           BASE_URL: http://localhost:3000
           API_KEY: e2e-test-key-001
           METRICS_PORT: 9091
+          KEYCLOAK_URL: http://localhost:8080
+          KEYCLOAK_REALM: apify
+          KEYCLOAK_CLIENT_ID: apify-test-client
+          KEYCLOAK_CLIENT_SECRET: apify-test-secret
+          KEYCLOAK_USERNAME: testuser
+          KEYCLOAK_PASSWORD: testpassword
         run: ginkgo -v
 
       - name: Show logs on failure
         if: failure()
         run: |
+          echo "=== Apify logs ==="
           docker compose logs apify-postgres
+          echo "=== PostgreSQL logs ==="
           docker compose logs postgres
+          echo "=== Keycloak logs ==="
+          docker logs keycloak
       
       - name: Cleanup
         if: always()
         run: |
           docker compose down -v
+          docker stop keycloak || true
+          docker rm keycloak || true
 
 
   test-sqlite:
@@ -156,6 +227,50 @@ jobs:
           go mod download
           go install github.com/onsi/ginkgo/v2/ginkgo@latest
 
+      - name: Start Keycloak
+        run: |
+          docker run -d --name keycloak \
+            --network host \
+            -e KEYCLOAK_ADMIN=admin \
+            -e KEYCLOAK_ADMIN_PASSWORD=admin \
+            quay.io/keycloak/keycloak:24.0 start-dev
+
+      - name: Wait for Keycloak
+        run: |
+          echo "Waiting for Keycloak to start..."
+          for i in {1..60}; do
+            if curl -sf http://localhost:8080/health/ready > /dev/null 2>&1; then
+              echo "Keycloak is ready!"
+              exit 0
+            fi
+            echo "Attempt $i: Keycloak not ready yet..."
+            sleep 3
+          done
+          echo "Keycloak failed to start"
+          docker logs keycloak
+          exit 1
+
+      - name: Get Keycloak admin token
+        id: keycloak_token
+        run: |
+          TOKEN=$(curl -sf -X POST http://localhost:8080/realms/master/protocol/openid-connect/token \
+            -d "grant_type=password" \
+            -d "client_id=admin-cli" \
+            -d "username=admin" \
+            -d "password=admin" | jq -r .access_token)
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Import Keycloak realm
+        run: |
+          curl -sf -X POST http://localhost:8080/admin/realms \
+            -H "Authorization: Bearer ${{ steps.keycloak_token.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d @config/keycloak/realm-export.json
+
+      - name: Verify realm imported
+        run: |
+          curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration | jq .
+
       - name: Download Docker image
         uses: actions/download-artifact@v4
         with:
@@ -165,9 +280,24 @@ jobs:
         run: |
           docker load < apify-image.tar.gz
 
-      - name: Start Apify with SQLite using docker compose
+      - name: Update config for SQLite and add OAuth provider
         run: |
           sed -i 's/postgres1/sqlite1/g' ./config/config.yaml
+          cat >> config/config.yaml << 'EOF'
+
+          oauth_providers:
+            - name: keycloak
+              issuer: "http://localhost:8080/realms/apify"
+              client_id: "apify-test-client"
+              client_secret: "apify-test-secret"
+              audience: "apify-api"
+              use_introspection: true
+          EOF
+          echo "Updated config.yaml:"
+          cat config/config.yaml
+
+      - name: Start Apify with SQLite using docker compose
+        run: |
           docker compose up -d
           docker compose ps
 
@@ -186,23 +316,34 @@ jobs:
           docker compose logs apify-sqlite
           exit 1
 
-      - name: Run E2E tests
+      - name: Run E2E tests (including OAuth)
         working-directory: e2e
         env:
           BASE_URL: http://localhost:3001
           API_KEY: e2e-test-key-001
           METRICS_PORT: 9092
+          KEYCLOAK_URL: http://localhost:8080
+          KEYCLOAK_REALM: apify
+          KEYCLOAK_CLIENT_ID: apify-test-client
+          KEYCLOAK_CLIENT_SECRET: apify-test-secret
+          KEYCLOAK_USERNAME: testuser
+          KEYCLOAK_PASSWORD: testpassword
         run: ginkgo -v
 
       - name: Show logs on failure
         if: failure()
         run: |
+          echo "=== Apify logs ==="
           docker compose logs apify-sqlite
+          echo "=== Keycloak logs ==="
+          docker logs keycloak
 
       - name: Cleanup
         if: always()
         run: |
           docker compose down -v
+          docker stop keycloak || true
+          docker rm keycloak || true
 
 
   scan:

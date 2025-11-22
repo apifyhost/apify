@@ -215,7 +215,7 @@ Apify uses a dual-path validation strategy:
 
 **Testing with Keycloak:**
 
-See [`.github/workflows/oauth-e2e.yml`](../.github/workflows/oauth-e2e.yml) for a complete example of running OAuth e2e tests with Keycloak in CI.
+OAuth e2e tests are integrated into the main CI workflow (`.github/workflows/docker.yml`) as a separate `test-oauth` job, running alongside PostgreSQL and SQLite tests.
 
 **Migration Note:** Legacy `x-modules: access: ["key_auth"]` syntax is still supported for backward compatibility, but using standard OpenAPI security schemes is recommended.
 
