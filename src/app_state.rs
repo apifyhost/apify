@@ -2,8 +2,8 @@
 
 use super::api_generator::APIGenerator;
 use super::config::{
-    ConsumerConfig, DatabaseSettings, MatchRule, ModulesConfig, OpenAPIConfig, RouteConfig,
-    OAuthProviderConfig,
+    ConsumerConfig, DatabaseSettings, MatchRule, ModulesConfig, OAuthProviderConfig, OpenAPIConfig,
+    RouteConfig,
 };
 use super::crud_handler::CRUDHandler;
 use super::database::DatabaseManager;
@@ -198,8 +198,12 @@ impl AppState {
             let mut global_access: Vec<String> = Vec::new();
             if let Some(sec_arr) = spec.get("security").and_then(|v| v.as_array()) {
                 for req in sec_arr.iter().filter_map(|v| v.as_object()) {
-                    if req.contains_key("ApiKeyAuth") { global_access.push("key_auth".to_string()); }
-                    if req.contains_key("BearerAuth") || req.contains_key("OpenID") { global_access.push("oauth".to_string()); }
+                    if req.contains_key("ApiKeyAuth") {
+                        global_access.push("key_auth".to_string());
+                    }
+                    if req.contains_key("BearerAuth") || req.contains_key("OpenID") {
+                        global_access.push("oauth".to_string());
+                    }
                 }
             }
             // Deduplicate
@@ -229,8 +233,14 @@ impl AppState {
                                 if let Some(sec_arr) = op.get("security").and_then(|v| v.as_array())
                                 {
                                     for req in sec_arr.iter().filter_map(|v| v.as_object()) {
-                                        if req.contains_key("ApiKeyAuth") { access_from_security.push("key_auth".to_string()); }
-                                        if req.contains_key("BearerAuth") || req.contains_key("OpenID") { access_from_security.push("oauth".to_string()); }
+                                        if req.contains_key("ApiKeyAuth") {
+                                            access_from_security.push("key_auth".to_string());
+                                        }
+                                        if req.contains_key("BearerAuth")
+                                            || req.contains_key("OpenID")
+                                        {
+                                            access_from_security.push("oauth".to_string());
+                                        }
                                     }
                                 } else {
                                     // Use global security if local absent
@@ -276,7 +286,9 @@ impl AppState {
         // Build oauth providers map
         let mut oauth_map = HashMap::new();
         if let Some(list) = oauth_providers {
-            for p in list { oauth_map.insert(p.name.clone(), p); }
+            for p in list {
+                oauth_map.insert(p.name.clone(), p);
+            }
         }
 
         Ok(Self {
@@ -307,7 +319,9 @@ fn apply_modules_cfg(
                     reg = reg.with(Arc::new(crate::modules::key_auth::KeyAuthModule::new()));
                 }
                 "oauth" => {
-                    reg = reg.with(Arc::new(crate::modules::oauth::OAuthModule::new("default".to_string())));
+                    reg = reg.with(Arc::new(crate::modules::oauth::OAuthModule::new(
+                        "default".to_string(),
+                    )));
                 }
                 _ => eprintln!("Unknown access module: {}", name),
             }
