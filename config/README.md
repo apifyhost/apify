@@ -221,8 +221,42 @@ OAuth e2e tests are integrated into the main CI workflow (`.github/workflows/doc
 
 ## Environment Variables
 
+### Environment Variable Substitution
+
+Configuration files support environment variable expansion using the `${VAR:default}` syntax:
+
+```yaml
+oauth_providers:
+  - name: keycloak
+    # Use KEYCLOAK_URL env var, fallback to http://localhost:8080
+    issuer: "${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:apify}"
+    client_id: "${KEYCLOAK_CLIENT_ID:apify-client}"
+    client_secret: "${KEYCLOAK_CLIENT_SECRET}"
+    audience: "account"
+
+datasource:
+  postgres1:
+    driver: postgres
+    host: "${DB_HOST:localhost}"
+    port: 5432
+    user: "${DB_USER:postgres}"
+    password: "${DB_PASSWORD}"
+    database: "${DB_NAME:apify}"
+```
+
+**Syntax:**
+- `${VAR}` - Use environment variable VAR, empty string if not set
+- `${VAR:default}` - Use environment variable VAR, use "default" if not set
+
+**Common Variables:**
 - `RUST_LOG`: Override log level (e.g., `RUST_LOG=debug`)
-- `APIFY_THREADS`: Number of worker threads (default: CPU cores)
+- `APIFY_THREADS`: Number of worker threads (default: 2)
+
+**OAuth Testing:**
+- `KEYCLOAK_URL`: Keycloak server URL
+- `KEYCLOAK_REALM`: Keycloak realm name
+- `KEYCLOAK_CLIENT_ID`: OAuth client ID
+- `KEYCLOAK_CLIENT_SECRET`: OAuth client secret
 
 ## See Also
 

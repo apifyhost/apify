@@ -908,9 +908,10 @@ Validates OAuth 2.0 bearer tokens using OIDC discovery and dual-path validation 
 # config.yaml
 oauth_providers:
   - name: keycloak
-    issuer: "http://localhost:8080/realms/apify"
-    client_id: "apify-client"
-    client_secret: "client-secret"
+    # Supports env var expansion: ${VAR:default}
+    issuer: "${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:apify}"
+    client_id: "${KEYCLOAK_CLIENT_ID:apify-client}"
+    client_secret: "${KEYCLOAK_CLIENT_SECRET}"
     audience: "apify-api"
     use_introspection: true
 
