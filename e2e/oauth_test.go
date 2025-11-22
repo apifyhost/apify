@@ -2,6 +2,7 @@ package e2e_test
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
