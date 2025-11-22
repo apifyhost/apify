@@ -2,16 +2,12 @@ openapi:
   spec:
     openapi: "3.0.0"
     info:
-      title: "E2E Test API"
+      title: "E2E OAuth API"
       version: "1.0.0"
-      description: "API for end-to-end testing"
+      description: "API for end-to-end OAuth/OIDC testing (separate from API key)"
 
     components:
       securitySchemes:
-        ApiKeyAuth:
-          type: apiKey
-          in: header
-          name: X-Api-Key
         BearerAuth:
           type: http
           scheme: bearer
@@ -20,60 +16,26 @@ openapi:
           type: openIdConnect
           openIdConnectUrl: "${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:apify}/.well-known/openid-configuration"
 
-    x-table-schemas:
-      - table_name: "items"
-        columns:
-          - name: "id"
-            column_type: "INTEGER"
-            nullable: false
-            primary_key: true
-            unique: false
-            auto_increment: true
-          - name: "name"
-            column_type: "TEXT"
-            nullable: false
-            primary_key: false
-            unique: false
-            auto_increment: false
-          - name: "description"
-            column_type: "TEXT"
-            nullable: true
-            primary_key: false
-            unique: false
-            auto_increment: false
-          - name: "price"
-            column_type: "REAL"
-            nullable: true
-            primary_key: false
-            unique: false
-            auto_increment: false
-          - name: "created_at"
-            column_type: "TIMESTAMP"
-            nullable: false
-            primary_key: false
-            unique: false
-            auto_increment: false
-            default_value: "CURRENT_TIMESTAMP"
-        indexes: []
+    # NOTE: Table schemas defined in items.yaml; we reuse the same underlying tables.
 
     paths:
-      /items:
+      /secure-items:
         get:
-          operationId: listItems
-          summary: "List all items"
+          operationId: listSecureItems
+          summary: "List all items (OAuth protected)"
           x-table-name: "items"
           security:
-            - ApiKeyAuth: []
+            - BearerAuth: []
           responses:
             "200":
               description: "List of items"
 
         post:
-          operationId: createItem
-          summary: "Create a new item"
+          operationId: createSecureItem
+          summary: "Create a new item (OAuth protected)"
           x-table-name: "items"
           security:
-            - ApiKeyAuth: []
+            - BearerAuth: []
           requestBody:
             required: true
             content:
@@ -92,13 +54,13 @@ openapi:
             "200":
               description: "Item created"
 
-      /items/{id}:
+      /secure-items/{id}:
         get:
-          operationId: getItem
-          summary: "Get item by ID"
+          operationId: getSecureItem
+          summary: "Get item by ID (OAuth protected)"
           x-table-name: "items"
           security:
-            - ApiKeyAuth: []
+            - BearerAuth: []
           parameters:
             - name: id
               in: path
@@ -112,11 +74,11 @@ openapi:
               description: "Item not found"
 
         put:
-          operationId: updateItem
-          summary: "Update an item"
+          operationId: updateSecureItem
+          summary: "Update an item (OAuth protected)"
           x-table-name: "items"
           security:
-            - ApiKeyAuth: []
+            - BearerAuth: []
           parameters:
             - name: id
               in: path
@@ -136,11 +98,11 @@ openapi:
               description: "Item not found"
 
         delete:
-          operationId: deleteItem
-          summary: "Delete an item"
+          operationId: deleteSecureItem
+          summary: "Delete an item (OAuth protected)"
           x-table-name: "items"
           security:
-            - ApiKeyAuth: []
+            - BearerAuth: []
           parameters:
             - name: id
               in: path
@@ -152,19 +114,3 @@ openapi:
               description: "Item deleted"
             "404":
               description: "Item not found"
-
-      /healthz:
-        get:
-          operationId: healthCheck
-          summary: "Health check endpoint"
-          responses:
-            "200":
-              description: "Service is healthy"
-              content:
-                application/json:
-                  schema:
-                    type: object
-                    properties:
-                      status:
-                        type: string
-                        example: "ok"

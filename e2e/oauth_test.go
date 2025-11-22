@@ -77,7 +77,7 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 	Describe("Bearer Token Authentication", func() {
 		Context("when valid bearer token is provided", func() {
 			It("should allow access to protected endpoints", func() {
-				req, err := http.NewRequest("GET", baseURL+"/items", nil)
+				req, err := http.NewRequest("GET", baseURL+"/secure-items", nil)
 				Expect(err).NotTo(HaveOccurred())
 				req.Header.Set("Authorization", "Bearer "+accessToken)
 
@@ -91,7 +91,7 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 
 			It("should allow creating items with bearer token", func() {
 				body := `{"name": "OAuth Test Item", "description": "Created via OAuth", "price": 99.99}`
-				req, err := http.NewRequest("POST", baseURL+"/items", strings.NewReader(body))
+				req, err := http.NewRequest("POST", baseURL+"/secure-items", strings.NewReader(body))
 				Expect(err).NotTo(HaveOccurred())
 				req.Header.Set("Authorization", "Bearer "+accessToken)
 				req.Header.Set("Content-Type", "application/json")
@@ -107,7 +107,7 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 
 		Context("when bearer token is missing", func() {
 			It("should return 401 Unauthorized", func() {
-				req, err := http.NewRequest("GET", baseURL+"/items", nil)
+				req, err := http.NewRequest("GET", baseURL+"/secure-items", nil)
 				Expect(err).NotTo(HaveOccurred())
 
 				resp, err := client.Do(req)
@@ -121,7 +121,7 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 
 		Context("when invalid bearer token is provided", func() {
 			It("should return 401 Unauthorized", func() {
-				req, err := http.NewRequest("GET", baseURL+"/items", nil)
+				req, err := http.NewRequest("GET", baseURL+"/secure-items", nil)
 				Expect(err).NotTo(HaveOccurred())
 				req.Header.Set("Authorization", "Bearer invalid-token-xyz")
 
@@ -138,7 +138,7 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 			It("should return 401 Unauthorized", func() {
 				// Use a clearly malformed token to simulate expiration
 				expiredToken := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2MDAwMDAwMDB9.invalid"
-				req, err := http.NewRequest("GET", baseURL+"/items", nil)
+				req, err := http.NewRequest("GET", baseURL+"/secure-items", nil)
 				Expect(err).NotTo(HaveOccurred())
 				req.Header.Set("Authorization", "Bearer "+expiredToken)
 
@@ -173,7 +173,7 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 			It("should validate token via introspection endpoint", func() {
 				// This test assumes the oauth module attempts introspection
 				// when configured. The token should be validated successfully.
-				req, err := http.NewRequest("GET", baseURL+"/items", nil)
+				req, err := http.NewRequest("GET", baseURL+"/secure-items", nil)
 				Expect(err).NotTo(HaveOccurred())
 				req.Header.Set("Authorization", "Bearer "+accessToken)
 

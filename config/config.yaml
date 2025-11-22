@@ -5,6 +5,8 @@ listeners:
     apis:
       - path: ./openapi/items.yaml
         datasource: postgres1
+      - path: ./openapi/items_oauth.yaml
+        datasource: postgres1
 
 consumers:
   - name: default
