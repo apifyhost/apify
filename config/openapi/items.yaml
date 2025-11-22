@@ -63,6 +63,7 @@ openapi:
           summary: "List all items"
           x-table-name: "items"
           security:
+            - ApiKeyAuth: []
             - BearerAuth: []
           responses:
             "200":
@@ -73,6 +74,7 @@ openapi:
           summary: "Create a new item"
           x-table-name: "items"
           security:
+            - ApiKeyAuth: []
             - BearerAuth: []
           requestBody:
             required: true
@@ -98,6 +100,7 @@ openapi:
           summary: "Get item by ID"
           x-table-name: "items"
           security:
+            - ApiKeyAuth: []
             - BearerAuth: []
           parameters:
             - name: id
@@ -116,6 +119,7 @@ openapi:
           summary: "Update an item"
           x-table-name: "items"
           security:
+            - ApiKeyAuth: []
             - BearerAuth: []
           parameters:
             - name: id
@@ -140,6 +144,7 @@ openapi:
           summary: "Delete an item"
           x-table-name: "items"
           security:
+            - ApiKeyAuth: []
             - BearerAuth: []
           parameters:
             - name: id
