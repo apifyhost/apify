@@ -55,6 +55,7 @@ pub fn start_listener(
         Option<String>, // datasource name for this API
     )>,
     consumers: Vec<super::config::ConsumerConfig>,
+    oauth_providers: Option<Vec<super::config::OAuthProviderConfig>>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Critical: Create single-threaded runtime using new_current_thread
     let rt = tokio::runtime::Builder::new_current_thread() // <-- Restored critical line
@@ -77,6 +78,7 @@ pub fn start_listener(
             openapi_configs,
             listener_config.modules,
             consumers,
+            oauth_providers,
         )
         .await
         {

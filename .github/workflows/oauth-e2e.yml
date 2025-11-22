@@ -1,0 +1,154 @@
+name: OAuth/OIDC E2E Tests
+
+on:
+  push:
+    branches: [ main, feat/oauth ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  oauth-e2e:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: apify
+          POSTGRES_PASSWORD: apify_test_password
+          POSTGRES_DB: apify_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build Apify
+        run: cargo build --release
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Start Keycloak
+        run: |
+          docker run -d --name keycloak \
+            -p 8080:8080 \
+            -e KEYCLOAK_ADMIN=admin \
+            -e KEYCLOAK_ADMIN_PASSWORD=admin \
+            -e KC_HTTP_RELATIVE_PATH=/auth \
+            quay.io/keycloak/keycloak:24.0 \
+            start-dev
+          
+          echo "Waiting for Keycloak to start..."
+          timeout 120 bash -c 'until curl -sf http://localhost:8080/auth/health/ready; do sleep 2; done'
+          echo "Keycloak is ready"
+
+      - name: Import Keycloak realm
+        run: |
+          # Get admin token
+          ADMIN_TOKEN=$(curl -sS -X POST http://localhost:8080/auth/realms/master/protocol/openid-connect/token \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "username=admin" \
+            -d "password=admin" \
+            -d "grant_type=password" \
+            -d "client_id=admin-cli" | jq -r '.access_token')
+          
+          # Import realm
+          curl -sS -X POST http://localhost:8080/auth/admin/realms \
+            -H "Authorization: Bearer $ADMIN_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d @config/keycloak/realm-export.json
+          
+          echo "Realm imported successfully"
+
+      - name: Create OAuth test config
+        run: |
+          cat > config/oauth-test.yaml <<EOF
+          datasource:
+            test_db:
+              driver: postgres
+              host: localhost
+              port: 5432
+              user: apify
+              password: apify_test_password
+              database: apify_e2e
+              max_pool_size: 5
+
+          oauth_providers:
+            - name: keycloak
+              issuer: http://localhost:8080/auth/realms/apify
+              client_id: apify-test-client
+              client_secret: apify-test-secret
+              audience: apify-api
+              introspection: true
+
+          consumers:
+            - name: e2e-test
+              keys:
+                - e2e-test-key-001
+
+          listeners:
+            - port: 3000
+              ip: 0.0.0.0
+              protocol: HTTP
+              apis:
+                - path: openapi/items.yaml
+                  datasource: test_db
+
+          observability:
+            log_level: info
+            metrics_enabled: true
+            metrics_port: 9090
+          EOF
+
+      - name: Start Apify server
+        run: |
+          ./target/release/apify -c config/oauth-test.yaml &
+          APIFY_PID=$!
+          echo "APIFY_PID=$APIFY_PID" >> $GITHUB_ENV
+          
+          echo "Waiting for Apify to start..."
+          timeout 30 bash -c 'until curl -sf http://localhost:3000/healthz; do sleep 1; done'
+          echo "Apify is ready"
+
+      - name: Run OAuth E2E tests
+        working-directory: e2e
+        env:
+          BASE_URL: http://localhost:3000
+          KEYCLOAK_URL: http://localhost:8080/auth
+        run: |
+          go test -v -run "OAuth"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          if [ -n "$APIFY_PID" ]; then
+            kill $APIFY_PID || true
+          fi
+          docker stop keycloak || true
+          docker rm keycloak || true

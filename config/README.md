@@ -112,7 +112,9 @@ listeners:
 
 ### Authentication with OpenAPI Security Schemes
 
-Apify supports standard OpenAPI 3.0 security schemes:
+Apify supports multiple standard OpenAPI 3.0 security schemes:
+
+#### API Key Authentication
 
 ```yaml
 # In your OpenAPI spec (e.g., openapi/items.yaml)
@@ -148,6 +150,72 @@ openapi:
           security: []
           summary: "Public endpoint"
 ```
+
+#### OAuth 2.0 / OpenID Connect Authentication
+
+Apify supports OAuth 2.0 and OpenID Connect (OIDC) authentication with automatic OIDC discovery and dual-path token validation.
+
+**Configuration:**
+
+```yaml
+# config.yaml
+oauth_providers:
+  - name: keycloak
+    issuer: "http://localhost:8080/realms/apify"
+    client_id: "apify-client"
+    client_secret: "your-client-secret"
+    audience: "apify-api"  # Optional: validate aud claim
+    use_introspection: true  # Use token introspection (recommended)
+
+listeners:
+  - port: 3000
+    apis:
+      - path: openapi/items.yaml
+```
+
+**OpenAPI Security Scheme:**
+
+```yaml
+# openapi/items.yaml
+openapi:
+  spec:
+    components:
+      securitySchemes:
+        # HTTP Bearer token
+        BearerAuth:
+          type: http
+          scheme: bearer
+          bearerFormat: JWT
+        
+        # Or OpenID Connect (with discovery)
+        OpenID:
+          type: openIdConnect
+          openIdConnectUrl: "http://localhost:8080/realms/apify/.well-known/openid-configuration"
+    
+    # Apply OAuth globally
+    security:
+      - BearerAuth: []
+      # Or use OpenID:
+      # - OpenID: []
+```
+
+**Token Validation:**
+
+Apify uses a dual-path validation strategy:
+
+1. **Token Introspection (Primary)**: When `use_introspection: true`, tokens are validated by calling the provider's introspection endpoint with client credentials
+2. **JWT Validation (Fallback)**: Validates tokens locally using JWKS public keys from the OIDC discovery endpoint
+
+**Features:**
+- Automatic OIDC discovery (`.well-known/openid-configuration`)
+- JWKS caching for performance
+- Issuer (`iss`) and audience (`aud`) validation
+- Subject (`sub`) extraction to `ConsumerIdentity`
+- Both `BearerAuth` (http bearer) and `OpenID` (openIdConnect) security schemes supported
+
+**Testing with Keycloak:**
+
+See [`.github/workflows/oauth-e2e.yml`](../.github/workflows/oauth-e2e.yml) for a complete example of running OAuth e2e tests with Keycloak in CI.
 
 **Migration Note:** Legacy `x-modules: access: ["key_auth"]` syntax is still supported for backward compatibility, but using standard OpenAPI security schemes is recommended.
 

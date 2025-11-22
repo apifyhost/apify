@@ -12,6 +12,7 @@ pub struct Config {
     pub consumers: Option<Vec<ConsumerConfig>>, // Global consumers
     pub datasource: Option<std::collections::HashMap<String, DatabaseSettings>>, // Global datasources
     pub observability: Option<ObservabilityConfig>, // Observability settings
+    pub oauth_providers: Option<Vec<OAuthProviderConfig>>, // OAuth/OIDC providers
 }
 
 /// Observability configuration
@@ -119,6 +120,16 @@ pub struct ConsumerConfig {
     pub name: String,
     pub keys: Vec<String>, // API keys bound to this consumer
                            // Future: rate limits, roles, metadata, etc.
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct OAuthProviderConfig {
+    pub name: String,
+    pub issuer: String,
+    pub client_id: Option<String>,
+    pub client_secret: Option<String>,
+    pub audience: Option<String>,
+    pub introspection: Option<bool>, // enable introspection endpoint usage
 }
 
 impl Config {

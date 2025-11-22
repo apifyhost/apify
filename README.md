@@ -25,7 +25,11 @@ Define your data models in OpenAPI specs with `x-table-schemas`, and Apify autom
 
 #### 🔐 **Built-in Authentication**
 - **OpenAPI Security Scheme** support (standards-compliant)
-- API Key-based authentication via `components.securitySchemes`
+- **API Key** authentication via `components.securitySchemes`
+- **OAuth 2.0 / OpenID Connect** with OIDC discovery
+  - Token introspection and JWT validation
+  - Automatic JWKS caching
+  - Issuer and audience validation
 - Consumer management with multiple keys
 - Operation-level, route-level, and listener-level access control
 - Extensible module system for custom auth methods
@@ -330,7 +334,11 @@ Once your Apify server is running, you can interact with it using any HTTP clien
 
 #### Authentication
 
-Apify uses **API Key authentication** via the `X-Api-Key` header (when `key_auth` module is enabled):
+Apify supports multiple authentication methods via OpenAPI security schemes:
+
+##### API Key Authentication
+
+When using API Key authentication (`key_auth` module), include the API key in the `X-Api-Key` header:
 
 ```bash
 # Include the API key in every request
@@ -341,6 +349,35 @@ Without authentication, you'll get a 401 Unauthorized response:
 ```bash
 curl http://localhost:3000/users
 # Response: 401 Unauthorized
+```
+
+##### OAuth 2.0 / OpenID Connect Authentication
+
+When using OAuth/OIDC authentication (`oauth` module), include the bearer token in the `Authorization` header:
+
+```bash
+# First, obtain a token from your OAuth provider
+TOKEN=$(curl -X POST https://your-oauth-provider.com/token \
+  -d "grant_type=client_credentials" \
+  -d "client_id=your-client-id" \
+  -d "client_secret=your-secret" | jq -r .access_token)
+
+# Use the token in API requests
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/users
+```
+
+Example with Keycloak:
+```bash
+# Get token using password grant (for testing)
+TOKEN=$(curl -X POST http://localhost:8080/realms/apify/protocol/openid-connect/token \
+  -d "grant_type=password" \
+  -d "client_id=apify-client" \
+  -d "client_secret=apify-secret" \
+  -d "username=testuser" \
+  -d "password=testpassword" | jq -r .access_token)
+
+# Call protected endpoint
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/users
 ```
 
 #### CRUD Operations
@@ -847,14 +884,72 @@ consumers:
     keys: ["key-123", "key-456"]
 
 # In OpenAPI spec
-x-modules:
-  access: ["key_auth"]
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+
+security:
+  - ApiKeyAuth: []
 ```
 
 Example request:
 ```bash
 curl -H "X-Api-Key: key-123" http://localhost:3000/users
 ```
+
+**`oauth`** - OAuth 2.0 / OpenID Connect Authentication
+
+Validates OAuth 2.0 bearer tokens using OIDC discovery and dual-path validation (introspection + JWT).
+
+```yaml
+# config.yaml
+oauth_providers:
+  - name: keycloak
+    issuer: "http://localhost:8080/realms/apify"
+    client_id: "apify-client"
+    client_secret: "client-secret"
+    audience: "apify-api"
+    use_introspection: true
+
+# In OpenAPI spec
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    # Or use OpenID Connect:
+    OpenID:
+      type: openIdConnect
+      openIdConnectUrl: "http://localhost:8080/realms/apify/.well-known/openid-configuration"
+
+security:
+  - BearerAuth: []
+```
+
+Example request:
+```bash
+# Get token from OAuth provider (e.g., Keycloak)
+TOKEN=$(curl -X POST http://localhost:8080/realms/apify/protocol/openid-connect/token \
+  -d "grant_type=password" \
+  -d "client_id=apify-client" \
+  -d "client_secret=client-secret" \
+  -d "username=testuser" \
+  -d "password=testpass" | jq -r .access_token)
+
+# Use token in API request
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/users
+```
+
+Features:
+- Automatic OIDC discovery (`.well-known/openid-configuration`)
+- Token introspection via OAuth provider
+- Local JWT validation with JWKS
+- Issuer and audience validation
+- JWKS caching for performance
 
 ##### BodyParse Phase Modules
 
