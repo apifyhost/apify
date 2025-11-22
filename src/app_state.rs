@@ -294,8 +294,8 @@ impl AppState {
                 tracing::debug!(
                     name = %p.name,
                     issuer = %p.issuer,
-                    client_id = %p.client_id,
-                    introspection = p.introspection,
+                    client_id = ?p.client_id,
+                    introspection = ?p.introspection,
                     "Registered OAuth provider"
                 );
                 oauth_map.insert(p.name.clone(), p);
