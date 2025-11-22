@@ -20,7 +20,7 @@ oauth_providers:
     issuer: "${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:apify}"
     client_id: "${KEYCLOAK_CLIENT_ID:apify-test-client}"
     client_secret: "${KEYCLOAK_CLIENT_SECRET:apify-test-secret}"
-    audience: "account"
+    audience: "apify-api"
     introspection: true
 
 datasource:
