@@ -88,8 +88,16 @@ impl Module for OAuthModule {
 
         // Select provider config (first available for now)
         let provider_cfg = match state.oauth_providers.values().next() {
-            Some(p) => p,
+            Some(p) => {
+                tracing::debug!(
+                    provider = %p.name,
+                    issuer = %p.issuer,
+                    "Using OAuth provider"
+                );
+                p
+            },
             None => {
+                tracing::error!("OAuth module called but no providers configured in state");
                 return ModuleOutcome::Respond(error_response(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "oauth provider not configured",
@@ -99,11 +107,32 @@ impl Module for OAuthModule {
 
         // Discovery caching
         let discovery = DISCOVERY.get_or_init(|| {
-            fetch_discovery(&provider_cfg.issuer).unwrap_or(OIDCDiscovery {
-                issuer: provider_cfg.issuer.clone(),
-                jwks_uri: None,
-                introspection_endpoint: None,
-            })
+            tracing::info!(
+                issuer = %provider_cfg.issuer,
+                "Fetching OIDC discovery document"
+            );
+            match fetch_discovery(&provider_cfg.issuer) {
+                Some(d) => {
+                    tracing::info!(
+                        issuer = %d.issuer,
+                        jwks_uri = ?d.jwks_uri,
+                        introspection_endpoint = ?d.introspection_endpoint,
+                        "OIDC discovery successful"
+                    );
+                    d
+                },
+                None => {
+                    tracing::error!(
+                        issuer = %provider_cfg.issuer,
+                        "Failed to fetch OIDC discovery document"
+                    );
+                    OIDCDiscovery {
+                        issuer: provider_cfg.issuer.clone(),
+                        jwks_uri: None,
+                        introspection_endpoint: None,
+                    }
+                }
+            }
         });
 
         // Attempt introspection if configured
@@ -111,6 +140,10 @@ impl Module for OAuthModule {
             && let Some(introspect_url) = &discovery.introspection_endpoint
             && let (Some(cid), Some(csec)) = (&provider_cfg.client_id, &provider_cfg.client_secret)
         {
+            tracing::debug!(
+                introspect_url = %introspect_url,
+                "Attempting token introspection"
+            );
             let form = [("token", token)];
             let client = reqwest::blocking::Client::new();
             let resp = client
@@ -121,6 +154,10 @@ impl Module for OAuthModule {
             if let Ok(r) = resp
                 && let Ok(json) = r.json::<serde_json::Value>()
             {
+                tracing::debug!(
+                    active = ?json.get("active"),
+                    "Token introspection response received"
+                );
                 if json
                     .get("active")
                     .and_then(|v| v.as_bool())
@@ -137,6 +174,7 @@ impl Module for OAuthModule {
                     });
                     return ModuleOutcome::Continue;
                 } else {
+                    tracing::warn!("Token introspection returned inactive=false");
                     return ModuleOutcome::Respond(error_response(
                         StatusCode::UNAUTHORIZED,
                         "inactive token",

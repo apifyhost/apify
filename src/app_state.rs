@@ -286,9 +286,22 @@ impl AppState {
         // Build oauth providers map
         let mut oauth_map = HashMap::new();
         if let Some(list) = oauth_providers {
+            tracing::info!(
+                provider_count = list.len(),
+                "Loading OAuth providers"
+            );
             for p in list {
+                tracing::debug!(
+                    name = %p.name,
+                    issuer = %p.issuer,
+                    client_id = %p.client_id,
+                    introspection = p.introspection,
+                    "Registered OAuth provider"
+                );
                 oauth_map.insert(p.name.clone(), p);
             }
+        } else {
+            tracing::warn!("No OAuth providers configured");
         }
 
         Ok(Self {

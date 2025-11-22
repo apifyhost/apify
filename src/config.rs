@@ -162,8 +162,16 @@ fn expand_env_vars(content: &str) -> String {
             let var_name = &caps[1];
             let default_val = caps.get(2).map(|m| m.as_str()).unwrap_or("");
             
+            let expanded_value = std::env::var(var_name).unwrap_or_else(|_| default_val.to_string());
+            tracing::debug!(
+                var = %var_name,
+                value = %expanded_value,
+                from_env = std::env::var(var_name).is_ok(),
+                "Expanding environment variable"
+            );
+            
             changed = true;
-            std::env::var(var_name).unwrap_or_else(|_| default_val.to_string())
+            expanded_value
         }).to_string();
         
         if !changed {
