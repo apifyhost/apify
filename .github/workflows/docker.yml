@@ -96,28 +96,22 @@ jobs:
 
       - name: Wait for Keycloak
         run: |
-          echo "Waiting for Keycloak (port + health + realm + log pattern)..."
+          echo "Waiting for Keycloak (port + log pattern)..."
           ATTEMPTS=0
-          MAX_ATTEMPTS=180
+          MAX_ATTEMPTS=120
           while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
-            # 1. Port open check
             if nc -z localhost 8080 2>/dev/null; then PORT_OK=1; else PORT_OK=0; fi
-            # 2. Health endpoint
-            if curl -sf http://localhost:8080/health/ready > /dev/null 2>&1; then HEALTH_OK=1; else HEALTH_OK=0; fi
-            # 3. Master realm availability
-            if curl -sf http://localhost:8080/realms/master > /dev/null 2>&1; then REALM_OK=1; else REALM_OK=0; fi
-            # 4. Log pattern (started) – grep only last 100 lines for speed
             if docker logs keycloak --tail 100 2>/dev/null | grep -q "Keycloak .* started"; then LOG_OK=1; else LOG_OK=0; fi
-            if [ $PORT_OK -eq 1 ] && [ $HEALTH_OK -eq 1 ] && [ $REALM_OK -eq 1 ] && [ $LOG_OK -eq 1 ]; then
-              echo "Keycloak ready after $ATTEMPTS attempts (PORT/HEALTH/REALM/LOG)"
+            if [ $PORT_OK -eq 1 ] && [ $LOG_OK -eq 1 ]; then
+              echo "Keycloak base ready after $ATTEMPTS attempts"
               exit 0
             fi
             ATTEMPTS=$((ATTEMPTS+1))
-            echo "Attempt $ATTEMPTS/$MAX_ATTEMPTS: PORT=$PORT_OK HEALTH=$HEALTH_OK REALM=$REALM_OK LOG=$LOG_OK"
+            echo "Attempt $ATTEMPTS/$MAX_ATTEMPTS: PORT=$PORT_OK LOG=$LOG_OK"
             sleep 2
           done
-          echo "Keycloak failed to become ready in time"
-          docker logs keycloak | tail -300
+          echo "Keycloak failed (port/log not ready)"
+          docker logs keycloak | tail -200
           exit 1
 
       - name: Get Keycloak admin token
@@ -137,6 +131,24 @@ jobs:
             -H "Content-Type: application/json" \
             -d @config/keycloak/realm-export.json
 
+      - name: Wait for Apify realm OIDC discovery
+        run: |
+          echo "Waiting for apify realm OIDC discovery endpoint..."
+          ATTEMPTS=0
+          MAX_ATTEMPTS=60
+          while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+            if curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration > /dev/null 2>&1; then
+              echo "Apify realm OIDC discovery available after $ATTEMPTS attempts"
+              exit 0
+            fi
+            ATTEMPTS=$((ATTEMPTS+1))
+            echo "Attempt $ATTEMPTS/$MAX_ATTEMPTS: discovery not yet available"
+            sleep 2
+          done
+          echo "OIDC discovery for apify realm not available in time"
+          curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration || true
+          docker logs keycloak | tail -150
+          exit 1
       - name: Verify realm imported
         run: |
           curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration | jq .
@@ -248,25 +260,23 @@ jobs:
 
       - name: Wait for Keycloak
         run: |
-          echo "Waiting for Keycloak (port + health + realm + log pattern)..."
+          echo "Waiting for Keycloak (port + log pattern)..."
           ATTEMPTS=0
-          MAX_ATTEMPTS=180
+          MAX_ATTEMPTS=120
           while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
             if nc -z localhost 8080 2>/dev/null; then PORT_OK=1; else PORT_OK=0; fi
-            if curl -sf http://localhost:8080/health/ready > /dev/null 2>&1; then HEALTH_OK=1; else HEALTH_OK=0; fi
-            if curl -sf http://localhost:8080/realms/master > /dev/null 2>&1; then REALM_OK=1; else REALM_OK=0; fi
             if docker logs keycloak --tail 100 2>/dev/null | grep -q "Keycloak .* started"; then LOG_OK=1; else LOG_OK=0; fi
-            if [ $PORT_OK -eq 1 ] && [ $HEALTH_OK -eq 1 ] && [ $REALM_OK -eq 1 ] && [ $LOG_OK -eq 1 ]; then
-              echo "Keycloak ready after $ATTEMPTS attempts (PORT/HEALTH/REALM/LOG)"
+            if [ $PORT_OK -eq 1 ] && [ $LOG_OK -eq 1 ]; then
+              echo "Keycloak base ready after $ATTEMPTS attempts"
               exit 0
             fi
             ATTEMPTS=$((ATTEMPTS+1))
-            echo "Attempt $ATTEMPTS/$MAX_ATTEMPTS: PORT=$PORT_OK HEALTH=$HEALTH_OK REALM=$REALM_OK LOG=$LOG_OK"
+            echo "Attempt $ATTEMPTS/$MAX_ATTEMPTS: PORT=$PORT_OK LOG=$LOG_OK"
             sleep 2
           done
-            echo "Keycloak failed to become ready in time"
-            docker logs keycloak | tail -300
-            exit 1
+          echo "Keycloak failed (port/log not ready)"
+          docker logs keycloak | tail -200
+          exit 1
 
       - name: Get Keycloak admin token
         id: keycloak_token
@@ -284,6 +294,25 @@ jobs:
             -H "Authorization: Bearer ${{ steps.keycloak_token.outputs.token }}" \
             -H "Content-Type: application/json" \
             -d @config/keycloak/realm-export.json
+
+      - name: Wait for Apify realm OIDC discovery
+        run: |
+          echo "Waiting for apify realm OIDC discovery endpoint..."
+          ATTEMPTS=0
+          MAX_ATTEMPTS=60
+          while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+            if curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration > /dev/null 2>&1; then
+              echo "Apify realm OIDC discovery available after $ATTEMPTS attempts"
+              exit 0
+            fi
+            ATTEMPTS=$((ATTEMPTS+1))
+            echo "Attempt $ATTEMPTS/$MAX_ATTEMPTS: discovery not yet available"
+            sleep 2
+          done
+          echo "OIDC discovery for apify realm not available in time"
+          curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration || true
+          docker logs keycloak | tail -150
+          exit 1
 
       - name: Verify realm imported
         run: |
