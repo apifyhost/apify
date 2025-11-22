@@ -23,19 +23,9 @@ services:
     volumes:
       - ./config:/app/config:ro
       - sqlite_data:/app/data
-    command:
-      - apify
-      - -c
-      - /app/config/config.yaml 
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 5s
     environment:
       - RUST_LOG=info
-      - APIFY_THREADS=1
+      - APIFY_THREADS=2
 
   apify-postgres:
     image: apifyhost/apify:latest
@@ -44,22 +34,12 @@ services:
       - "9091:9090"
     volumes:
       - ./config:/app/config:ro
-    command:
-      - apify
-      - -c
-      - /app/config/config.yaml 
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
     environment:
       - RUST_LOG=info
-      - APIFY_THREADS=1
+      - APIFY_THREADS=2
 
   jaeger:
     image: jaegertracing/all-in-one:latest
