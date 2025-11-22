@@ -36,7 +36,7 @@ fn fetch_discovery(issuer: &str) -> Option<OIDCDiscovery> {
     // In Docker environments, replace localhost with keycloak service name for actual HTTP requests
     // This allows tokens to have issuer=localhost while containers access keycloak service
     let actual_url = issuer.replace("localhost", "keycloak");
-    
+
     let url = format!(
         "{}/.well-known/openid-configuration",
         actual_url.trim_end_matches('/')
@@ -99,7 +99,7 @@ impl Module for OAuthModule {
                     "Using OAuth provider"
                 );
                 p
-            },
+            }
             None => {
                 tracing::error!("OAuth module called but no providers configured in state");
                 return ModuleOutcome::Respond(error_response(
@@ -124,7 +124,7 @@ impl Module for OAuthModule {
                         "OIDC discovery successful"
                     );
                     d
-                },
+                }
                 None => {
                     tracing::error!(
                         issuer = %provider_cfg.issuer,
@@ -146,7 +146,7 @@ impl Module for OAuthModule {
         {
             // Replace localhost with keycloak for Docker network access
             let actual_introspect_url = introspect_url.replace("localhost", "keycloak");
-            
+
             tracing::debug!(
                 introspect_url = %actual_introspect_url,
                 "Attempting token introspection"
@@ -194,9 +194,10 @@ impl Module for OAuthModule {
         if let Some(jwks_uri) = &discovery.jwks_uri {
             // Replace localhost with keycloak for Docker network access
             let actual_jwks_uri = jwks_uri.replace("localhost", "keycloak");
-            
-            let jwks_val = JWKS
-                .get_or_init(|| fetch_jwks(&actual_jwks_uri).unwrap_or(serde_json::json!({"keys": []})));
+
+            let jwks_val = JWKS.get_or_init(|| {
+                fetch_jwks(&actual_jwks_uri).unwrap_or(serde_json::json!({"keys": []}))
+            });
             if let Some(keys) = jwks_val.get("keys").and_then(|v| v.as_array())
                 && let Ok(header) = jsonwebtoken::decode_header(token)
                 && let Some(kid) = header.kid

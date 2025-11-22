@@ -286,10 +286,7 @@ impl AppState {
         // Build oauth providers map
         let mut oauth_map = HashMap::new();
         if let Some(list) = oauth_providers {
-            tracing::info!(
-                provider_count = list.len(),
-                "Loading OAuth providers"
-            );
+            tracing::info!(provider_count = list.len(), "Loading OAuth providers");
             for p in list {
                 tracing::debug!(
                     name = %p.name,
