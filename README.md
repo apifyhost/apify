@@ -24,7 +24,8 @@ Define your data models in OpenAPI specs with `x-table-schemas`, and Apify autom
 - Schema auto-initialization from OpenAPI specs
 
 #### 🔐 **Built-in Authentication**
-- API Key-based authentication (`key_auth` module)
+- **OpenAPI Security Scheme** support (standards-compliant)
+- API Key-based authentication via `components.securitySchemes`
 - Consumer management with multiple keys
 - Operation-level, route-level, and listener-level access control
 - Extensible module system for custom auth methods
@@ -189,6 +190,18 @@ openapi:
     info:
       title: "Users API"
       version: "1.0.0"
+    
+    # Define authentication using OpenAPI security schemes
+    components:
+      securitySchemes:
+        ApiKeyAuth:
+          type: apiKey
+          in: header
+          name: X-Api-Key
+    
+    # Apply security globally (can be overridden per operation)
+    security:
+      - ApiKeyAuth: []
     
     # Define database table schema
     x-table-schemas:

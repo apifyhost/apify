@@ -38,7 +38,9 @@ Defines:
 - API endpoints and operations
 - Table schemas (x-table-schemas)
 - Request/response formats
-- Authentication requirements (x-modules)
+- **Authentication requirements** (via OpenAPI `security` and `components.securitySchemes`)
+  - Standards-compliant security definitions
+  - Legacy `x-modules` still supported for backward compatibility
 
 ## Usage
 
@@ -107,6 +109,47 @@ listeners:
       - path: ./openapi/orders.yaml
         datasource: orders_db
 ```
+
+### Authentication with OpenAPI Security Schemes
+
+Apify supports standard OpenAPI 3.0 security schemes:
+
+```yaml
+# In your OpenAPI spec (e.g., openapi/items.yaml)
+openapi:
+  spec:
+    openapi: "3.0.0"
+    
+    # Define security schemes
+    components:
+      securitySchemes:
+        ApiKeyAuth:
+          type: apiKey
+          in: header
+          name: X-Api-Key
+    
+    # Apply globally to all operations
+    security:
+      - ApiKeyAuth: []
+    
+    paths:
+      /items:
+        get:
+          # Inherits global security
+          summary: "List items"
+        post:
+          # Can override with operation-level security
+          security:
+            - ApiKeyAuth: []
+          summary: "Create item"
+      /public:
+        get:
+          # Disable auth for specific operation
+          security: []
+          summary: "Public endpoint"
+```
+
+**Migration Note:** Legacy `x-modules: access: ["key_auth"]` syntax is still supported for backward compatibility, but using standard OpenAPI security schemes is recommended.
 
 ## Environment Variables
 
