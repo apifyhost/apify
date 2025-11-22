@@ -33,9 +33,13 @@ static DISCOVERY: OnceCell<OIDCDiscovery> = OnceCell::new();
 static JWKS: OnceCell<serde_json::Value> = OnceCell::new();
 
 fn fetch_discovery(issuer: &str) -> Option<OIDCDiscovery> {
+    // In Docker environments, replace localhost with keycloak service name for actual HTTP requests
+    // This allows tokens to have issuer=localhost while containers access keycloak service
+    let actual_url = issuer.replace("localhost", "keycloak");
+    
     let url = format!(
         "{}/.well-known/openid-configuration",
-        issuer.trim_end_matches('/')
+        actual_url.trim_end_matches('/')
     );
     reqwest::blocking::get(&url)
         .ok()?
@@ -140,14 +144,17 @@ impl Module for OAuthModule {
             && let Some(introspect_url) = &discovery.introspection_endpoint
             && let (Some(cid), Some(csec)) = (&provider_cfg.client_id, &provider_cfg.client_secret)
         {
+            // Replace localhost with keycloak for Docker network access
+            let actual_introspect_url = introspect_url.replace("localhost", "keycloak");
+            
             tracing::debug!(
-                introspect_url = %introspect_url,
+                introspect_url = %actual_introspect_url,
                 "Attempting token introspection"
             );
             let form = [("token", token)];
             let client = reqwest::blocking::Client::new();
             let resp = client
-                .post(introspect_url)
+                .post(&actual_introspect_url)
                 .basic_auth(cid, Some(csec))
                 .form(&form)
                 .send();
@@ -185,8 +192,11 @@ impl Module for OAuthModule {
 
         // Fallback: verify JWT locally if JWKS available
         if let Some(jwks_uri) = &discovery.jwks_uri {
+            // Replace localhost with keycloak for Docker network access
+            let actual_jwks_uri = jwks_uri.replace("localhost", "keycloak");
+            
             let jwks_val = JWKS
-                .get_or_init(|| fetch_jwks(jwks_uri).unwrap_or(serde_json::json!({"keys": []})));
+                .get_or_init(|| fetch_jwks(&actual_jwks_uri).unwrap_or(serde_json::json!({"keys": []})));
             if let Some(keys) = jwks_val.get("keys").and_then(|v| v.as_array())
                 && let Ok(header) = jsonwebtoken::decode_header(token)
                 && let Some(kid) = header.kid
