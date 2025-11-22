@@ -86,7 +86,7 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 				defer resp.Body.Close()
 
 				Expect(resp.StatusCode).To(Equal(http.StatusOK),
-					"GET /items with valid Bearer token should return 200")
+					"GET /secure-items with valid Bearer token should return 200")
 			})
 
 			It("should allow creating items with bearer token", func() {
@@ -101,7 +101,7 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 				defer resp.Body.Close()
 
 				Expect(resp.StatusCode).To(Equal(http.StatusOK),
-					"POST /items with valid Bearer token should return 200")
+					"POST /secure-items with valid Bearer token should return 200")
 			})
 		})
 
@@ -115,7 +115,7 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 				defer resp.Body.Close()
 
 				Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized),
-					"GET /items without Authorization header should return 401")
+					"GET /secure-items without Authorization header should return 401")
 			})
 		})
 
@@ -130,7 +130,7 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 				defer resp.Body.Close()
 
 				Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized),
-					"GET /items with invalid Bearer token should return 401")
+					"GET /secure-items with invalid Bearer token should return 401")
 			})
 		})
 
@@ -147,8 +147,58 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 				defer resp.Body.Close()
 
 				Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized),
-					"GET /items with expired token should return 401")
+					"GET /secure-items with expired token should return 401")
 			})
+		})
+	})
+
+	Describe("Cross-Surface Data Visibility", func() {
+		It("should see item created via API key on OAuth endpoint", func() {
+			// Create item via API key on /items
+			uniqueName := "cross-key-" + time.Now().Format("150405.000")
+			body := `{"name":"` + uniqueName + `","description":"from key","price":1}`
+			createReq, err := http.NewRequest("POST", baseURL+"/items", strings.NewReader(body))
+			Expect(err).NotTo(HaveOccurred())
+			createReq.Header.Set("X-Api-Key", os.Getenv("API_KEY"))
+			createReq.Header.Set("Content-Type", "application/json")
+			createResp, err := client.Do(createReq)
+			Expect(err).NotTo(HaveOccurred())
+			defer createResp.Body.Close()
+			Expect(createResp.StatusCode).To(Equal(http.StatusOK))
+
+			// List via OAuth on /secure-items
+			listReq, err := http.NewRequest("GET", baseURL+"/secure-items", nil)
+			Expect(err).NotTo(HaveOccurred())
+			listReq.Header.Set("Authorization", "Bearer "+accessToken)
+			listResp, err := client.Do(listReq)
+			Expect(err).NotTo(HaveOccurred())
+			defer listResp.Body.Close()
+			Expect(listResp.StatusCode).To(Equal(http.StatusOK))
+			b, _ := io.ReadAll(listResp.Body)
+			Expect(string(b)).To(ContainSubstring(uniqueName))
+		})
+
+		It("should see item created via OAuth endpoint on API key endpoint", func() {
+			uniqueName := "cross-oauth-" + time.Now().Format("150405.000")
+			body := `{"name":"` + uniqueName + `","description":"from oauth","price":2}`
+			createReq, err := http.NewRequest("POST", baseURL+"/secure-items", strings.NewReader(body))
+			Expect(err).NotTo(HaveOccurred())
+			createReq.Header.Set("Authorization", "Bearer "+accessToken)
+			createReq.Header.Set("Content-Type", "application/json")
+			createResp, err := client.Do(createReq)
+			Expect(err).NotTo(HaveOccurred())
+			defer createResp.Body.Close()
+			Expect(createResp.StatusCode).To(Equal(http.StatusOK))
+
+			listReq, err := http.NewRequest("GET", baseURL+"/items", nil)
+			Expect(err).NotTo(HaveOccurred())
+			listReq.Header.Set("X-Api-Key", os.Getenv("API_KEY"))
+			listResp, err := client.Do(listReq)
+			Expect(err).NotTo(HaveOccurred())
+			defer listResp.Body.Close()
+			Expect(listResp.StatusCode).To(Equal(http.StatusOK))
+			b, _ := io.ReadAll(listResp.Body)
+			Expect(string(b)).To(ContainSubstring(uniqueName))
 		})
 	})
 
