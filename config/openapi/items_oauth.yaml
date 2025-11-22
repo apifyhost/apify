@@ -8,6 +8,10 @@ openapi:
 
     components:
       securitySchemes:
+        ApiKeyAuth:
+          type: apiKey
+          in: header
+          name: X-Api-Key
         BearerAuth:
           type: http
           scheme: bearer
