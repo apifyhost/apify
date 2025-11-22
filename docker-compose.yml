@@ -26,6 +26,11 @@ services:
     environment:
       - RUST_LOG=info
       - APIFY_THREADS=2
+      # OAuth/OIDC configuration
+      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://keycloak:8080}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-apify}
+      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-apify-test-client}
+      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-apify-test-secret}
 
   apify-postgres:
     image: apifyhost/apify:latest
@@ -40,8 +45,8 @@ services:
     environment:
       - RUST_LOG=info
       - APIFY_THREADS=2
-      # OAuth/OIDC configuration - use container service name for inter-container communication
-      - KEYCLOAK_URL=http://keycloak:8080
+      # OAuth/OIDC configuration
+      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://keycloak:8080}
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-apify}
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-apify-test-client}
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-apify-test-secret}

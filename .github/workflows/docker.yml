@@ -88,8 +88,10 @@ jobs:
 
       - name: Start Keycloak
         run: |
+          # Connect to docker compose default network
           docker run -d --name keycloak \
-            --network host \
+            --network apify_default \
+            -p 8080:8080 \
             -e KEYCLOAK_ADMIN=admin \
             -e KEYCLOAK_ADMIN_PASSWORD=admin \
             quay.io/keycloak/keycloak:24.0 start-dev
@@ -237,8 +239,10 @@ jobs:
 
       - name: Start Keycloak
         run: |
+          # Connect to docker compose default network
           docker run -d --name keycloak \
-            --network host \
+            --network apify_default \
+            -p 8080:8080 \
             -e KEYCLOAK_ADMIN=admin \
             -e KEYCLOAK_ADMIN_PASSWORD=admin \
             quay.io/keycloak/keycloak:24.0 start-dev
