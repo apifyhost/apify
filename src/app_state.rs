@@ -216,13 +216,15 @@ impl AppState {
 
                                 // 1. Legacy x-modules extension
                                 if let Some(xmods) = op.get("x-modules")
-                                    && let Some(parsed) = modules_from_value(xmods) {
-                                        cfg = parsed;
-                                    }
+                                    && let Some(parsed) = modules_from_value(xmods)
+                                {
+                                    cfg = parsed;
+                                }
 
                                 // 2. Security requirement objects (operation-level overrides global)
                                 let mut access_from_security: Vec<String> = Vec::new();
-                                if let Some(sec_arr) = op.get("security").and_then(|v| v.as_array()) {
+                                if let Some(sec_arr) = op.get("security").and_then(|v| v.as_array())
+                                {
                                     for req in sec_arr.iter().filter_map(|v| v.as_object()) {
                                         if req.contains_key("ApiKeyAuth") {
                                             access_from_security.push("key_auth".to_string());
