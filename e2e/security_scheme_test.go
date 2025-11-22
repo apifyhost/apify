@@ -33,6 +33,20 @@ var _ = Describe("OpenAPI Security Scheme", func() {
 	})
 
 	Describe("Security Scheme - ApiKeyAuth", func() {
+		Context("when using API key against OAuth-only endpoint", func() {
+			It("should reject API key on /secure-items", func() {
+				// /secure-items is protected by BearerAuth only
+				req, err := http.NewRequest("GET", baseURL+"/secure-items", nil)
+				Expect(err).NotTo(HaveOccurred())
+				req.Header.Set("X-Api-Key", apiKey)
+
+				resp, err := client.Do(req)
+				Expect(err).NotTo(HaveOccurred())
+				defer resp.Body.Close()
+				Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized),
+					"API key should not grant access to /secure-items")
+			})
+		})
 		Context("when operations use standard OpenAPI security", func() {
 			It("should enforce authentication via securitySchemes", func() {
 				// Test GET /items - should require auth

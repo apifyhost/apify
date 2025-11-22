@@ -166,6 +166,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let datasources_clone = datasources.clone();
             let openapi_configs_clone = openapi_configs.clone();
             let consumers_clone = all_consumers.clone();
+            let oauth_clone = config.oauth_providers.clone();
             let handle = thread::spawn(
                 move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     tracing::info!(
@@ -180,6 +181,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         datasources_clone,
                         openapi_configs_clone,
                         consumers_clone,
+                        oauth_clone,
                     )?;
                     Ok(())
                 },

@@ -86,6 +86,83 @@ jobs:
           go mod download
           go install github.com/onsi/ginkgo/v2/ginkgo@latest
 
+      - name: Create Docker Compose network
+        run: |
+          # Create the network that docker compose will use
+          docker network create apify_default || true
+
+      - name: Start Keycloak
+        run: |
+          # Connect to docker compose default network
+          # Set hostname to localhost so tokens have consistent issuer URL
+          docker run -d --name keycloak \
+            --network apify_default \
+            -p 8080:8080 \
+            -e KEYCLOAK_ADMIN=admin \
+            -e KEYCLOAK_ADMIN_PASSWORD=admin \
+            -e KC_HOSTNAME=localhost \
+            -e KC_HOSTNAME_STRICT=false \
+            quay.io/keycloak/keycloak:24.0 start-dev
+
+      - name: Wait for Keycloak
+        run: |
+          echo "Waiting for Keycloak (port + log pattern)..."
+          ATTEMPTS=0
+          MAX_ATTEMPTS=120
+          while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+            if nc -z localhost 8080 2>/dev/null; then PORT_OK=1; else PORT_OK=0; fi
+            if docker logs keycloak --tail 100 2>/dev/null | grep -q "Keycloak .* started"; then LOG_OK=1; else LOG_OK=0; fi
+            if [ $PORT_OK -eq 1 ] && [ $LOG_OK -eq 1 ]; then
+              echo "Keycloak base ready after $ATTEMPTS attempts"
+              exit 0
+            fi
+            ATTEMPTS=$((ATTEMPTS+1))
+            echo "Attempt $ATTEMPTS/$MAX_ATTEMPTS: PORT=$PORT_OK LOG=$LOG_OK"
+            sleep 2
+          done
+          echo "Keycloak failed (port/log not ready)"
+          docker logs keycloak | tail -200
+          exit 1
+
+      - name: Get Keycloak admin token
+        id: keycloak_token
+        run: |
+          TOKEN=$(curl -sf -X POST http://localhost:8080/realms/master/protocol/openid-connect/token \
+            -d "grant_type=password" \
+            -d "client_id=admin-cli" \
+            -d "username=admin" \
+            -d "password=admin" | jq -r .access_token)
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Import Keycloak realm
+        run: |
+          curl -sf -X POST http://localhost:8080/admin/realms \
+            -H "Authorization: Bearer ${{ steps.keycloak_token.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d @config/keycloak/realm-export.json
+
+      - name: Wait for Apify realm OIDC discovery
+        run: |
+          echo "Waiting for apify realm OIDC discovery endpoint..."
+          ATTEMPTS=0
+          MAX_ATTEMPTS=60
+          while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+            if curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration > /dev/null 2>&1; then
+              echo "Apify realm OIDC discovery available after $ATTEMPTS attempts"
+              exit 0
+            fi
+            ATTEMPTS=$((ATTEMPTS+1))
+            echo "Attempt $ATTEMPTS/$MAX_ATTEMPTS: discovery not yet available"
+            sleep 2
+          done
+          echo "OIDC discovery for apify realm not available in time"
+          curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration || true
+          docker logs keycloak | tail -150
+          exit 1
+      - name: Verify realm imported
+        run: |
+          curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration | jq .
+
       - name: Download Docker image
         uses: actions/download-artifact@v4
         with:
@@ -95,9 +172,9 @@ jobs:
         run: |
           docker load < apify-image.tar.gz
 
-      - name: Start Apify with PostgreSQL using docker compose
+      - name: Start Apify with Postgres using docker compose
         run: |
-          docker compose up -d
+          docker compose up -d apify-postgres postgres
           docker compose ps
 
       - name: Wait for service to be ready
@@ -115,24 +192,36 @@ jobs:
           docker compose logs apify-postgres
           exit 1
 
-      - name: Run E2E tests
+      - name: Run E2E tests (including OAuth)
         working-directory: e2e
         env:
           BASE_URL: http://localhost:3000
           API_KEY: e2e-test-key-001
           METRICS_PORT: 9091
+          KEYCLOAK_URL: http://localhost:8080
+          KEYCLOAK_REALM: apify
+          KEYCLOAK_CLIENT_ID: apify-test-client
+          KEYCLOAK_CLIENT_SECRET: apify-test-secret
+          KEYCLOAK_USERNAME: testuser
+          KEYCLOAK_PASSWORD: testpassword
         run: ginkgo -v
 
       - name: Show logs on failure
         if: failure()
         run: |
+          echo "=== Apify logs ==="
           docker compose logs apify-postgres
+          echo "=== PostgreSQL logs ==="
           docker compose logs postgres
+          echo "=== Keycloak logs ==="
+          docker logs keycloak
       
       - name: Cleanup
         if: always()
         run: |
           docker compose down -v
+          docker stop keycloak || true
+          docker rm keycloak || true
 
 
   test-sqlite:
@@ -156,6 +245,84 @@ jobs:
           go mod download
           go install github.com/onsi/ginkgo/v2/ginkgo@latest
 
+      - name: Create Docker Compose network
+        run: |
+          # Create the network that docker compose will use
+          docker network create apify_default || true
+
+      - name: Start Keycloak
+        run: |
+          # Connect to docker compose default network
+          # Set hostname to localhost so tokens have consistent issuer URL
+          docker run -d --name keycloak \
+            --network apify_default \
+            -p 8080:8080 \
+            -e KEYCLOAK_ADMIN=admin \
+            -e KEYCLOAK_ADMIN_PASSWORD=admin \
+            -e KC_HOSTNAME=localhost \
+            -e KC_HOSTNAME_STRICT=false \
+            quay.io/keycloak/keycloak:24.0 start-dev
+
+      - name: Wait for Keycloak
+        run: |
+          echo "Waiting for Keycloak (port + log pattern)..."
+          ATTEMPTS=0
+          MAX_ATTEMPTS=120
+          while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+            if nc -z localhost 8080 2>/dev/null; then PORT_OK=1; else PORT_OK=0; fi
+            if docker logs keycloak --tail 100 2>/dev/null | grep -q "Keycloak .* started"; then LOG_OK=1; else LOG_OK=0; fi
+            if [ $PORT_OK -eq 1 ] && [ $LOG_OK -eq 1 ]; then
+              echo "Keycloak base ready after $ATTEMPTS attempts"
+              exit 0
+            fi
+            ATTEMPTS=$((ATTEMPTS+1))
+            echo "Attempt $ATTEMPTS/$MAX_ATTEMPTS: PORT=$PORT_OK LOG=$LOG_OK"
+            sleep 2
+          done
+          echo "Keycloak failed (port/log not ready)"
+          docker logs keycloak | tail -200
+          exit 1
+
+      - name: Get Keycloak admin token
+        id: keycloak_token
+        run: |
+          TOKEN=$(curl -sf -X POST http://localhost:8080/realms/master/protocol/openid-connect/token \
+            -d "grant_type=password" \
+            -d "client_id=admin-cli" \
+            -d "username=admin" \
+            -d "password=admin" | jq -r .access_token)
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Import Keycloak realm
+        run: |
+          curl -sf -X POST http://localhost:8080/admin/realms \
+            -H "Authorization: Bearer ${{ steps.keycloak_token.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d @config/keycloak/realm-export.json
+
+      - name: Wait for Apify realm OIDC discovery
+        run: |
+          echo "Waiting for apify realm OIDC discovery endpoint..."
+          ATTEMPTS=0
+          MAX_ATTEMPTS=60
+          while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+            if curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration > /dev/null 2>&1; then
+              echo "Apify realm OIDC discovery available after $ATTEMPTS attempts"
+              exit 0
+            fi
+            ATTEMPTS=$((ATTEMPTS+1))
+            echo "Attempt $ATTEMPTS/$MAX_ATTEMPTS: discovery not yet available"
+            sleep 2
+          done
+          echo "OIDC discovery for apify realm not available in time"
+          curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration || true
+          docker logs keycloak | tail -150
+          exit 1
+
+      - name: Verify realm imported
+        run: |
+          curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration | jq .
+
       - name: Download Docker image
         uses: actions/download-artifact@v4
         with:
@@ -165,10 +332,15 @@ jobs:
         run: |
           docker load < apify-image.tar.gz
 
-      - name: Start Apify with SQLite using docker compose
+      - name: Update config for SQLite
         run: |
           sed -i 's/postgres1/sqlite1/g' ./config/config.yaml
-          docker compose up -d
+          echo "Updated config.yaml:"
+          cat config/config.yaml
+
+      - name: Start Apify with SQLite using docker compose
+        run: |
+          docker compose up -d apify-sqlite
           docker compose ps
 
       - name: Wait for service to be ready
@@ -186,23 +358,34 @@ jobs:
           docker compose logs apify-sqlite
           exit 1
 
-      - name: Run E2E tests
+      - name: Run E2E tests (including OAuth)
         working-directory: e2e
         env:
           BASE_URL: http://localhost:3001
           API_KEY: e2e-test-key-001
           METRICS_PORT: 9092
+          KEYCLOAK_URL: http://localhost:8080
+          KEYCLOAK_REALM: apify
+          KEYCLOAK_CLIENT_ID: apify-test-client
+          KEYCLOAK_CLIENT_SECRET: apify-test-secret
+          KEYCLOAK_USERNAME: testuser
+          KEYCLOAK_PASSWORD: testpassword
         run: ginkgo -v
 
       - name: Show logs on failure
         if: failure()
         run: |
+          echo "=== Apify logs ==="
           docker compose logs apify-sqlite
+          echo "=== Keycloak logs ==="
+          docker logs keycloak
 
       - name: Cleanup
         if: always()
         run: |
           docker compose down -v
+          docker stop keycloak || true
+          docker rm keycloak || true
 
 
   scan:

@@ -46,11 +46,18 @@ impl APIGenerator {
         if let Some(paths) = spec.get("paths").and_then(|p| p.as_object()) {
             for (path, path_item) in paths.iter() {
                 if let Some(path_obj) = path_item.as_object() {
-                    // Extract table name from path (e.g., "/users" -> "users")
-                    let table_name = Self::extract_table_name(path);
+                    // Default table name from path (e.g., "/users" -> "users")
+                    let default_table_name = Self::extract_table_name(path);
 
                     for (method, operation) in path_obj.iter() {
-                        if let Some(_op_obj) = operation.as_object() {
+                        if let Some(op_obj) = operation.as_object() {
+                            // Check for x-table-name in operation, otherwise use default
+                            let table_name = op_obj
+                                .get("x-table-name")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|| default_table_name.clone());
+
                             let operation_type = Self::determine_operation_type(method, path);
                             let regex = Self::build_regex_from_openapi_path(path)?;
                             let param_names = Self::extract_param_names_from_openapi(path);
@@ -61,7 +68,7 @@ impl APIGenerator {
                                 param_names,
                                 methods: vec![method.to_uppercase()],
                                 operation_type,
-                                table_name: table_name.clone(),
+                                table_name,
                             });
                         }
                     }
