@@ -21,18 +21,12 @@ services:
       - "3001:3000"
       - "9092:9090"
     volumes:
-      - ./config:/app/config-template:ro
-      - ./e2e/prepare-config.sh:/app/prepare-config.sh:ro
+      - ./config:/app/config:ro
       - sqlite_data:/app/data
     command:
-      - /bin/sh
+      - apify
       - -c
-      - |
-        mkdir -p /tmp/config/openapi &&
-        cat /app/config-template/config.yaml > /tmp/config/config.yaml &&
-        cat /app/config-template/openapi/items.yaml > /tmp/config/openapi/items.yaml &&
-        sh /app/prepare-config.sh sqlite /tmp/config/config.yaml &&
-        apify -c /tmp/config/config.yaml
+      - /app/config/config.yaml 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
       interval: 5s
@@ -49,17 +43,11 @@ services:
       - "3000:3000"
       - "9091:9090"
     volumes:
-      - ./config:/app/config-template:ro
-      - ./e2e/prepare-config.sh:/app/prepare-config.sh:ro
+      - ./config:/app/config:ro
     command:
-      - /bin/sh
+      - apify
       - -c
-      - |
-        mkdir -p /tmp/config/openapi &&
-        cat /app/config-template/config.yaml > /tmp/config/config.yaml &&
-        cat /app/config-template/openapi/items.yaml > /tmp/config/openapi/items.yaml &&
-        sh /app/prepare-config.sh postgres /tmp/config/config.yaml &&
-        apify -c /tmp/config/config.yaml
+      - /app/config/config.yaml 
     depends_on:
       postgres:
         condition: service_healthy
