@@ -113,4 +113,4 @@ volumes:
 networks:
   default:
     name: apify_default
-    driver: bridge
+    external: true
