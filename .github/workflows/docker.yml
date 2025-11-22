@@ -172,9 +172,9 @@ jobs:
         run: |
           docker load < apify-image.tar.gz
 
-      - name: Start Apify with PostgreSQL using docker compose
+      - name: Start Apify with Postgres using docker compose
         run: |
-          docker compose up -d
+          docker compose up -d apify-postgres postgres
           docker compose ps
 
       - name: Wait for service to be ready
@@ -340,7 +340,7 @@ jobs:
 
       - name: Start Apify with SQLite using docker compose
         run: |
-          docker compose up -d
+          docker compose up -d apify-sqlite
           docker compose ps
 
       - name: Wait for service to be ready
