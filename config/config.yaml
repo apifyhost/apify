@@ -12,6 +12,15 @@ consumers:
       - dev-key-123
       - e2e-test-key-001
 
+# OAuth/OIDC providers configuration
+oauth_providers:
+  - name: keycloak
+    issuer: "${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:apify}"
+    client_id: "${KEYCLOAK_CLIENT_ID:apify-test-client}"
+    client_secret: "${KEYCLOAK_CLIENT_SECRET:apify-test-secret}"
+    audience: "account"
+    introspection: true
+
 datasource:
   sqlite1:
     driver: sqlite

@@ -138,10 +138,41 @@ impl Config {
     pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let content =
             fs::read_to_string(path).map_err(|e| format!("Failed to read config file: {}", e))?;
-        let config = serde_yaml::from_str(&content)
+        
+        // Expand environment variables in format ${VAR:default}
+        let expanded = expand_env_vars(&content);
+        
+        let config = serde_yaml::from_str(&expanded)
             .map_err(|e| format!("Failed to parse config file: {}", e))?;
         Ok(config)
     }
+}
+
+/// Expand environment variables in config content
+/// Supports ${VAR:default} syntax
+fn expand_env_vars(content: &str) -> String {
+    let mut result = content.to_string();
+    
+    // Regex pattern: ${VAR:default} or ${VAR}
+    let re = regex::Regex::new(r"\$\{([^:}]+)(?::([^}]*))?\}").unwrap();
+    
+    loop {
+        let mut changed = false;
+        let new_result = re.replace_all(&result, |caps: &regex::Captures| {
+            let var_name = &caps[1];
+            let default_val = caps.get(2).map(|m| m.as_str()).unwrap_or("");
+            
+            changed = true;
+            std::env::var(var_name).unwrap_or_else(|_| default_val.to_string())
+        }).to_string();
+        
+        if !changed {
+            break;
+        }
+        result = new_result;
+    }
+    
+    result
 }
 
 impl DatabaseConfig {
