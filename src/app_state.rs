@@ -185,10 +185,24 @@ impl AppState {
             }
         }
 
-        // Build per-operation module registries from OpenAPI x-modules on operations
+        // Build per-operation module registries from OpenAPI (legacy x-modules + security schemes)
         let mut operation_modules: HashMap<String, crate::modules::ModuleRegistry> = HashMap::new();
         if let Some(ch) = &crud_handler {
             let spec = ch.api_generator.get_spec();
+
+            // Parse global security (applies if operation has no local security)
+            let mut global_access: Vec<String> = Vec::new();
+            if let Some(sec_arr) = spec.get("security").and_then(|v| v.as_array()) {
+                for req in sec_arr.iter().filter_map(|v| v.as_object()) {
+                    if req.contains_key("ApiKeyAuth") {
+                        global_access.push("key_auth".to_string());
+                    }
+                }
+            }
+            // Deduplicate
+            global_access.sort();
+            global_access.dedup();
+
             if let Some(paths_obj) = spec.get("paths").and_then(|v| v.as_object()) {
                 for (path_key, path_item) in paths_obj.iter() {
                     if let Some(po) = path_item.as_object() {
@@ -197,14 +211,49 @@ impl AppState {
                         ]
                         .iter()
                         {
-                            if let Some(op) = po.get(*method)
-                                && let Some(xmods) = op.get("x-modules")
-                                && let Some(cfg) = modules_from_value(xmods)
-                            {
-                                let reg =
-                                    apply_modules_cfg(crate::modules::ModuleRegistry::new(), cfg);
-                                let key = format!("{} {}", method.to_uppercase(), path_key);
-                                operation_modules.insert(key, reg);
+                            if let Some(op) = po.get(*method) {
+                                let mut cfg: ModulesConfig = ModulesConfig::default();
+
+                                // 1. Legacy x-modules extension
+                                if let Some(xmods) = op.get("x-modules")
+                                    && let Some(parsed) = modules_from_value(xmods)
+                                {
+                                    cfg = parsed;
+                                }
+
+                                // 2. Security requirement objects (operation-level overrides global)
+                                let mut access_from_security: Vec<String> = Vec::new();
+                                if let Some(sec_arr) = op.get("security").and_then(|v| v.as_array())
+                                {
+                                    for req in sec_arr.iter().filter_map(|v| v.as_object()) {
+                                        if req.contains_key("ApiKeyAuth") {
+                                            access_from_security.push("key_auth".to_string());
+                                        }
+                                    }
+                                } else {
+                                    // Use global security if local absent
+                                    access_from_security.extend(global_access.clone());
+                                }
+                                access_from_security.sort();
+                                access_from_security.dedup();
+                                if !access_from_security.is_empty() {
+                                    // Merge with any existing access modules from legacy extension
+                                    let mut merged: Vec<String> = cfg.access.unwrap_or_default();
+                                    merged.extend(access_from_security);
+                                    merged.sort();
+                                    merged.dedup();
+                                    cfg.access = Some(merged);
+                                }
+
+                                // Only create registry if we have at least one module configured
+                                if cfg.access.is_some() || cfg.rewrite.is_some() {
+                                    let reg = apply_modules_cfg(
+                                        crate::modules::ModuleRegistry::new(),
+                                        cfg,
+                                    );
+                                    let key = format!("{} {}", method.to_uppercase(), path_key);
+                                    operation_modules.insert(key, reg);
+                                }
                             }
                         }
                     }

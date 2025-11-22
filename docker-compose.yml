@@ -21,27 +21,11 @@ services:
       - "3001:3000"
       - "9092:9090"
     volumes:
-      - ./config:/app/config-template:ro
-      - ./e2e/prepare-config.sh:/app/prepare-config.sh:ro
+      - ./config:/app/config:ro
       - sqlite_data:/app/data
-    command:
-      - /bin/sh
-      - -c
-      - |
-        mkdir -p /tmp/config/openapi &&
-        cat /app/config-template/config.yaml > /tmp/config/config.yaml &&
-        cat /app/config-template/openapi/items.yaml > /tmp/config/openapi/items.yaml &&
-        sh /app/prepare-config.sh sqlite /tmp/config/config.yaml &&
-        apify -c /tmp/config/config.yaml
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 5s
     environment:
       - RUST_LOG=info
-      - APIFY_THREADS=1
+      - APIFY_THREADS=2
 
   apify-postgres:
     image: apifyhost/apify:latest
@@ -49,29 +33,13 @@ services:
       - "3000:3000"
       - "9091:9090"
     volumes:
-      - ./config:/app/config-template:ro
-      - ./e2e/prepare-config.sh:/app/prepare-config.sh:ro
-    command:
-      - /bin/sh
-      - -c
-      - |
-        mkdir -p /tmp/config/openapi &&
-        cat /app/config-template/config.yaml > /tmp/config/config.yaml &&
-        cat /app/config-template/openapi/items.yaml > /tmp/config/openapi/items.yaml &&
-        sh /app/prepare-config.sh postgres /tmp/config/config.yaml &&
-        apify -c /tmp/config/config.yaml
+      - ./config:/app/config:ro
     depends_on:
       postgres:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
     environment:
       - RUST_LOG=info
-      - APIFY_THREADS=1
+      - APIFY_THREADS=2
 
   jaeger:
     image: jaegertracing/all-in-one:latest

@@ -106,8 +106,8 @@ var _ = Describe("Observability Features", Ordered, func() {
 			metricsText := string(body)
 
 			Expect(metricsText).To(ContainSubstring("apify_worker_threads"))
-			// Should show 1 thread (APIFY_THREADS=1 in docker-compose)
-			Expect(metricsText).To(ContainSubstring("apify_worker_threads 1"))
+			// Should show 2 threads (APIFY_THREADS=2 in docker-compose)
+			Expect(metricsText).To(ContainSubstring("apify_worker_threads 2"))
 		})
 
 		It("should track request counts by status code", func() {

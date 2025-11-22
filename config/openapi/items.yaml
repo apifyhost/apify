@@ -6,6 +6,13 @@ openapi:
       version: "1.0.0"
       description: "API for end-to-end testing"
 
+    components:
+      securitySchemes:
+        ApiKeyAuth:
+          type: apiKey
+          in: header
+          name: X-Api-Key
+
     x-table-schemas:
       - table_name: "items"
         columns:
@@ -48,8 +55,8 @@ openapi:
           operationId: listItems
           summary: "List all items"
           x-table-name: "items"
-          x-modules:
-            access: ["key_auth"]
+          security:
+            - ApiKeyAuth: []
           responses:
             "200":
               description: "List of items"
@@ -58,8 +65,8 @@ openapi:
           operationId: createItem
           summary: "Create a new item"
           x-table-name: "items"
-          x-modules:
-            access: ["key_auth"]
+          security:
+            - ApiKeyAuth: []
           requestBody:
             required: true
             content:
@@ -83,8 +90,8 @@ openapi:
           operationId: getItem
           summary: "Get item by ID"
           x-table-name: "items"
-          x-modules:
-            access: ["key_auth"]
+          security:
+            - ApiKeyAuth: []
           parameters:
             - name: id
               in: path
@@ -101,8 +108,8 @@ openapi:
           operationId: updateItem
           summary: "Update an item"
           x-table-name: "items"
-          x-modules:
-            access: ["key_auth"]
+          security:
+            - ApiKeyAuth: []
           parameters:
             - name: id
               in: path
@@ -125,8 +132,8 @@ openapi:
           operationId: deleteItem
           summary: "Delete an item"
           x-table-name: "items"
-          x-modules:
-            access: ["key_auth"]
+          security:
+            - ApiKeyAuth: []
           parameters:
             - name: id
               in: path

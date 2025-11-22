@@ -19,7 +19,8 @@
 - 从 OpenAPI 规范自动初始化数据库模式
 
 ### 🔐 **内置认证**
-- 基于 API Key 的认证（`key_auth` 模块）
+- **OpenAPI Security Scheme** 支持（符合标准规范）
+- 基于 API Key 的认证，通过 `components.securitySchemes` 定义
 - 支持多密钥的消费者管理
 - 操作级、路由级、监听器级访问控制
 - 可扩展的模块系统支持自定义认证方法
@@ -128,6 +129,18 @@ openapi:
     info:
       title: "用户 API"
       version: "1.0.0"
+    
+    # 使用 OpenAPI 安全方案定义认证
+    components:
+      securitySchemes:
+        ApiKeyAuth:
+          type: apiKey
+          in: header
+          name: X-Api-Key
+    
+    # 全局应用安全策略（可在具体操作中覆盖）
+    security:
+      - ApiKeyAuth: []
     
     # 定义数据库表模式
     x-table-schemas:
