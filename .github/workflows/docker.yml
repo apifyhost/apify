@@ -81,7 +81,7 @@ jobs:
           cache-dependency-path: e2e/go.sum
       
       - name: Install Go dependencies
-        working-directory: examples/full
+        working-directory: e2e
         run: |
           go mod download
           go install github.com/onsi/ginkgo/v2/ginkgo@latest
@@ -194,7 +194,7 @@ jobs:
           exit 1
 
       - name: Run E2E tests (including OAuth)
-        working-directory: examples/full
+        working-directory: e2e
         env:
           BASE_URL: http://localhost:3000
           API_KEY: e2e-test-key-001
@@ -241,7 +241,7 @@ jobs:
           cache-dependency-path: e2e/go.sum
 
       - name: Install Go dependencies
-        working-directory: examples/full
+        working-directory: e2e
         run: |
           go mod download
           go install github.com/onsi/ginkgo/v2/ginkgo@latest
@@ -361,7 +361,7 @@ jobs:
           exit 1
 
       - name: Run E2E tests (including OAuth)
-        working-directory: examples/full
+        working-directory: e2e
         env:
           BASE_URL: http://localhost:3001
           API_KEY: e2e-test-key-001
