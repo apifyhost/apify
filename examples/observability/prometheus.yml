@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'apify-cluster'
+    environment: 'development'
+
+scrape_configs:
+  # Apify instance
+  - job_name: 'apify'
+    static_configs:
+      - targets: ['apify:9090']
+        labels:
+          instance: 'apify'
+          database: 'postgres'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

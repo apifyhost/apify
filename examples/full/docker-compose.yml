@@ -26,13 +26,10 @@ services:
     environment:
       - RUST_LOG=debug,apify=debug,apify::modules::oauth=debug
       - APIFY_THREADS=2
-      # OAuth/OIDC configuration
-      # Use localhost as KEYCLOAK_URL to match Keycloak's KC_HOSTNAME (for issuer URL)
-      # Apify will use this to construct the issuer, but actual requests go to keycloak:8080
-      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://localhost:8080}
-      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-apify}
-      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-apify-test-client}
-      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-apify-test-secret}
+      - KEYCLOAK_URL=http://localhost:8080
+      - KEYCLOAK_REALM=apify
+      - KEYCLOAK_CLIENT_ID=apify-test-client
+      - KEYCLOAK_CLIENT_SECRET=apify-test-secret
 
   apify-postgres:
     image: apifyhost/apify:latest
@@ -47,13 +44,10 @@ services:
     environment:
       - RUST_LOG=debug,apify=debug,apify::modules::oauth=debug
       - APIFY_THREADS=2
-      # OAuth/OIDC configuration
-      # Use localhost as KEYCLOAK_URL to match Keycloak's KC_HOSTNAME (for issuer URL)
-      # Apify will use this to construct the issuer, but actual requests go to keycloak:8080
-      - KEYCLOAK_URL=${KEYCLOAK_URL:-http://localhost:8080}
-      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-apify}
-      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID:-apify-test-client}
-      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-apify-test-secret}
+      - KEYCLOAK_URL=http://localhost:8080
+      - KEYCLOAK_REALM=apify
+      - KEYCLOAK_CLIENT_ID=apify-test-client
+      - KEYCLOAK_CLIENT_SECRET=apify-test-secret
 
   jaeger:
     image: jaegertracing/all-in-one:latest
@@ -75,7 +69,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -99,8 +93,8 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_INSTALL_PLUGINS=grafana-piechart-panel
     volumes:
-      - ./observability/grafana/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./observability/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
       - grafana_data:/var/lib/grafana
     depends_on:
       prometheus:
