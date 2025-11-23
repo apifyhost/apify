@@ -243,7 +243,7 @@ impl SchemaGenerator {
                         let target_table = relation_obj
                             .get("target")
                             .and_then(|t| t.as_str())
-                            .map(|s| Self::to_table_name(s));
+                            .map(Self::to_table_name);
 
                         let foreign_key = relation_obj
                             .get("foreignKey")

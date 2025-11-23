@@ -128,8 +128,8 @@ impl CRUDHandler {
 
         // Load nested relations for each record
         let table_schema = self.api_generator.get_table_schema(table);
-        if let Some(schema) = table_schema {
-            if !schema.relations.is_empty() {
+        if let Some(schema) = table_schema
+            && !schema.relations.is_empty() {
                 let mut enriched_results = Vec::new();
                 for record in results {
                     let enriched = self.load_relations_for_record(table, record).await?;
@@ -137,7 +137,6 @@ impl CRUDHandler {
                 }
                 return Ok(Value::Array(enriched_results));
             }
-        }
 
         Ok(Value::Array(results))
     }
@@ -163,12 +162,11 @@ impl CRUDHandler {
 
         // Check if this table has relations
         let table_schema = self.api_generator.get_table_schema(table);
-        if let Some(schema) = table_schema {
-            if !schema.relations.is_empty() {
+        if let Some(schema) = table_schema
+            && !schema.relations.is_empty() {
                 // Use fetch_with_relations to get record with nested data
                 return self.fetch_with_relations(table, id_json).await;
             }
-        }
 
         // No relations, use regular select
         let mut where_clause = HashMap::new();
@@ -209,11 +207,8 @@ impl CRUDHandler {
         let table_schema = self.api_generator.get_table_schema(table);
         let mut nested_relations: Vec<(String, Vec<Value>)> = Vec::new();
         let mut nested_single_relations: Vec<(String, Value)> = Vec::new(); // For hasOne
-        let mut has_relations = false;
 
         if let Some(schema) = table_schema {
-            has_relations = !schema.relations.is_empty();
-
             tracing::debug!(
                 table = %table,
                 relations_count = schema.relations.len(),
@@ -225,8 +220,8 @@ impl CRUDHandler {
                 match relation.relation_type {
                     crate::schema_generator::RelationType::HasMany => {
                         // Extract array of nested items
-                        if let Some(nested_data) = data_map.remove(&relation.field_name) {
-                            if let Value::Array(items) = nested_data {
+                        if let Some(nested_data) = data_map.remove(&relation.field_name)
+                            && let Value::Array(items) = nested_data {
                                 tracing::info!(
                                     relation = %relation.field_name,
                                     item_count = items.len(),
@@ -234,12 +229,11 @@ impl CRUDHandler {
                                 );
                                 nested_relations.push((relation.field_name.clone(), items));
                             }
-                        }
                     }
                     crate::schema_generator::RelationType::HasOne => {
                         // Extract single nested object
-                        if let Some(nested_data) = data_map.remove(&relation.field_name) {
-                            if let Value::Object(_) = nested_data {
+                        if let Some(nested_data) = data_map.remove(&relation.field_name)
+                            && let Value::Object(_) = nested_data {
                                 tracing::info!(
                                     relation = %relation.field_name,
                                     "Extracted hasOne relation data"
@@ -247,7 +241,6 @@ impl CRUDHandler {
                                 nested_single_relations
                                     .push((relation.field_name.clone(), nested_data));
                             }
-                        }
                     }
                     crate::schema_generator::RelationType::BelongsTo => {
                         // For belongsTo, just remove the nested object if present
@@ -331,8 +324,8 @@ impl CRUDHandler {
                                 item_map.insert(relation.foreign_key.clone(), parent_id.clone());
 
                                 // Inject audit fields if user is authenticated
-                                if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>() {
-                                    if let Some(target_schema) =
+                                if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>()
+                                    && let Some(target_schema) =
                                         self.api_generator.get_table_schema(&relation.target_table)
                                     {
                                         for col in &target_schema.columns {
@@ -347,7 +340,6 @@ impl CRUDHandler {
                                             }
                                         }
                                     }
-                                }
 
                                 let mut item_hashmap = HashMap::new();
                                 for (k, v) in item_map.iter() {
@@ -381,8 +373,8 @@ impl CRUDHandler {
                             item_map.insert(relation.foreign_key.clone(), parent_id.clone());
 
                             // Inject audit fields if user is authenticated
-                            if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>() {
-                                if let Some(target_schema) =
+                            if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>()
+                                && let Some(target_schema) =
                                     self.api_generator.get_table_schema(&relation.target_table)
                                 {
                                     for col in &target_schema.columns {
@@ -396,7 +388,6 @@ impl CRUDHandler {
                                         }
                                     }
                                 }
-                            }
 
                             let mut item_hashmap = HashMap::new();
                             for (k, v) in item_map.iter() {
@@ -581,8 +572,8 @@ impl CRUDHandler {
             for relation in &schema.relations {
                 match relation.relation_type {
                     crate::schema_generator::RelationType::HasMany => {
-                        if let Some(nested_data) = data_map.remove(&relation.field_name) {
-                            if let Value::Array(items) = nested_data {
+                        if let Some(nested_data) = data_map.remove(&relation.field_name)
+                            && let Value::Array(items) = nested_data {
                                 tracing::info!(
                                     relation = %relation.field_name,
                                     item_count = items.len(),
@@ -590,11 +581,10 @@ impl CRUDHandler {
                                 );
                                 nested_relations.push((relation.field_name.clone(), items));
                             }
-                        }
                     }
                     crate::schema_generator::RelationType::HasOne => {
-                        if let Some(nested_data) = data_map.remove(&relation.field_name) {
-                            if let Value::Object(_) = nested_data {
+                        if let Some(nested_data) = data_map.remove(&relation.field_name)
+                            && let Value::Object(_) = nested_data {
                                 tracing::info!(
                                     relation = %relation.field_name,
                                     "Extracted hasOne relation for update"
@@ -602,7 +592,6 @@ impl CRUDHandler {
                                 nested_single_relations
                                     .push((relation.field_name.clone(), nested_data));
                             }
-                        }
                     }
                     crate::schema_generator::RelationType::BelongsTo => {
                         // For belongsTo, just remove the nested object
@@ -614,8 +603,8 @@ impl CRUDHandler {
         }
 
         // Inject audit fields for update operation
-        if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>() {
-            if let Some(schema) = &table_schema {
+        if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>()
+            && let Some(schema) = &table_schema {
                 for col in &schema.columns {
                     if col.auto_field && col.name == "updatedBy" {
                         data_map.insert(
@@ -625,7 +614,6 @@ impl CRUDHandler {
                     }
                 }
             }
-        }
 
         // Convert serde_json::Map to HashMap<String, Value>
         let mut data_hashmap = HashMap::new();
@@ -643,8 +631,8 @@ impl CRUDHandler {
             .await?;
 
         // Handle nested relation updates
-        if !nested_relations.is_empty() || !nested_single_relations.is_empty() {
-            if let Some(schema) = table_schema {
+        if (!nested_relations.is_empty() || !nested_single_relations.is_empty())
+            && let Some(schema) = table_schema {
                 // Process hasMany relations (replace all children)
                 for (field_name, new_items) in nested_relations {
                     if let Some(relation) =
@@ -674,24 +662,22 @@ impl CRUDHandler {
                                 item_map.insert(relation.foreign_key.clone(), record_id.clone());
 
                                 // Inject audit fields
-                                if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>() {
-                                    if let Some(target_schema) =
+                                if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>()
+                                    && let Some(target_schema) =
                                         self.api_generator.get_table_schema(&relation.target_table)
                                     {
                                         for col in &target_schema.columns {
-                                            if col.auto_field {
-                                                if col.name == "createdBy"
-                                                    || col.name == "updatedBy"
+                                            if col.auto_field
+                                                && (col.name == "createdBy"
+                                                    || col.name == "updatedBy")
                                                 {
                                                     item_map.insert(
                                                         col.name.clone(),
                                                         Value::String(identity.name.clone()),
                                                     );
                                                 }
-                                            }
                                         }
                                     }
-                                }
 
                                 let mut item_hashmap = HashMap::new();
                                 for (k, v) in item_map.iter() {
@@ -730,22 +716,20 @@ impl CRUDHandler {
                             item_map.insert(relation.foreign_key.clone(), record_id.clone());
 
                             // Inject audit fields
-                            if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>() {
-                                if let Some(target_schema) =
+                            if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>()
+                                && let Some(target_schema) =
                                     self.api_generator.get_table_schema(&relation.target_table)
                                 {
                                     for col in &target_schema.columns {
-                                        if col.auto_field {
-                                            if col.name == "createdBy" || col.name == "updatedBy" {
+                                        if col.auto_field
+                                            && (col.name == "createdBy" || col.name == "updatedBy") {
                                                 item_map.insert(
                                                     col.name.clone(),
                                                     Value::String(identity.name.clone()),
                                                 );
                                             }
-                                        }
                                     }
                                 }
-                            }
 
                             let mut item_hashmap = HashMap::new();
                             for (k, v) in item_map.iter() {
@@ -759,7 +743,6 @@ impl CRUDHandler {
                     }
                 }
             }
-        }
 
         Ok(result)
     }
@@ -785,8 +768,8 @@ impl CRUDHandler {
 
         // Check if this table has relations that need cascading delete
         let table_schema = self.api_generator.get_table_schema(table);
-        if let Some(schema) = table_schema {
-            if !schema.relations.is_empty() {
+        if let Some(schema) = table_schema
+            && !schema.relations.is_empty() {
                 tracing::info!(
                     table = %table,
                     id = ?id_json,
@@ -823,7 +806,6 @@ impl CRUDHandler {
                     }
                 }
             }
-        }
 
         let mut where_clause = HashMap::new();
         where_clause.insert(id_param.clone(), id_json);
