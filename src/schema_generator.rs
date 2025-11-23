@@ -22,7 +22,7 @@ pub struct ColumnDefinition {
     pub auto_increment: bool,
     pub default_value: Option<String>,
     #[serde(default)]
-    pub auto_field: bool,  // For audit fields like createdBy, updatedBy
+    pub auto_field: bool, // For audit fields like createdBy, updatedBy
 }
 
 /// Index definition
@@ -142,7 +142,7 @@ impl SchemaGenerator {
                         .and_then(|o| o.get("x-unique"))
                         .and_then(|v| v.as_bool())
                         .unwrap_or(false);
-                    
+
                     // Check for auto-field markers (x-auto-field or readOnly)
                     let auto_field = prop_schema
                         .as_object()

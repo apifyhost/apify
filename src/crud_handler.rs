@@ -192,10 +192,16 @@ impl CRUDHandler {
                     if col.auto_field {
                         match col.name.as_str() {
                             "createdBy" => {
-                                data_map.insert("createdBy".to_string(), Value::String(identity.name.clone()));
+                                data_map.insert(
+                                    "createdBy".to_string(),
+                                    Value::String(identity.name.clone()),
+                                );
                             }
                             "updatedBy" => {
-                                data_map.insert("updatedBy".to_string(), Value::String(identity.name.clone()));
+                                data_map.insert(
+                                    "updatedBy".to_string(),
+                                    Value::String(identity.name.clone()),
+                                );
                             }
                             _ => {}
                         }
@@ -242,7 +248,10 @@ impl CRUDHandler {
             if let Some(schema) = table_schema {
                 for col in &schema.columns {
                     if col.auto_field && col.name == "updatedBy" {
-                        data_map.insert("updatedBy".to_string(), Value::String(identity.name.clone()));
+                        data_map.insert(
+                            "updatedBy".to_string(),
+                            Value::String(identity.name.clone()),
+                        );
                     }
                 }
             }
