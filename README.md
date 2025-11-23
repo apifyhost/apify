@@ -61,6 +61,15 @@ Each phase can have custom modules with flexible configuration at multiple level
 - Automatic DDL generation and execution
 - Support for constraints, indexes, foreign keys
 - Database schema versioning ready
+- **Relations & Nested Objects** ✅ - Full CRUD support for related records
+  - `hasMany` (one-to-many) - Parent with multiple children
+  - `hasOne` (one-to-one) - Parent with single child
+  - `belongsTo` (many-to-one) - Child references parent
+  - Automatic foreign key injection
+  - Nested data creation and retrieval
+  - Auto-loading of relations in GET requests
+  - Update nested relations (replace children)
+  - Cascade delete for hasMany/hasOne
 
 #### 🎯 **Flexible Configuration**
 - YAML-based configuration

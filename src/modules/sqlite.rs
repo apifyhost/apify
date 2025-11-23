@@ -113,7 +113,13 @@ impl SqliteBackend {
             .execute(&self.pool)
             .await
             .map_err(DatabaseError::QueryError)?;
-        Ok(json!({"message": "Record inserted", "affected_rows": res.rows_affected()}))
+        
+        let last_id = res.last_insert_rowid();
+        Ok(json!({
+            "message": "Record inserted",
+            "affected_rows": res.rows_affected(),
+            "id": last_id
+        }))
     }
 
     async fn do_update(

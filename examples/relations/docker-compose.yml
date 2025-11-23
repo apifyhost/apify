@@ -1,0 +1,13 @@
+services:
+  apify:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+      - "9090:9090"
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+    environment:
+      - RUST_LOG=info

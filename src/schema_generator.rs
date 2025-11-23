@@ -9,6 +9,27 @@ pub struct TableSchema {
     pub table_name: String,
     pub columns: Vec<ColumnDefinition>,
     pub indexes: Vec<IndexDefinition>,
+    #[serde(default)]
+    pub relations: Vec<RelationDefinition>,
+}
+
+/// Relation definition for nested object support
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RelationDefinition {
+    pub field_name: String,        // Property name in the schema (e.g., "items")
+    pub relation_type: RelationType, // hasMany, belongsTo, hasOne, belongsToMany
+    pub target_table: String,      // Related table name
+    pub foreign_key: String,       // Foreign key column name
+    pub local_key: Option<String>, // Local key (default: "id")
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum RelationType {
+    HasMany,
+    BelongsTo,
+    HasOne,
+    BelongsToMany, // For future many-to-many support
 }
 
 /// Column definition
@@ -200,11 +221,57 @@ impl SchemaGenerator {
                 );
             }
 
+            // Extract relations from properties with x-relation
+            let mut relations = Vec::new();
+            if let Some(props) = obj.get("properties").and_then(|p| p.as_object()) {
+                for (prop_name, prop_schema) in props.iter() {
+                    if let Some(relation_obj) = prop_schema.get("x-relation").and_then(|r| r.as_object()) {
+                        // Extract relation configuration
+                        let relation_type = relation_obj
+                            .get("type")
+                            .and_then(|t| t.as_str())
+                            .and_then(|t| match t {
+                                "hasMany" => Some(RelationType::HasMany),
+                                "belongsTo" => Some(RelationType::BelongsTo),
+                                "hasOne" => Some(RelationType::HasOne),
+                                "belongsToMany" => Some(RelationType::BelongsToMany),
+                                _ => None,
+                            });
+
+                        let target_table = relation_obj
+                            .get("target")
+                            .and_then(|t| t.as_str())
+                            .map(|s| Self::to_table_name(s));
+
+                        let foreign_key = relation_obj
+                            .get("foreignKey")
+                            .and_then(|fk| fk.as_str())
+                            .map(|s| s.to_string());
+
+                        let local_key = relation_obj
+                            .get("localKey")
+                            .and_then(|lk| lk.as_str())
+                            .map(|s| s.to_string());
+
+                        if let (Some(rel_type), Some(target), Some(fk)) = (relation_type, target_table, foreign_key) {
+                            relations.push(RelationDefinition {
+                                field_name: prop_name.clone(),
+                                relation_type: rel_type,
+                                target_table: target,
+                                foreign_key: fk,
+                                local_key,
+                            });
+                        }
+                    }
+                }
+            }
+
             let table_name = Self::to_table_name(schema_name);
             tables.push(TableSchema {
                 table_name,
                 columns,
                 indexes,
+                relations,
             });
         }
 

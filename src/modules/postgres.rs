@@ -138,7 +138,16 @@ impl PostgresBackend {
             .await
             .map_err(DatabaseError::QueryError)?;
         let inserted = row_to_json_postgres(&row);
-        Ok(json!({"message": "Record inserted", "affected_rows": 1, "record": inserted}))
+        
+        // Extract the id field from the inserted record
+        let id = inserted.get("id").cloned();
+        
+        Ok(json!({
+            "message": "Record inserted",
+            "affected_rows": 1,
+            "record": inserted,
+            "id": id
+        }))
     }
 
     async fn do_update(
