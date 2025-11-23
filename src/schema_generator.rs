@@ -21,6 +21,8 @@ pub struct ColumnDefinition {
     pub unique: bool,
     pub auto_increment: bool,
     pub default_value: Option<String>,
+    #[serde(default)]
+    pub auto_field: bool, // For audit fields like createdBy, updatedBy
 }
 
 /// Index definition
@@ -125,6 +127,7 @@ impl SchemaGenerator {
                             unique: false,
                             auto_increment: true,
                             default_value: None,
+                            auto_field: false,
                         });
                         continue;
                     }
@@ -139,6 +142,18 @@ impl SchemaGenerator {
                         .and_then(|o| o.get("x-unique"))
                         .and_then(|v| v.as_bool())
                         .unwrap_or(false);
+
+                    // Check for auto-field markers (x-auto-field or readOnly)
+                    let auto_field = prop_schema
+                        .as_object()
+                        .and_then(|o| o.get("x-auto-field"))
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false)
+                        || prop_schema
+                            .as_object()
+                            .and_then(|o| o.get("readOnly"))
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
 
                     // indexes via x-index
                     let index = prop_schema
@@ -155,6 +170,7 @@ impl SchemaGenerator {
                         unique,
                         auto_increment: false,
                         default_value,
+                        auto_field,
                     });
 
                     if index {
@@ -179,6 +195,7 @@ impl SchemaGenerator {
                         unique: false,
                         auto_increment: true,
                         default_value: None,
+                        auto_field: false,
                     },
                 );
             }
@@ -206,12 +223,21 @@ impl SchemaGenerator {
         prop_name: &str,
         prop_schema: &Value,
     ) -> (String, Option<String>) {
-        // special-case created_at
-        if prop_name == "created_at" {
-            return (
-                "DATETIME".to_string(),
-                Some("CURRENT_TIMESTAMP".to_string()),
-            );
+        // Special cases for audit fields
+        match prop_name {
+            "createdBy" | "updatedBy" => {
+                return ("TEXT".to_string(), None);
+            }
+            "createdAt" | "created_at" => {
+                return (
+                    "DATETIME".to_string(),
+                    Some("CURRENT_TIMESTAMP".to_string()),
+                );
+            }
+            "updatedAt" | "updated_at" => {
+                return ("DATETIME".to_string(), None);
+            }
+            _ => {}
         }
 
         let t = prop_schema
@@ -416,6 +442,7 @@ mod tests {
                     unique: false,
                     auto_increment: true,
                     default_value: None,
+                    auto_field: false,
                 },
                 ColumnDefinition {
                     name: "name".to_string(),
@@ -425,6 +452,7 @@ mod tests {
                     unique: false,
                     auto_increment: false,
                     default_value: None,
+                    auto_field: false,
                 },
                 ColumnDefinition {
                     name: "email".to_string(),
@@ -434,6 +462,7 @@ mod tests {
                     unique: true,
                     auto_increment: false,
                     default_value: None,
+                    auto_field: false,
                 },
             ],
             indexes: vec![IndexDefinition {

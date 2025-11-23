@@ -257,4 +257,142 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 			GinkgoWriter.Printf("OIDC Discovery: issuer=%v\n", discovery["issuer"])
 		})
 	})
+
+	Describe("Audit Trail", func() {
+		Context("when creating items with OAuth authentication", func() {
+			It("should automatically populate createdBy and updatedBy fields", func() {
+				body := `{"name": "Audit Test Item", "description": "Testing audit trail", "price": 55.55}`
+				req, err := http.NewRequest("POST", baseURL+"/secure-items", strings.NewReader(body))
+				Expect(err).NotTo(HaveOccurred())
+				req.Header.Set("Authorization", "Bearer "+accessToken)
+				req.Header.Set("Content-Type", "application/json")
+
+				resp, err := client.Do(req)
+				Expect(err).NotTo(HaveOccurred())
+				defer resp.Body.Close()
+
+				Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+				var item map[string]interface{}
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				err = json.Unmarshal(bodyBytes, &item)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Verify audit fields are populated
+				if createdBy, ok := item["createdBy"]; ok {
+					Expect(createdBy).To(Equal(username), "createdBy should be set to the authenticated user")
+				}
+				if updatedBy, ok := item["updatedBy"]; ok {
+					Expect(updatedBy).To(Equal(username), "updatedBy should be set to the authenticated user")
+				}
+				if createdAt, ok := item["createdAt"]; ok {
+					Expect(createdAt).NotTo(BeNil(), "createdAt should be populated")
+				}
+
+				GinkgoWriter.Printf("Created item with audit fields: createdBy=%v\n", item["createdBy"])
+			})
+		})
+
+		Context("when updating items with OAuth authentication", func() {
+			It("should update updatedBy field while preserving createdBy", func() {
+				// First create an item
+				createBody := `{"name": "Update Audit Test", "description": "Initial", "price": 10.00}`
+				createReq, err := http.NewRequest("POST", baseURL+"/secure-items", strings.NewReader(createBody))
+				Expect(err).NotTo(HaveOccurred())
+				createReq.Header.Set("Authorization", "Bearer "+accessToken)
+				createReq.Header.Set("Content-Type", "application/json")
+
+				createResp, err := client.Do(createReq)
+				Expect(err).NotTo(HaveOccurred())
+				defer createResp.Body.Close()
+
+				var createdItem map[string]interface{}
+				createBodyBytes, _ := io.ReadAll(createResp.Body)
+				err = json.Unmarshal(createBodyBytes, &createdItem)
+				Expect(err).NotTo(HaveOccurred())
+
+				originalCreatedBy := createdItem["createdBy"]
+				originalCreatedAt := createdItem["createdAt"]
+				itemID := createdItem["id"]
+
+				// Wait a moment to ensure timestamp difference
+				time.Sleep(1 * time.Second)
+
+				// Update the item
+				updateBody := `{"name": "Updated Audit Test", "description": "Modified", "price": 20.00}`
+				updateReq, err := http.NewRequest("PUT", baseURL+"/secure-items/"+toString(itemID), strings.NewReader(updateBody))
+				Expect(err).NotTo(HaveOccurred())
+				updateReq.Header.Set("Authorization", "Bearer "+accessToken)
+				updateReq.Header.Set("Content-Type", "application/json")
+
+				updateResp, err := client.Do(updateReq)
+				Expect(err).NotTo(HaveOccurred())
+				defer updateResp.Body.Close()
+
+				var updatedItem map[string]interface{}
+				updateBodyBytes, _ := io.ReadAll(updateResp.Body)
+				err = json.Unmarshal(updateBodyBytes, &updatedItem)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Verify createdBy and createdAt are preserved
+				if createdBy, ok := updatedItem["createdBy"]; ok {
+					Expect(createdBy).To(Equal(originalCreatedBy), "createdBy should not change on update")
+				}
+				if createdAt, ok := updatedItem["createdAt"]; ok {
+					Expect(createdAt).To(Equal(originalCreatedAt), "createdAt should not change on update")
+				}
+
+				// Verify updatedBy is set
+				if updatedBy, ok := updatedItem["updatedBy"]; ok {
+					Expect(updatedBy).To(Equal(username), "updatedBy should be set to the authenticated user")
+				}
+
+				GinkgoWriter.Printf("Updated item: createdBy=%v, updatedBy=%v\n",
+					updatedItem["createdBy"], updatedItem["updatedBy"])
+			})
+		})
+
+		Context("when user tries to override audit fields", func() {
+			It("should ignore user-provided audit field values", func() {
+				// Try to create with manually set audit fields
+				body := `{"name": "Hacker Item", "description": "test", "price": 1.00, "createdBy": "hacker", "updatedBy": "hacker"}`
+				req, err := http.NewRequest("POST", baseURL+"/secure-items", strings.NewReader(body))
+				Expect(err).NotTo(HaveOccurred())
+				req.Header.Set("Authorization", "Bearer "+accessToken)
+				req.Header.Set("Content-Type", "application/json")
+
+				resp, err := client.Do(req)
+				Expect(err).NotTo(HaveOccurred())
+				defer resp.Body.Close()
+
+				var item map[string]interface{}
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				err = json.Unmarshal(bodyBytes, &item)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Audit fields should be overridden by the system
+				if createdBy, ok := item["createdBy"]; ok {
+					Expect(createdBy).To(Equal(username), "createdBy should be overridden to authenticated user, not 'hacker'")
+				}
+				if updatedBy, ok := item["updatedBy"]; ok {
+					Expect(updatedBy).To(Equal(username), "updatedBy should be overridden to authenticated user, not 'hacker'")
+				}
+			})
+		})
+	})
 })
+
+// Helper function to convert interface{} to string for URL construction
+func toString(v interface{}) string {
+	switch val := v.(type) {
+	case float64:
+		return strings.TrimSuffix(strings.TrimSuffix(json.Number(string(rune(val))).String(), ".0"), ".")
+	case int:
+		return string(rune(val))
+	case string:
+		return val
+	default:
+		b, _ := json.Marshal(v)
+		return strings.Trim(string(b), "\"")
+	}
+}

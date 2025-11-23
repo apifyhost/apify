@@ -2,6 +2,8 @@
 
 use crate::api_generator::{APIGenerator, OperationType, RoutePattern};
 use crate::database::DatabaseManager;
+use crate::modules::ConsumerIdentity;
+use crate::phases::RequestContext;
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -66,6 +68,7 @@ impl CRUDHandler {
         path_params: HashMap<String, String>,
         query_params: HashMap<String, String>,
         body: Option<Value>,
+        ctx: &RequestContext,
     ) -> Result<Value, CRUDError> {
         // Find matching route pattern
         let pattern = self
@@ -78,8 +81,8 @@ impl CRUDHandler {
         match pattern.operation_type {
             OperationType::List => self.handle_list(pattern, query_params).await,
             OperationType::Get => self.handle_get(pattern, path_params).await,
-            OperationType::Create => self.handle_create(pattern, body).await,
-            OperationType::Update => self.handle_update(pattern, path_params, body).await,
+            OperationType::Create => self.handle_create(pattern, body, ctx).await,
+            OperationType::Update => self.handle_update(pattern, path_params, body, ctx).await,
             OperationType::Delete => self.handle_delete(pattern, path_params).await,
         }
     }
@@ -164,13 +167,14 @@ impl CRUDHandler {
         &self,
         pattern: &RoutePattern,
         body: Option<Value>,
+        ctx: &RequestContext,
     ) -> Result<Value, CRUDError> {
         let table = &pattern.table_name;
 
         let data =
             body.ok_or_else(|| CRUDError::ValidationError("Request body is required".to_string()))?;
 
-        let data_map = match data {
+        let mut data_map = match data {
             Value::Object(map) => map,
             _ => {
                 return Err(CRUDError::ValidationError(
@@ -178,6 +182,33 @@ impl CRUDHandler {
                 ));
             }
         };
+
+        // Inject audit fields for create operation
+        if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>() {
+            // Check if table has auto-fields and inject user identity
+            let table_schema = self.api_generator.get_table_schema(table);
+            if let Some(schema) = table_schema {
+                for col in &schema.columns {
+                    if col.auto_field {
+                        match col.name.as_str() {
+                            "createdBy" => {
+                                data_map.insert(
+                                    "createdBy".to_string(),
+                                    Value::String(identity.name.clone()),
+                                );
+                            }
+                            "updatedBy" => {
+                                data_map.insert(
+                                    "updatedBy".to_string(),
+                                    Value::String(identity.name.clone()),
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
 
         // Convert serde_json::Map to HashMap<String, Value>
         let mut data_hashmap = HashMap::new();
@@ -195,13 +226,14 @@ impl CRUDHandler {
         pattern: &RoutePattern,
         path_params: HashMap<String, String>,
         body: Option<Value>,
+        ctx: &RequestContext,
     ) -> Result<Value, CRUDError> {
         let table = &pattern.table_name;
 
         let data =
             body.ok_or_else(|| CRUDError::ValidationError("Request body is required".to_string()))?;
 
-        let data_map = match data {
+        let mut data_map = match data {
             Value::Object(map) => map,
             _ => {
                 return Err(CRUDError::ValidationError(
@@ -209,6 +241,21 @@ impl CRUDHandler {
                 ));
             }
         };
+
+        // Inject audit fields for update operation
+        if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>() {
+            let table_schema = self.api_generator.get_table_schema(table);
+            if let Some(schema) = table_schema {
+                for col in &schema.columns {
+                    if col.auto_field && col.name == "updatedBy" {
+                        data_map.insert(
+                            "updatedBy".to_string(),
+                            Value::String(identity.name.clone()),
+                        );
+                    }
+                }
+            }
+        }
 
         // Convert serde_json::Map to HashMap<String, Value>
         let mut data_hashmap = HashMap::new();

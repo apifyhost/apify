@@ -142,6 +142,7 @@ async fn handle_request_inner(
                 ctx.path_params.clone(),
                 ctx.query_params.clone(),
                 ctx.json_body.clone(),
+                &ctx,
             )
             .await
         {
