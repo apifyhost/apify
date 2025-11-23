@@ -335,9 +335,9 @@ jobs:
 
       - name: Update config for SQLite
         run: |
-          sed -i 's/datasource: postgres1/datasource: sqlite1/g' ./e2e/config/config.yaml
+          sed -i 's/datasource: postgres1/datasource: sqlite1/g' ./examples/full/config/config.yaml
           echo "Updated config.yaml:"
-          cat e2e/config/config.yaml
+          cat examples/full/config/config.yaml
 
       - name: Start Apify with SQLite using docker compose
         run: |
@@ -544,8 +544,8 @@ jobs:
 
       - name: Create quickstart package
         run: |
-          # Copy quickstart directory as the base
-          cp -r quickstart quickstart-package
+          # Copy examples/basic directory as the quickstart base
+          cp -r examples/basic quickstart-package
           
           # Update image tag in docker-compose.yml
           sed -i "s|apifyhost/apify:latest|apifyhost/apify:${{ steps.version.outputs.VERSION }}|g" quickstart-package/docker-compose.yml
@@ -553,90 +553,30 @@ jobs:
           echo "Updated docker-compose.yml with image tag: ${{ steps.version.outputs.VERSION }}"
           grep "image: apifyhost/apify:" quickstart-package/docker-compose.yml || true
           
-          # Add quickstart.sh script
-          cp quickstart.sh quickstart-package/
+          # Create a simple quickstart.sh script
+          cat > quickstart-package/quickstart.sh << 'ENDSCRIPT'
+          #!/bin/bash
+          set -e
+          echo "Starting Apify quickstart..."
+          docker compose up -d
+          echo "Waiting for service to be ready..."
+          for i in {1..30}; do
+            if curl -sf http://localhost:3000/healthz > /dev/null 2>&1; then
+              echo "Apify is ready!"
+              echo "API: http://localhost:3000"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Service failed to start"
+          docker compose logs
+          exit 1
+          ENDSCRIPT
           
-          # Add observability examples
-          cp -r observability quickstart-package/
+          chmod +x quickstart-package/quickstart.sh
           
-          # Add main README and LICENSE
+          # Add LICENSE
           cp LICENSE quickstart-package/
-          
-          # Rename quickstart README to QUICKSTART.md as an additional guide
-          mv quickstart-package/README.md quickstart-package/QUICKSTART.md
-          
-          # Create a simple main README for the package
-          cat > quickstart-package/README.md << 'EOF'
-          # Apify Quickstart Package
-          
-          This package contains everything you need to run Apify using Docker Compose.
-          
-          ## Prerequisites
-          
-          - Docker and Docker Compose installed
-          - curl (for health checks)
-          
-          ## Quick Start
-          
-          ```bash
-          # Make the script executable
-          chmod +x quickstart.sh
-          
-          # Run Apify
-          ./quickstart.sh
-          ```
-          
-          The script will:
-          1. Start Apify with SQLite using Docker Compose
-          2. Wait for the service to be ready
-          3. Display the listening addresses
-          
-          ## Manual Start
-          
-          If you prefer to start manually:
-          
-          ```bash
-          # Start with SQLite
-          docker compose up -d apify-sqlite
-          
-          # Start with PostgreSQL
-          docker compose up -d postgres apify-postgres
-          
-          # View logs
-          docker compose logs -f
-          
-          # Stop services
-          docker compose down
-          ```
-          
-          ## Access
-          
-          - API: http://localhost:3000
-          - Metrics: http://localhost:9090/metrics
-          - Health: http://localhost:3000/healthz
-          
-          ## Configuration
-          
-          Configuration files are in the `config/` directory:
-          - `config/config.yaml` - Main configuration
-          - `config/openapi/items.yaml` - OpenAPI specification
-          
-          ## Observability
-          
-          Optional observability stack (Prometheus, Grafana, Jaeger):
-          
-          ```bash
-          docker compose up -d jaeger prometheus grafana
-          ```
-          
-          - Grafana: http://localhost:3002 (admin/admin)
-          - Jaeger UI: http://localhost:16686
-          - Prometheus: http://localhost:9092
-          
-          ## Documentation
-          
-          See README.md for full documentation.
-          EOF
           
           # Set proper permissions
           chmod +x quickstart-package/quickstart.sh
