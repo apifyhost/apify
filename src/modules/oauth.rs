@@ -20,6 +20,7 @@ struct OIDCDiscovery {
 
 #[derive(Clone)]
 pub struct OAuthModule {
+    #[allow(dead_code)]
     provider_name: String,
 }
 
@@ -220,9 +221,9 @@ impl Module for OAuthModule {
                 let decoding_key_res = DecodingKey::from_rsa_components(n, e);
                 if let Ok(decoding_key) = decoding_key_res {
                     let mut validation = Validation::new(Algorithm::RS256);
-                    validation.set_issuer(&[discovery.issuer.clone()]);
+                    validation.set_issuer(std::slice::from_ref(&discovery.issuer));
                     if let Some(aud) = &provider_cfg.audience {
-                        validation.set_audience(&[aud.clone()]);
+                        validation.set_audience(std::slice::from_ref(aud));
                     }
                     if let Ok(data) = decode::<serde_json::Value>(token, &decoding_key, &validation)
                     {
