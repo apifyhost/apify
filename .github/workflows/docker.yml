@@ -544,44 +544,70 @@ jobs:
 
       - name: Create quickstart package
         run: |
-          # Copy examples/basic directory as the quickstart base
-          cp -r examples/basic quickstart-package
+          mkdir -p quickstart-package
           
-          # Update image tag in docker-compose.yml
-          sed -i "s|apifyhost/apify:latest|apifyhost/apify:${{ steps.version.outputs.VERSION }}|g" quickstart-package/docker-compose.yml
+          # Copy entire examples directory
+          cp -r examples quickstart-package/
           
-          echo "Updated docker-compose.yml with image tag: ${{ steps.version.outputs.VERSION }}"
-          grep "image: apifyhost/apify:" quickstart-package/docker-compose.yml || true
+          # Update image tags in all docker-compose.yml files
+          find quickstart-package/examples -name "docker-compose.yml" -exec sed -i "s|apifyhost/apify:latest|apifyhost/apify:${{ steps.version.outputs.VERSION }}|g" {} \;
           
-          # Create a simple quickstart.sh script
-          cat > quickstart-package/quickstart.sh << 'ENDSCRIPT'
-          #!/bin/bash
-          set -e
-          echo "Starting Apify quickstart..."
-          docker compose up -d
-          echo "Waiting for service to be ready..."
-          for i in {1..30}; do
-            if curl -sf http://localhost:3000/healthz > /dev/null 2>&1; then
-              echo "Apify is ready!"
-              echo "API: http://localhost:3000"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Service failed to start"
-          docker compose logs
-          exit 1
-          ENDSCRIPT
+          echo "Updated docker-compose.yml files with image tag: ${{ steps.version.outputs.VERSION }}"
+          find quickstart-package/examples -name "docker-compose.yml" -exec grep "image: apifyhost/apify:" {} \;
           
+          # Copy quickstart.sh from root
+          cp quickstart.sh quickstart-package/
           chmod +x quickstart-package/quickstart.sh
           
           # Add LICENSE
           cp LICENSE quickstart-package/
           
+          # Create README.md for the package
+          cat > quickstart-package/README.md << 'ENDREADME'
+          # Apify Quickstart Package
+          
+          This package contains Apify with multiple example configurations.
+          
+          ## Quick Start
+          
+          ```bash
+          # Start basic example (default)
+          ./quickstart.sh
+          
+          # Or choose a specific example
+          ./quickstart.sh basic          # Basic CRUD API
+          ./quickstart.sh oauth           # OAuth/OIDC with Keycloak
+          ./quickstart.sh observability   # Metrics, Tracing, Dashboards
+          ./quickstart.sh full            # All features combined
+          ```
+          
+          ## Examples
+          
+          - **basic/** - Simple CRUD API with PostgreSQL
+          - **oauth/** - OAuth 2.0 / OIDC authentication with Keycloak
+          - **observability/** - Full observability stack (Prometheus, Grafana, Jaeger)
+          - **full/** - All features combined (for testing)
+          
+          Each example has its own README with detailed instructions.
+          
+          ## Manual Start
+          
+          ```bash
+          cd examples/basic
+          docker compose up -d
+          ```
+          
+          ## Documentation
+          
+          For full documentation, visit: https://github.com/apifyhost/apify
+          ENDREADME
+          
+          # Create QUICKSTART.md (copy from basic example)
+          cp quickstart-package/examples/basic/README.md quickstart-package/QUICKSTART.md
+          
           # Set proper permissions
-          chmod +x quickstart-package/quickstart.sh
-          find quickstart-package/config -type f -exec chmod 644 {} \;
-          find quickstart-package/config -type d -exec chmod 755 {} \;
+          find quickstart-package/examples -name "*.yaml" -o -name "*.yml" -o -name "*.json" | xargs chmod 644
+          find quickstart-package/examples -type d -exec chmod 755 {} \;
           
           # Create tarball
           cd quickstart-package
@@ -590,7 +616,7 @@ jobs:
           
           # Verify the package
           echo "Package contents:"
-          tar -tzf apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz | head -20
+          tar -tzf apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz | head -30
 
       - name: Generate SHA256 checksum
         run: |
@@ -604,35 +630,44 @@ jobs:
           echo "Testing in: $TEST_DIR"
           cd "$TEST_DIR"
           tar -xzf $GITHUB_WORKSPACE/apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz
-
+          
           # Verify all required files exist
           echo "Checking required files..."
-          test -f docker-compose.yml || { echo "Missing docker-compose.yml"; exit 1; }
           test -f quickstart.sh || { echo "Missing quickstart.sh"; exit 1; }
           test -f README.md || { echo "Missing README.md"; exit 1; }
-          test -d config || { echo "Missing config directory"; exit 1; }
-          test -f config/config.yaml || { echo "Missing config.yaml"; exit 1; }
-          test -f config/openapi/items.yaml || { echo "Missing items.yaml"; exit 1; }
-
+          test -f QUICKSTART.md || { echo "Missing QUICKSTART.md"; exit 1; }
+          test -d examples || { echo "Missing examples directory"; exit 1; }
+          test -d examples/basic || { echo "Missing examples/basic"; exit 1; }
+          test -d examples/oauth || { echo "Missing examples/oauth"; exit 1; }
+          test -d examples/observability || { echo "Missing examples/observability"; exit 1; }
+          test -d examples/full || { echo "Missing examples/full"; exit 1; }
+          
           # Verify quickstart.sh is executable
           test -x quickstart.sh || { echo "quickstart.sh is not executable"; exit 1; }
-
-          # Verify config file permissions
-          ls -la config/
-          ls -la config/openapi/
-
+          
+          # Verify basic example structure
+          test -f examples/basic/docker-compose.yml || { echo "Missing basic/docker-compose.yml"; exit 1; }
+          test -f examples/basic/config/config.yaml || { echo "Missing basic/config.yaml"; exit 1; }
+          test -f examples/basic/config/openapi/items.yaml || { echo "Missing basic/items.yaml"; exit 1; }
+          
           # Verify docker-compose.yml has correct image tag
-          echo "Checking image tag in docker-compose.yml..."
-          grep "image: apifyhost/apify:${{ steps.version.outputs.VERSION }}" docker-compose.yml || {
-            echo "Image tag not updated correctly"
-            grep "image: apifyhost/apify:" docker-compose.yml
+          echo "Checking image tags in docker-compose.yml files..."
+          grep "image: apifyhost/apify:${{ steps.version.outputs.VERSION }}" examples/basic/docker-compose.yml || {
+            echo "Image tag not updated correctly in basic example"
+            grep "image: apifyhost/apify:" examples/basic/docker-compose.yml
             exit 1
           }
-
+          
           # Verify docker-compose config is valid
+          cd examples/basic
           docker compose config > /dev/null || { echo "Invalid docker-compose.yml"; exit 1; }
-
+          cd ../..
+          
           echo "✅ Quickstart package validation passed!"
+          
+          # Cleanup
+          cd /
+          rm -rf "$TEST_DIR"          echo "✅ Quickstart package validation passed!"
 
           # Cleanup
           cd /
