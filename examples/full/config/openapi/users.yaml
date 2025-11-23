@@ -1,0 +1,340 @@
+openapi:
+  spec:
+    openapi: "3.0.0"
+    info:
+      title: "Users API with Relations"
+      version: "1.0.0"
+      description: "API demonstrating hasOne and belongsTo relations"
+
+    components:
+      securitySchemes:
+        ApiKeyAuth:
+          type: apiKey
+          in: header
+          name: X-Api-Key
+        BearerAuth:
+          type: http
+          scheme: bearer
+          bearerFormat: JWT
+
+    x-table-schemas:
+      - table_name: "users"
+        columns:
+          - name: "id"
+            column_type: "INTEGER"
+            nullable: false
+            primary_key: true
+            unique: false
+            auto_increment: true
+          - name: "username"
+            column_type: "TEXT"
+            nullable: false
+            primary_key: false
+            unique: true
+            auto_increment: false
+          - name: "email"
+            column_type: "TEXT"
+            nullable: false
+            primary_key: false
+            unique: false
+            auto_increment: false
+          - name: "full_name"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+          - name: "createdBy"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            auto_field: true
+          - name: "updatedBy"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            auto_field: true
+          - name: "createdAt"
+            column_type: "DATETIME"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            default_value: "CURRENT_TIMESTAMP"
+            auto_field: true
+          - name: "updatedAt"
+            column_type: "DATETIME"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            auto_field: true
+        indexes: []
+
+      - table_name: "user_profiles"
+        columns:
+          - name: "id"
+            column_type: "INTEGER"
+            nullable: false
+            primary_key: true
+            unique: false
+            auto_increment: true
+          - name: "user_id"
+            column_type: "INTEGER"
+            nullable: false
+            primary_key: false
+            unique: true
+            auto_increment: false
+          - name: "bio"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+          - name: "avatar_url"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+          - name: "phone"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+          - name: "createdBy"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            auto_field: true
+          - name: "updatedBy"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            auto_field: true
+          - name: "createdAt"
+            column_type: "DATETIME"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            default_value: "CURRENT_TIMESTAMP"
+            auto_field: true
+          - name: "updatedAt"
+            column_type: "DATETIME"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            auto_field: true
+        indexes: []
+
+    paths:
+      /users:
+        get:
+          operationId: listUsers
+          summary: "List all users"
+          x-table-name: "users"
+          security:
+            - ApiKeyAuth: []
+          responses:
+            "200":
+              description: "List of users"
+
+        post:
+          operationId: createUser
+          summary: "Create a new user"
+          x-table-name: "users"
+          security:
+            - ApiKeyAuth: []
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  required: ["username", "email"]
+                  properties:
+                    username:
+                      type: string
+                    email:
+                      type: string
+                    full_name:
+                      type: string
+                    profile:
+                      type: object
+                      x-relation:
+                        type: hasOne
+                        target: UserProfile
+                        foreignKey: user_id
+                      properties:
+                        bio:
+                          type: string
+                        avatar_url:
+                          type: string
+                        phone:
+                          type: string
+          responses:
+            "200":
+              description: "User created"
+
+      /users/{id}:
+        get:
+          operationId: getUser
+          summary: "Get user by ID"
+          x-table-name: "users"
+          security:
+            - ApiKeyAuth: []
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          responses:
+            "200":
+              description: "User details with nested profile"
+              content:
+                application/json:
+                  schema:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      username:
+                        type: string
+                      email:
+                        type: string
+                      full_name:
+                        type: string
+                      profile:
+                        type: object
+                        x-relation:
+                          type: hasOne
+                          target: UserProfile
+                          foreignKey: user_id
+            "404":
+              description: "User not found"
+
+        put:
+          operationId: updateUser
+          summary: "Update a user"
+          x-table-name: "users"
+          security:
+            - ApiKeyAuth: []
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    username:
+                      type: string
+                    email:
+                      type: string
+                    full_name:
+                      type: string
+                    profile:
+                      type: object
+                      x-relation:
+                        type: hasOne
+                        target: UserProfile
+                        foreignKey: user_id
+                      properties:
+                        bio:
+                          type: string
+                        avatar_url:
+                          type: string
+                        phone:
+                          type: string
+          responses:
+            "200":
+              description: "User updated"
+            "404":
+              description: "User not found"
+
+        delete:
+          operationId: deleteUser
+          summary: "Delete a user"
+          x-table-name: "users"
+          security:
+            - ApiKeyAuth: []
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          responses:
+            "200":
+              description: "User deleted (cascade deletes profile)"
+            "404":
+              description: "User not found"
+
+      /user-profiles:
+        get:
+          operationId: listUserProfiles
+          summary: "List all user profiles"
+          x-table-name: "user_profiles"
+          security:
+            - ApiKeyAuth: []
+          responses:
+            "200":
+              description: "List of user profiles"
+
+      /user-profiles/{id}:
+        get:
+          operationId: getUserProfile
+          summary: "Get user profile by ID"
+          x-table-name: "user_profiles"
+          security:
+            - ApiKeyAuth: []
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          responses:
+            "200":
+              description: "User profile details with parent user"
+              content:
+                application/json:
+                  schema:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      user_id:
+                        type: integer
+                      bio:
+                        type: string
+                      avatar_url:
+                        type: string
+                      phone:
+                        type: string
+                      user:
+                        type: object
+                        x-relation:
+                          type: belongsTo
+                          target: User
+                          foreignKey: user_id
+            "404":
+              description: "User profile not found"
+

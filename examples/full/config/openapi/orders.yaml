@@ -1,0 +1,346 @@
+openapi:
+  spec:
+    openapi: "3.0.0"
+    info:
+      title: "Orders API with Relations"
+      version: "1.0.0"
+      description: "API demonstrating hasMany relations"
+
+    components:
+      securitySchemes:
+        ApiKeyAuth:
+          type: apiKey
+          in: header
+          name: X-Api-Key
+        BearerAuth:
+          type: http
+          scheme: bearer
+          bearerFormat: JWT
+
+    x-table-schemas:
+      - table_name: "orders"
+        columns:
+          - name: "id"
+            column_type: "INTEGER"
+            nullable: false
+            primary_key: true
+            unique: false
+            auto_increment: true
+          - name: "customer_name"
+            column_type: "TEXT"
+            nullable: false
+            primary_key: false
+            unique: false
+            auto_increment: false
+          - name: "total_amount"
+            column_type: "REAL"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+          - name: "status"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+          - name: "createdBy"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            auto_field: true
+          - name: "updatedBy"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            auto_field: true
+          - name: "createdAt"
+            column_type: "DATETIME"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            default_value: "CURRENT_TIMESTAMP"
+            auto_field: true
+          - name: "updatedAt"
+            column_type: "DATETIME"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            auto_field: true
+        indexes: []
+
+      - table_name: "order_items"
+        columns:
+          - name: "id"
+            column_type: "INTEGER"
+            nullable: false
+            primary_key: true
+            unique: false
+            auto_increment: true
+          - name: "order_id"
+            column_type: "INTEGER"
+            nullable: false
+            primary_key: false
+            unique: false
+            auto_increment: false
+          - name: "product_name"
+            column_type: "TEXT"
+            nullable: false
+            primary_key: false
+            unique: false
+            auto_increment: false
+          - name: "quantity"
+            column_type: "INTEGER"
+            nullable: false
+            primary_key: false
+            unique: false
+            auto_increment: false
+          - name: "price"
+            column_type: "REAL"
+            nullable: false
+            primary_key: false
+            unique: false
+            auto_increment: false
+          - name: "createdBy"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            auto_field: true
+          - name: "updatedBy"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            auto_field: true
+          - name: "createdAt"
+            column_type: "DATETIME"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            default_value: "CURRENT_TIMESTAMP"
+            auto_field: true
+          - name: "updatedAt"
+            column_type: "DATETIME"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            auto_field: true
+        indexes: []
+
+    paths:
+      /orders:
+        get:
+          operationId: listOrders
+          summary: "List all orders"
+          x-table-name: "orders"
+          security:
+            - ApiKeyAuth: []
+          responses:
+            "200":
+              description: "List of orders"
+
+        post:
+          operationId: createOrder
+          summary: "Create a new order"
+          x-table-name: "orders"
+          security:
+            - ApiKeyAuth: []
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  required: ["customer_name"]
+                  properties:
+                    customer_name:
+                      type: string
+                    total_amount:
+                      type: number
+                    status:
+                      type: string
+                    items:
+                      type: array
+                      x-relation:
+                        type: hasMany
+                        target: OrderItem
+                        foreignKey: order_id
+                      items:
+                        type: object
+                        properties:
+                          product_name:
+                            type: string
+                          quantity:
+                            type: integer
+                          price:
+                            type: number
+          responses:
+            "200":
+              description: "Order created"
+
+      /orders/{id}:
+        get:
+          operationId: getOrder
+          summary: "Get order by ID"
+          x-table-name: "orders"
+          security:
+            - ApiKeyAuth: []
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          responses:
+            "200":
+              description: "Order details with nested items"
+              content:
+                application/json:
+                  schema:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      customer_name:
+                        type: string
+                      total_amount:
+                        type: number
+                      status:
+                        type: string
+                      items:
+                        type: array
+                        x-relation:
+                          type: hasMany
+                          target: OrderItem
+                          foreignKey: order_id
+                        items:
+                          type: object
+            "404":
+              description: "Order not found"
+
+        put:
+          operationId: updateOrder
+          summary: "Update an order"
+          x-table-name: "orders"
+          security:
+            - ApiKeyAuth: []
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    customer_name:
+                      type: string
+                    total_amount:
+                      type: number
+                    status:
+                      type: string
+                    items:
+                      type: array
+                      x-relation:
+                        type: hasMany
+                        target: OrderItem
+                        foreignKey: order_id
+                      items:
+                        type: object
+                        properties:
+                          product_name:
+                            type: string
+                          quantity:
+                            type: integer
+                          price:
+                            type: number
+          responses:
+            "200":
+              description: "Order updated"
+            "404":
+              description: "Order not found"
+
+        delete:
+          operationId: deleteOrder
+          summary: "Delete an order"
+          x-table-name: "orders"
+          security:
+            - ApiKeyAuth: []
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          responses:
+            "200":
+              description: "Order deleted (cascade deletes items)"
+            "404":
+              description: "Order not found"
+
+      /order-items:
+        get:
+          operationId: listOrderItems
+          summary: "List all order items"
+          x-table-name: "order_items"
+          security:
+            - ApiKeyAuth: []
+          responses:
+            "200":
+              description: "List of order items"
+
+      /order-items/{id}:
+        get:
+          operationId: getOrderItem
+          summary: "Get order item by ID"
+          x-table-name: "order_items"
+          security:
+            - ApiKeyAuth: []
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          responses:
+            "200":
+              description: "Order item details with parent order"
+              content:
+                application/json:
+                  schema:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      order_id:
+                        type: integer
+                      product_name:
+                        type: string
+                      quantity:
+                        type: integer
+                      price:
+                        type: number
+                      order:
+                        type: object
+                        x-relation:
+                          type: belongsTo
+                          target: Order
+                          foreignKey: order_id
+            "404":
+              description: "Order item not found"
+

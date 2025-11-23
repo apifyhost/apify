@@ -1169,6 +1169,12 @@ The E2E test suite validates:
 - ✅ CRUD operations (Create, Read, Update, Delete)
 - ✅ Authentication and authorization
 - ✅ API key validation
+- ✅ OAuth 2.0 / OIDC authentication
+- ✅ Relations (hasMany, hasOne, belongsTo)
+- ✅ Nested data creation and auto-loading
+- ✅ CASCADE DELETE operations
+- ✅ Audit trail propagation
+- ✅ Observability (metrics and tracing)
 - ✅ Error handling
 - ✅ Large payload handling
 - ✅ Content-Type validation

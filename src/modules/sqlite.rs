@@ -113,7 +113,7 @@ impl SqliteBackend {
             .execute(&self.pool)
             .await
             .map_err(DatabaseError::QueryError)?;
-        
+
         let last_id = res.last_insert_rowid();
         Ok(json!({
             "message": "Record inserted",

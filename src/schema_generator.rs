@@ -16,11 +16,11 @@ pub struct TableSchema {
 /// Relation definition for nested object support
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RelationDefinition {
-    pub field_name: String,        // Property name in the schema (e.g., "items")
+    pub field_name: String,          // Property name in the schema (e.g., "items")
     pub relation_type: RelationType, // hasMany, belongsTo, hasOne, belongsToMany
-    pub target_table: String,      // Related table name
-    pub foreign_key: String,       // Foreign key column name
-    pub local_key: Option<String>, // Local key (default: "id")
+    pub target_table: String,        // Related table name
+    pub foreign_key: String,         // Foreign key column name
+    pub local_key: Option<String>,   // Local key (default: "id")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -225,7 +225,9 @@ impl SchemaGenerator {
             let mut relations = Vec::new();
             if let Some(props) = obj.get("properties").and_then(|p| p.as_object()) {
                 for (prop_name, prop_schema) in props.iter() {
-                    if let Some(relation_obj) = prop_schema.get("x-relation").and_then(|r| r.as_object()) {
+                    if let Some(relation_obj) =
+                        prop_schema.get("x-relation").and_then(|r| r.as_object())
+                    {
                         // Extract relation configuration
                         let relation_type = relation_obj
                             .get("type")
@@ -253,7 +255,9 @@ impl SchemaGenerator {
                             .and_then(|lk| lk.as_str())
                             .map(|s| s.to_string());
 
-                        if let (Some(rel_type), Some(target), Some(fk)) = (relation_type, target_table, foreign_key) {
+                        if let (Some(rel_type), Some(target), Some(fk)) =
+                            (relation_type, target_table, foreign_key)
+                        {
                             relations.push(RelationDefinition {
                                 field_name: prop_name.clone(),
                                 relation_type: rel_type,

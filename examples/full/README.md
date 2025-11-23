@@ -10,6 +10,7 @@ Complete Apify setup with all features enabled. **Used for E2E testing.**
 - ✅ Full observability stack
 - ✅ Prometheus + Grafana + Jaeger
 - ✅ Metrics and distributed tracing
+- ✅ **Relations support** (hasMany, hasOne, belongsTo)
 
 ## Quick Start
 
@@ -46,17 +47,32 @@ This configuration is used by the E2E test suite:
 # From e2e directory
 cd e2e
 
-# Run all tests
+# Run all tests (includes CRUD, OAuth, observability, and relations)
 ./test.sh go
 
 # Run quick smoke test
 ./test.sh quick
 ```
 
+### Available Test Suites
+
+- **CRUD Tests** (`crud_test.go`): Basic create, read, update, delete operations
+- **OAuth Tests** (`oauth_test.go`): OAuth/OIDC authentication and audit trails
+- **Observability Tests** (`observability_test.go`): Metrics and tracing validation
+- **Relations Tests** (`relations_test.go`): 
+  - hasMany relations (Orders with Items)
+  - hasOne relations (Users with Profiles)
+  - belongsTo relations (reverse lookups)
+  - Nested data auto-loading
+  - UPDATE with replaced children
+  - CASCADE DELETE operations
+  - Audit field propagation
+
 ## Configuration
 
 This example combines all features:
 - Both `items.yaml` and `items_oauth.yaml` APIs
+- Relations APIs: `orders.yaml` (hasMany), `users.yaml` (hasOne/belongsTo)
 - PostgreSQL and SQLite datasources
 - OAuth providers configuration
 - Full observability setup
