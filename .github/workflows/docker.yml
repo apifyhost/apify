@@ -139,7 +139,7 @@ jobs:
           curl -sf -X POST http://localhost:8080/admin/realms \
             -H "Authorization: Bearer ${{ steps.keycloak_token.outputs.token }}" \
             -H "Content-Type: application/json" \
-            -d @config/keycloak/realm-export.json
+            -d @e2e/config/keycloak/realm-export.json
 
       - name: Wait for Apify realm OIDC discovery
         run: |
@@ -299,7 +299,7 @@ jobs:
           curl -sf -X POST http://localhost:8080/admin/realms \
             -H "Authorization: Bearer ${{ steps.keycloak_token.outputs.token }}" \
             -H "Content-Type: application/json" \
-            -d @config/keycloak/realm-export.json
+            -d @e2e/config/keycloak/realm-export.json
 
       - name: Wait for Apify realm OIDC discovery
         run: |
