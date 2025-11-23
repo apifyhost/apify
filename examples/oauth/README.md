@@ -1,6 +1,6 @@
-# OAuth Example
+# OAuth & Audit Trail Example
 
-Demonstrates OAuth/OIDC authentication with Keycloak.
+Demonstrates OAuth/OIDC authentication with Keycloak and automatic audit trail tracking.
 
 ## Features
 
@@ -8,6 +8,7 @@ Demonstrates OAuth/OIDC authentication with Keycloak.
 - ✅ Keycloak integration
 - ✅ Token introspection
 - ✅ JWT validation
+- ✅ **Automatic audit trail** - tracks who created/updated records
 - ✅ PostgreSQL database
 
 ## Quick Start
@@ -47,6 +48,42 @@ TOKEN=$(curl -X POST http://localhost:8080/realms/apify/protocol/openid-connect/
 # Use token to access API
 curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/secure-items
 ```
+
+## Audit Trail Usage
+
+When authenticated users create or update items, audit fields are automatically populated:
+
+```bash
+# Create an item (audit fields auto-populated)
+curl -X POST http://localhost:3000/secure-items \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Test Item",
+    "description": "Testing audit trail",
+    "price": 99.99
+  }'
+
+# Response includes audit fields:
+# {
+#   "id": 1,
+#   "name": "Test Item",
+#   "createdBy": "testuser",   ← Automatically set from OAuth token
+#   "updatedBy": "testuser",   ← Automatically set
+#   "createdAt": "2025-11-23T10:30:00Z",
+#   "updatedAt": null
+# }
+
+# Update the item
+curl -X PUT http://localhost:3000/secure-items/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Updated Item", "price": 149.99}'
+
+# Note: createdBy and createdAt are preserved, updatedBy and updatedAt are updated
+```
+
+**Security Note:** Even if you try to override audit fields in the request body, the system will ignore your values and use the authenticated user's identity.
 
 ## Configuration
 

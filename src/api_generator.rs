@@ -1,5 +1,6 @@
 //! API generation based on OpenAPI specifications
 
+use crate::schema_generator::TableSchema;
 use regex::Regex;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -8,6 +9,7 @@ use std::collections::HashMap;
 pub struct APIGenerator {
     spec: Value,
     route_patterns: Vec<RoutePattern>,
+    table_schemas: HashMap<String, TableSchema>,
 }
 
 #[derive(Debug, Clone)]
@@ -32,10 +34,23 @@ pub enum OperationType {
 impl APIGenerator {
     pub fn new(spec: Value) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let route_patterns = Self::build_route_patterns(&spec)?;
+        
+        // Extract table schemas from OpenAPI spec
+        let table_schemas = crate::schema_generator::SchemaGenerator::extract_schemas_from_openapi(&spec)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|schema| (schema.table_name.clone(), schema))
+            .collect();
+        
         Ok(Self {
             spec,
             route_patterns,
+            table_schemas,
         })
+    }
+    
+    pub fn get_table_schema(&self, table_name: &str) -> Option<&TableSchema> {
+        self.table_schemas.get(table_name)
     }
 
     fn build_route_patterns(

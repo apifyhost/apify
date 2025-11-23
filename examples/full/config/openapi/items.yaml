@@ -54,6 +54,35 @@ openapi:
             unique: false
             auto_increment: false
             default_value: "CURRENT_TIMESTAMP"
+          - name: "createdBy"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            auto_field: true
+          - name: "updatedBy"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            auto_field: true
+          - name: "createdAt"
+            column_type: "DATETIME"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            default_value: "CURRENT_TIMESTAMP"
+            auto_field: true
+          - name: "updatedAt"
+            column_type: "DATETIME"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
+            auto_field: true
         indexes: []
 
     paths:

@@ -23,13 +23,17 @@ Define your data models in OpenAPI specs with `x-table-schemas`, and Apify autom
 - Automatic connection pooling and management
 - Schema auto-initialization from OpenAPI specs
 
-#### 🔐 **Built-in Authentication**
+#### 🔐 **Built-in Authentication & Audit Trail**
 - **OpenAPI Security Scheme** support (standards-compliant)
 - **API Key** authentication via `components.securitySchemes`
 - **OAuth 2.0 / OpenID Connect** with OIDC discovery
   - Token introspection and JWT validation
   - Automatic JWKS caching
   - Issuer and audience validation
+- **Automatic Audit Trail** - Track who created/modified records
+  - `createdBy` / `updatedBy` fields auto-populated from OAuth identity
+  - `createdAt` / `updatedAt` timestamps
+  - Protection against user override attempts
 - Consumer management with multiple keys
 - Operation-level, route-level, and listener-level access control
 - Extensible module system for custom auth methods
