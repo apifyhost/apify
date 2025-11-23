@@ -604,23 +604,23 @@ jobs:
           echo "Testing in: $TEST_DIR"
           cd "$TEST_DIR"
           tar -xzf $GITHUB_WORKSPACE/apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz
-          
+
           # Verify all required files exist
           echo "Checking required files..."
           test -f docker-compose.yml || { echo "Missing docker-compose.yml"; exit 1; }
           test -f quickstart.sh || { echo "Missing quickstart.sh"; exit 1; }
-          test -f QUICKSTART.md || { echo "Missing QUICKSTART.md"; exit 1; }
+          test -f README.md || { echo "Missing README.md"; exit 1; }
           test -d config || { echo "Missing config directory"; exit 1; }
           test -f config/config.yaml || { echo "Missing config.yaml"; exit 1; }
           test -f config/openapi/items.yaml || { echo "Missing items.yaml"; exit 1; }
-          
+
           # Verify quickstart.sh is executable
           test -x quickstart.sh || { echo "quickstart.sh is not executable"; exit 1; }
-          
+
           # Verify config file permissions
           ls -la config/
           ls -la config/openapi/
-          
+
           # Verify docker-compose.yml has correct image tag
           echo "Checking image tag in docker-compose.yml..."
           grep "image: apifyhost/apify:${{ steps.version.outputs.VERSION }}" docker-compose.yml || {
@@ -628,12 +628,12 @@ jobs:
             grep "image: apifyhost/apify:" docker-compose.yml
             exit 1
           }
-          
+
           # Verify docker-compose config is valid
           docker compose config > /dev/null || { echo "Invalid docker-compose.yml"; exit 1; }
-          
+
           echo "✅ Quickstart package validation passed!"
-          
+
           # Cleanup
           cd /
           rm -rf "$TEST_DIR"
