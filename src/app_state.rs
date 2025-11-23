@@ -2,7 +2,8 @@
 
 use super::api_generator::APIGenerator;
 use super::config::{
-    ConsumerConfig, DatabaseSettings, MatchRule, ModulesConfig, OpenAPIConfig, RouteConfig,
+    ConsumerConfig, DatabaseSettings, MatchRule, ModulesConfig, OAuthProviderConfig, OpenAPIConfig,
+    RouteConfig,
 };
 use super::crud_handler::CRUDHandler;
 use super::database::DatabaseManager;
@@ -22,6 +23,7 @@ pub struct AppState {
     pub operation_modules: HashMap<String, crate::modules::ModuleRegistry>, // "METHOD path_pattern" -> modules
     consumers: HashMap<String, ConsumerConfig>,                             // name -> config
     key_to_consumer: HashMap<String, String>, // api_key -> consumer name
+    pub oauth_providers: HashMap<String, OAuthProviderConfig>, // name -> provider config
 }
 
 impl AppState {
@@ -41,6 +43,7 @@ impl AppState {
             operation_modules: HashMap::new(),
             consumers: HashMap::new(),
             key_to_consumer: HashMap::new(),
+            oauth_providers: HashMap::new(),
         }
     }
 
@@ -51,6 +54,7 @@ impl AppState {
         openapi_configs: Vec<(OpenAPIConfig, Option<ModulesConfig>, Option<String>)>,
         listener_modules: Option<ModulesConfig>,
         consumers: Vec<ConsumerConfig>,
+        oauth_providers: Option<Vec<OAuthProviderConfig>>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let routes = routes.unwrap_or_default();
         let mut route_responses = HashMap::new();
@@ -62,6 +66,12 @@ impl AppState {
         // Build CRUD handler if OpenAPI configs exist and datasources are configured
         let crud_handler = if let Some(ds_map) = datasources.as_ref() {
             if !openapi_configs.is_empty() {
+                tracing::debug!(
+                    available_datasources = ?ds_map.keys().collect::<Vec<_>>(),
+                    openapi_count = openapi_configs.len(),
+                    "Building CRUD handler"
+                );
+
                 // Determine which datasource to use (from first API config or first available)
                 let datasource_name = openapi_configs
                     .first()
@@ -72,6 +82,12 @@ impl AppState {
                 let ds = ds_map.get(&datasource_name).ok_or_else(|| {
                     format!("Datasource '{}' not found in config", datasource_name)
                 })?;
+
+                tracing::debug!(
+                    datasource_name = %datasource_name,
+                    driver = %ds.driver,
+                    "Selected datasource for AppState"
+                );
 
                 // Build database URL
                 let url = match ds.driver.as_str() {
@@ -95,6 +111,12 @@ impl AppState {
                     }
                     _ => return Err(format!("Unsupported database driver: {}", ds.driver).into()),
                 };
+
+                tracing::debug!(
+                    url = %url,
+                    max_size = ds.max_pool_size.unwrap_or(10),
+                    "Constructed database URL"
+                );
 
                 let max_size = ds.max_pool_size.unwrap_or(10) as u32;
                 let db_cfg = crate::database::DatabaseRuntimeConfig {
@@ -197,6 +219,9 @@ impl AppState {
                     if req.contains_key("ApiKeyAuth") {
                         global_access.push("key_auth".to_string());
                     }
+                    if req.contains_key("BearerAuth") || req.contains_key("OpenID") {
+                        global_access.push("oauth".to_string());
+                    }
                 }
             }
             // Deduplicate
@@ -228,6 +253,11 @@ impl AppState {
                                     for req in sec_arr.iter().filter_map(|v| v.as_object()) {
                                         if req.contains_key("ApiKeyAuth") {
                                             access_from_security.push("key_auth".to_string());
+                                        }
+                                        if req.contains_key("BearerAuth")
+                                            || req.contains_key("OpenID")
+                                        {
+                                            access_from_security.push("oauth".to_string());
                                         }
                                     }
                                 } else {
@@ -271,6 +301,24 @@ impl AppState {
             consumers_map.insert(c.name.clone(), c);
         }
 
+        // Build oauth providers map
+        let mut oauth_map = HashMap::new();
+        if let Some(list) = oauth_providers {
+            tracing::info!(provider_count = list.len(), "Loading OAuth providers");
+            for p in list {
+                tracing::debug!(
+                    name = %p.name,
+                    issuer = %p.issuer,
+                    client_id = ?p.client_id,
+                    introspection = ?p.introspection,
+                    "Registered OAuth provider"
+                );
+                oauth_map.insert(p.name.clone(), p);
+            }
+        } else {
+            tracing::warn!("No OAuth providers configured");
+        }
+
         Ok(Self {
             routes,
             route_responses,
@@ -280,6 +328,7 @@ impl AppState {
             operation_modules,
             consumers: consumers_map,
             key_to_consumer: key_map,
+            oauth_providers: oauth_map,
         })
     }
 }
@@ -296,6 +345,11 @@ fn apply_modules_cfg(
             match name.as_str() {
                 "key_auth" => {
                     reg = reg.with(Arc::new(crate::modules::key_auth::KeyAuthModule::new()));
+                }
+                "oauth" => {
+                    reg = reg.with(Arc::new(crate::modules::oauth::OAuthModule::new(
+                        "default".to_string(),
+                    )));
                 }
                 _ => eprintln!("Unknown access module: {}", name),
             }

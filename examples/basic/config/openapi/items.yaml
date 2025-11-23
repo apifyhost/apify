@@ -12,6 +12,13 @@ openapi:
           type: apiKey
           in: header
           name: X-Api-Key
+        BearerAuth:
+          type: http
+          scheme: bearer
+          bearerFormat: JWT
+        OpenID:
+          type: openIdConnect
+          openIdConnectUrl: "${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:apify}/.well-known/openid-configuration"
 
     x-table-schemas:
       - table_name: "items"

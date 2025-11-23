@@ -1,0 +1,36 @@
+listeners:
+  - port: 3000
+    ip: 0.0.0.0
+    protocol: HTTP
+    apis:
+      - path: ./openapi/items_oauth.yaml
+        datasource: postgres1
+
+consumers:
+  - name: default
+    keys:
+      - demo-key-123
+
+oauth_providers:
+  - name: keycloak
+    issuer: "${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:apify}"
+    client_id: "${KEYCLOAK_CLIENT_ID:apify-client}"
+    client_secret: "${KEYCLOAK_CLIENT_SECRET:your-client-secret}"
+    audience: "apify-api"
+    introspection: true
+
+datasource:
+  postgres1:
+    driver: postgres
+    host: postgres
+    port: 5432
+    user: apify
+    password: apify_password
+    database: apify
+    ssl_mode: disable
+    max_pool_size: 10
+
+observability:
+  log_level: "info"
+  metrics_enabled: true
+  metrics_port: 9090

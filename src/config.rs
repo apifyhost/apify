@@ -12,6 +12,7 @@ pub struct Config {
     pub consumers: Option<Vec<ConsumerConfig>>, // Global consumers
     pub datasource: Option<std::collections::HashMap<String, DatabaseSettings>>, // Global datasources
     pub observability: Option<ObservabilityConfig>, // Observability settings
+    pub oauth_providers: Option<Vec<OAuthProviderConfig>>, // OAuth/OIDC providers
 }
 
 /// Observability configuration
@@ -121,16 +122,68 @@ pub struct ConsumerConfig {
                            // Future: rate limits, roles, metadata, etc.
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct OAuthProviderConfig {
+    pub name: String,
+    pub issuer: String,
+    pub client_id: Option<String>,
+    pub client_secret: Option<String>,
+    pub audience: Option<String>,
+    pub introspection: Option<bool>, // enable introspection endpoint usage
+}
+
 impl Config {
     /// Read and parse configuration from file
     // Updated error type to include Send + Sync
     pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let content =
             fs::read_to_string(path).map_err(|e| format!("Failed to read config file: {}", e))?;
-        let config = serde_yaml::from_str(&content)
+
+        // Expand environment variables in format ${VAR:default}
+        let expanded = expand_env_vars(&content);
+
+        let config = serde_yaml::from_str(&expanded)
             .map_err(|e| format!("Failed to parse config file: {}", e))?;
         Ok(config)
     }
+}
+
+/// Expand environment variables in config content
+/// Supports ${VAR:default} syntax
+fn expand_env_vars(content: &str) -> String {
+    let mut result = content.to_string();
+
+    // Regex pattern: ${VAR:default} or ${VAR}
+    let re = regex::Regex::new(r"\$\{([^:}]+)(?::([^}]*))?\}").unwrap();
+
+    loop {
+        let mut changed = false;
+        let new_result = re
+            .replace_all(&result, |caps: &regex::Captures| {
+                let var_name = &caps[1];
+                let default_val = caps.get(2).map(|m| m.as_str()).unwrap_or("");
+
+                let expanded_value =
+                    std::env::var(var_name).unwrap_or_else(|_| default_val.to_string());
+                tracing::debug!(
+                    var = %var_name,
+                    value = %expanded_value,
+                    from_env = std::env::var(var_name).is_ok(),
+                    "Expanding environment variable"
+                );
+
+                changed = true;
+                expanded_value
+            })
+            .to_string();
+
+        if !changed {
+            break;
+        }
+        result = new_result;
+    }
+
+    result
 }
 
 impl DatabaseConfig {
@@ -149,7 +202,11 @@ impl OpenAPIConfig {
     pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let content = fs::read_to_string(path)
             .map_err(|e| format!("Failed to read OpenAPI config file: {}", e))?;
-        let config = serde_yaml::from_str(&content)
+
+        // Expand environment variables
+        let expanded = expand_env_vars(&content);
+
+        let config = serde_yaml::from_str(&expanded)
             .map_err(|e| format!("Failed to parse OpenAPI config file: {}", e))?;
         Ok(config)
     }

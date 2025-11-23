@@ -1,0 +1,120 @@
+openapi:
+  spec:
+    openapi: "3.0.0"
+    info:
+      title: "E2E OAuth API"
+      version: "1.0.0"
+      description: "API for end-to-end OAuth/OIDC testing (separate from API key)"
+
+    components:
+      securitySchemes:
+        ApiKeyAuth:
+          type: apiKey
+          in: header
+          name: X-Api-Key
+        BearerAuth:
+          type: http
+          scheme: bearer
+          bearerFormat: JWT
+        OpenID:
+          type: openIdConnect
+          openIdConnectUrl: "${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:apify}/.well-known/openid-configuration"
+
+    # NOTE: Table schemas defined in items.yaml; we reuse the same underlying tables.
+
+    paths:
+      /secure-items:
+        get:
+          operationId: listSecureItems
+          summary: "List all items (OAuth protected)"
+          x-table-name: "items"
+          security:
+            - BearerAuth: []
+          responses:
+            "200":
+              description: "List of items"
+
+        post:
+          operationId: createSecureItem
+          summary: "Create a new item (OAuth protected)"
+          x-table-name: "items"
+          security:
+            - BearerAuth: []
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+                  required: ["name"]
+                  properties:
+                    name:
+                      type: string
+                    description:
+                      type: string
+                    price:
+                      type: number
+          responses:
+            "200":
+              description: "Item created"
+
+      /secure-items/{id}:
+        get:
+          operationId: getSecureItem
+          summary: "Get item by ID (OAuth protected)"
+          x-table-name: "items"
+          security:
+            - BearerAuth: []
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          responses:
+            "200":
+              description: "Item details"
+            "404":
+              description: "Item not found"
+
+        put:
+          operationId: updateSecureItem
+          summary: "Update an item (OAuth protected)"
+          x-table-name: "items"
+          security:
+            - BearerAuth: []
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  type: object
+          responses:
+            "200":
+              description: "Item updated"
+            "404":
+              description: "Item not found"
+
+        delete:
+          operationId: deleteSecureItem
+          summary: "Delete an item (OAuth protected)"
+          x-table-name: "items"
+          security:
+            - BearerAuth: []
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          responses:
+            "200":
+              description: "Item deleted"
+            "404":
+              description: "Item not found"

@@ -86,6 +86,83 @@ jobs:
           go mod download
           go install github.com/onsi/ginkgo/v2/ginkgo@latest
 
+      - name: Create Docker Compose network
+        run: |
+          # Create the network that docker compose will use
+          docker network create apify_default || true
+
+      - name: Start Keycloak
+        run: |
+          # Connect to docker compose default network
+          # Set hostname to localhost so tokens have consistent issuer URL
+          docker run -d --name keycloak \
+            --network apify_default \
+            -p 8080:8080 \
+            -e KEYCLOAK_ADMIN=admin \
+            -e KEYCLOAK_ADMIN_PASSWORD=admin \
+            -e KC_HOSTNAME=localhost \
+            -e KC_HOSTNAME_STRICT=false \
+            quay.io/keycloak/keycloak:24.0 start-dev
+
+      - name: Wait for Keycloak
+        run: |
+          echo "Waiting for Keycloak (port + log pattern)..."
+          ATTEMPTS=0
+          MAX_ATTEMPTS=120
+          while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+            if nc -z localhost 8080 2>/dev/null; then PORT_OK=1; else PORT_OK=0; fi
+            if docker logs keycloak --tail 100 2>/dev/null | grep -q "Keycloak .* started"; then LOG_OK=1; else LOG_OK=0; fi
+            if [ $PORT_OK -eq 1 ] && [ $LOG_OK -eq 1 ]; then
+              echo "Keycloak base ready after $ATTEMPTS attempts"
+              exit 0
+            fi
+            ATTEMPTS=$((ATTEMPTS+1))
+            echo "Attempt $ATTEMPTS/$MAX_ATTEMPTS: PORT=$PORT_OK LOG=$LOG_OK"
+            sleep 2
+          done
+          echo "Keycloak failed (port/log not ready)"
+          docker logs keycloak | tail -200
+          exit 1
+
+      - name: Get Keycloak admin token
+        id: keycloak_token
+        run: |
+          TOKEN=$(curl -sf -X POST http://localhost:8080/realms/master/protocol/openid-connect/token \
+            -d "grant_type=password" \
+            -d "client_id=admin-cli" \
+            -d "username=admin" \
+            -d "password=admin" | jq -r .access_token)
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Import Keycloak realm
+        run: |
+          curl -sf -X POST http://localhost:8080/admin/realms \
+            -H "Authorization: Bearer ${{ steps.keycloak_token.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d @examples/full/config/keycloak/realm-export.json
+
+      - name: Wait for Apify realm OIDC discovery
+        run: |
+          echo "Waiting for apify realm OIDC discovery endpoint..."
+          ATTEMPTS=0
+          MAX_ATTEMPTS=60
+          while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+            if curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration > /dev/null 2>&1; then
+              echo "Apify realm OIDC discovery available after $ATTEMPTS attempts"
+              exit 0
+            fi
+            ATTEMPTS=$((ATTEMPTS+1))
+            echo "Attempt $ATTEMPTS/$MAX_ATTEMPTS: discovery not yet available"
+            sleep 2
+          done
+          echo "OIDC discovery for apify realm not available in time"
+          curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration || true
+          docker logs keycloak | tail -150
+          exit 1
+      - name: Verify realm imported
+        run: |
+          curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration | jq .
+
       - name: Download Docker image
         uses: actions/download-artifact@v4
         with:
@@ -95,9 +172,10 @@ jobs:
         run: |
           docker load < apify-image.tar.gz
 
-      - name: Start Apify with PostgreSQL using docker compose
+      - name: Start Apify with Postgres using docker compose
         run: |
-          docker compose up -d
+          cd examples/full
+          docker compose up -d apify-postgres postgres
           docker compose ps
 
       - name: Wait for service to be ready
@@ -112,27 +190,39 @@ jobs:
             sleep 2
           done
           echo "Service failed to start within timeout"
-          docker compose logs apify-postgres
+          cd examples/full && docker compose logs apify-postgres
           exit 1
 
-      - name: Run E2E tests
+      - name: Run E2E tests (including OAuth)
         working-directory: e2e
         env:
           BASE_URL: http://localhost:3000
           API_KEY: e2e-test-key-001
           METRICS_PORT: 9091
+          KEYCLOAK_URL: http://localhost:8080
+          KEYCLOAK_REALM: apify
+          KEYCLOAK_CLIENT_ID: apify-test-client
+          KEYCLOAK_CLIENT_SECRET: apify-test-secret
+          KEYCLOAK_USERNAME: testuser
+          KEYCLOAK_PASSWORD: testpassword
         run: ginkgo -v
 
       - name: Show logs on failure
         if: failure()
         run: |
-          docker compose logs apify-postgres
-          docker compose logs postgres
+          echo "=== Apify logs ==="
+          cd examples/full && docker compose logs apify-postgres
+          echo "=== PostgreSQL logs ==="
+          cd examples/full && docker compose logs postgres
+          echo "=== Keycloak logs ==="
+          docker logs keycloak
       
       - name: Cleanup
         if: always()
         run: |
-          docker compose down -v
+          cd examples/full && docker compose down -v
+          docker stop keycloak || true
+          docker rm keycloak || true
 
 
   test-sqlite:
@@ -156,6 +246,84 @@ jobs:
           go mod download
           go install github.com/onsi/ginkgo/v2/ginkgo@latest
 
+      - name: Create Docker Compose network
+        run: |
+          # Create the network that docker compose will use
+          docker network create apify_default || true
+
+      - name: Start Keycloak
+        run: |
+          # Connect to docker compose default network
+          # Set hostname to localhost so tokens have consistent issuer URL
+          docker run -d --name keycloak \
+            --network apify_default \
+            -p 8080:8080 \
+            -e KEYCLOAK_ADMIN=admin \
+            -e KEYCLOAK_ADMIN_PASSWORD=admin \
+            -e KC_HOSTNAME=localhost \
+            -e KC_HOSTNAME_STRICT=false \
+            quay.io/keycloak/keycloak:24.0 start-dev
+
+      - name: Wait for Keycloak
+        run: |
+          echo "Waiting for Keycloak (port + log pattern)..."
+          ATTEMPTS=0
+          MAX_ATTEMPTS=120
+          while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+            if nc -z localhost 8080 2>/dev/null; then PORT_OK=1; else PORT_OK=0; fi
+            if docker logs keycloak --tail 100 2>/dev/null | grep -q "Keycloak .* started"; then LOG_OK=1; else LOG_OK=0; fi
+            if [ $PORT_OK -eq 1 ] && [ $LOG_OK -eq 1 ]; then
+              echo "Keycloak base ready after $ATTEMPTS attempts"
+              exit 0
+            fi
+            ATTEMPTS=$((ATTEMPTS+1))
+            echo "Attempt $ATTEMPTS/$MAX_ATTEMPTS: PORT=$PORT_OK LOG=$LOG_OK"
+            sleep 2
+          done
+          echo "Keycloak failed (port/log not ready)"
+          docker logs keycloak | tail -200
+          exit 1
+
+      - name: Get Keycloak admin token
+        id: keycloak_token
+        run: |
+          TOKEN=$(curl -sf -X POST http://localhost:8080/realms/master/protocol/openid-connect/token \
+            -d "grant_type=password" \
+            -d "client_id=admin-cli" \
+            -d "username=admin" \
+            -d "password=admin" | jq -r .access_token)
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Import Keycloak realm
+        run: |
+          curl -sf -X POST http://localhost:8080/admin/realms \
+            -H "Authorization: Bearer ${{ steps.keycloak_token.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d @examples/full/config/keycloak/realm-export.json
+
+      - name: Wait for Apify realm OIDC discovery
+        run: |
+          echo "Waiting for apify realm OIDC discovery endpoint..."
+          ATTEMPTS=0
+          MAX_ATTEMPTS=60
+          while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+            if curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration > /dev/null 2>&1; then
+              echo "Apify realm OIDC discovery available after $ATTEMPTS attempts"
+              exit 0
+            fi
+            ATTEMPTS=$((ATTEMPTS+1))
+            echo "Attempt $ATTEMPTS/$MAX_ATTEMPTS: discovery not yet available"
+            sleep 2
+          done
+          echo "OIDC discovery for apify realm not available in time"
+          curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration || true
+          docker logs keycloak | tail -150
+          exit 1
+
+      - name: Verify realm imported
+        run: |
+          curl -sf http://localhost:8080/realms/apify/.well-known/openid-configuration | jq .
+
       - name: Download Docker image
         uses: actions/download-artifact@v4
         with:
@@ -165,10 +333,16 @@ jobs:
         run: |
           docker load < apify-image.tar.gz
 
+      - name: Update config for SQLite
+        run: |
+          sed -i 's/datasource: postgres1/datasource: sqlite1/g' ./examples/full/config/config.yaml
+          echo "Updated config.yaml:"
+          cat examples/full/config/config.yaml
+
       - name: Start Apify with SQLite using docker compose
         run: |
-          sed -i 's/postgres1/sqlite1/g' ./config/config.yaml
-          docker compose up -d
+          cd examples/full
+          docker compose up -d apify-sqlite
           docker compose ps
 
       - name: Wait for service to be ready
@@ -183,26 +357,37 @@ jobs:
             sleep 2
           done
           echo "Service failed to start within timeout"
-          docker compose logs apify-sqlite
+          cd examples/full && docker compose logs apify-sqlite
           exit 1
 
-      - name: Run E2E tests
+      - name: Run E2E tests (including OAuth)
         working-directory: e2e
         env:
           BASE_URL: http://localhost:3001
           API_KEY: e2e-test-key-001
           METRICS_PORT: 9092
+          KEYCLOAK_URL: http://localhost:8080
+          KEYCLOAK_REALM: apify
+          KEYCLOAK_CLIENT_ID: apify-test-client
+          KEYCLOAK_CLIENT_SECRET: apify-test-secret
+          KEYCLOAK_USERNAME: testuser
+          KEYCLOAK_PASSWORD: testpassword
         run: ginkgo -v
 
       - name: Show logs on failure
         if: failure()
         run: |
-          docker compose logs apify-sqlite
+          echo "=== Apify logs ==="
+          cd examples/full && docker compose logs apify-sqlite
+          echo "=== Keycloak logs ==="
+          docker logs keycloak
 
       - name: Cleanup
         if: always()
         run: |
-          docker compose down -v
+          cd examples/full && docker compose down -v
+          docker stop keycloak || true
+          docker rm keycloak || true
 
 
   scan:
@@ -359,99 +544,70 @@ jobs:
 
       - name: Create quickstart package
         run: |
-          # Create temporary directory for packaging
           mkdir -p quickstart-package
           
-          # Copy necessary files
-          cp docker-compose.yml quickstart-package/
-          sed -i "s|apifyhost/apify:latest|apifyhost/apify:${{ steps.version.outputs.VERSION }}|g" quickstart-package/docker-compose.yml
-          sed -i "s|apifyhost/apify:test|apifyhost/apify:${{ steps.version.outputs.VERSION }}|g" quickstart-package/docker-compose.yml
+          # Copy entire examples directory
+          cp -r examples quickstart-package/
           
-          echo "Updated docker-compose.yml with image tag: ${{ steps.version.outputs.VERSION }}"
-          grep "image: apifyhost/apify:" quickstart-package/docker-compose.yml || true
+          # Update image tags in all docker-compose.yml files
+          find quickstart-package/examples -name "docker-compose.yml" -exec sed -i "s|apifyhost/apify:latest|apifyhost/apify:${{ steps.version.outputs.VERSION }}|g" {} \;
+          
+          echo "Updated docker-compose.yml files with image tag: ${{ steps.version.outputs.VERSION }}"
+          find quickstart-package/examples -name "docker-compose.yml" -exec grep "image: apifyhost/apify:" {} \;
+          
+          # Copy quickstart.sh from root
           cp quickstart.sh quickstart-package/
-          cp -r config quickstart-package/
-          cp -r observability quickstart-package/
-          cp README.md quickstart-package/
+          chmod +x quickstart-package/quickstart.sh
+          
+          # Add LICENSE
           cp LICENSE quickstart-package/
           
-          # Create a simple README for quickstart
-          cat > quickstart-package/QUICKSTART.md << 'EOF'
+          # Create README.md for the package
+          cat > quickstart-package/README.md << 'ENDREADME'
           # Apify Quickstart Package
           
-          This package contains everything you need to run Apify using Docker Compose.
-          
-          ## Prerequisites
-          
-          - Docker and Docker Compose installed
-          - curl (for health checks)
+          This package contains Apify with multiple example configurations.
           
           ## Quick Start
           
           ```bash
-          # Make the script executable
-          chmod +x quickstart.sh
-          
-          # Run Apify
+          # Start basic example (default)
           ./quickstart.sh
+          
+          # Or choose a specific example
+          ./quickstart.sh basic          # Basic CRUD API
+          ./quickstart.sh oauth           # OAuth/OIDC with Keycloak
+          ./quickstart.sh observability   # Metrics, Tracing, Dashboards
+          ./quickstart.sh full            # All features combined
           ```
           
-          The script will:
-          1. Start Apify with SQLite using Docker Compose
-          2. Wait for the service to be ready
-          3. Display the listening addresses
+          ## Examples
+          
+          - **basic/** - Simple CRUD API with PostgreSQL
+          - **oauth/** - OAuth 2.0 / OIDC authentication with Keycloak
+          - **observability/** - Full observability stack (Prometheus, Grafana, Jaeger)
+          - **full/** - All features combined (for testing)
+          
+          Each example has its own README with detailed instructions.
           
           ## Manual Start
           
-          If you prefer to start manually:
-          
           ```bash
-          # Start with SQLite
-          docker compose up -d apify-sqlite
-          
-          # Start with PostgreSQL
-          docker compose up -d postgres apify-postgres
-          
-          # View logs
-          docker compose logs -f
-          
-          # Stop services
-          docker compose down
+          cd examples/basic
+          docker compose up -d
           ```
-          
-          ## Access
-          
-          - API: http://localhost:3000
-          - Metrics: http://localhost:9090/metrics
-          - Health: http://localhost:3000/healthz
-          
-          ## Configuration
-          
-          Configuration files are in the `config/` directory:
-          - `config/config.yaml` - Main configuration
-          - `config/openapi/items.yaml` - OpenAPI specification
-          
-          ## Observability
-          
-          Optional observability stack (Prometheus, Grafana, Jaeger):
-          
-          ```bash
-          docker compose up -d jaeger prometheus grafana
-          ```
-          
-          - Grafana: http://localhost:3002 (admin/admin)
-          - Jaeger UI: http://localhost:16686
-          - Prometheus: http://localhost:9092
           
           ## Documentation
           
-          See README.md for full documentation.
-          EOF
+          For full documentation, visit: https://github.com/apifyhost/apify
+          ENDREADME
+          
+          # Create QUICKSTART.md (copy from basic example)
+          cp quickstart-package/examples/basic/README.md quickstart-package/QUICKSTART.md
           
           # Set proper permissions
-          chmod +x quickstart-package/quickstart.sh
-          find quickstart-package/config -type f -exec chmod 644 {} \;
-          find quickstart-package/config -type d -exec chmod 755 {} \;
+          find quickstart-package/examples -name "*.yaml" -o -name "*.yml" -o -name "*.json" | xargs chmod 644
+          find quickstart-package/examples -type d -exec chmod 755 {} \;
           
           # Create tarball
           cd quickstart-package
@@ -460,7 +616,7 @@ jobs:
           
           # Verify the package
           echo "Package contents:"
-          tar -tzf apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz | head -20
+          tar -tzf apify-quickstart-${{ steps.version.outputs.VERSION }}.tar.gz | head -30
 
       - name: Generate SHA256 checksum
         run: |
@@ -477,33 +633,42 @@ jobs:
           
           # Verify all required files exist
           echo "Checking required files..."
-          test -f docker-compose.yml || { echo "Missing docker-compose.yml"; exit 1; }
           test -f quickstart.sh || { echo "Missing quickstart.sh"; exit 1; }
+          test -f README.md || { echo "Missing README.md"; exit 1; }
           test -f QUICKSTART.md || { echo "Missing QUICKSTART.md"; exit 1; }
-          test -d config || { echo "Missing config directory"; exit 1; }
-          test -f config/config.yaml || { echo "Missing config.yaml"; exit 1; }
-          test -f config/openapi/items.yaml || { echo "Missing items.yaml"; exit 1; }
+          test -d examples || { echo "Missing examples directory"; exit 1; }
+          test -d examples/basic || { echo "Missing examples/basic"; exit 1; }
+          test -d examples/oauth || { echo "Missing examples/oauth"; exit 1; }
+          test -d examples/observability || { echo "Missing examples/observability"; exit 1; }
+          test -d examples/full || { echo "Missing examples/full"; exit 1; }
           
           # Verify quickstart.sh is executable
           test -x quickstart.sh || { echo "quickstart.sh is not executable"; exit 1; }
           
-          # Verify config file permissions
-          ls -la config/
-          ls -la config/openapi/
+          # Verify basic example structure
+          test -f examples/basic/docker-compose.yml || { echo "Missing basic/docker-compose.yml"; exit 1; }
+          test -f examples/basic/config/config.yaml || { echo "Missing basic/config.yaml"; exit 1; }
+          test -f examples/basic/config/openapi/items.yaml || { echo "Missing basic/items.yaml"; exit 1; }
           
           # Verify docker-compose.yml has correct image tag
-          echo "Checking image tag in docker-compose.yml..."
-          grep "image: apifyhost/apify:${{ steps.version.outputs.VERSION }}" docker-compose.yml || {
-            echo "Image tag not updated correctly"
-            grep "image: apifyhost/apify:" docker-compose.yml
+          echo "Checking image tags in docker-compose.yml files..."
+          grep "image: apifyhost/apify:${{ steps.version.outputs.VERSION }}" examples/basic/docker-compose.yml || {
+            echo "Image tag not updated correctly in basic example"
+            grep "image: apifyhost/apify:" examples/basic/docker-compose.yml
             exit 1
           }
           
           # Verify docker-compose config is valid
+          cd examples/basic
           docker compose config > /dev/null || { echo "Invalid docker-compose.yml"; exit 1; }
+          cd ../..
           
           echo "✅ Quickstart package validation passed!"
           
+          # Cleanup
+          cd /
+          rm -rf "$TEST_DIR"          echo "✅ Quickstart package validation passed!"
+
           # Cleanup
           cd /
           rm -rf "$TEST_DIR"

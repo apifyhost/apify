@@ -5,12 +5,22 @@ listeners:
     apis:
       - path: ./openapi/items.yaml
         datasource: postgres1
+      - path: ./openapi/items_oauth.yaml
+        datasource: postgres1
 
 consumers:
   - name: default
     keys:
       - dev-key-123
       - e2e-test-key-001
+
+oauth_providers:
+  - name: keycloak
+    issuer: "${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:apify}"
+    client_id: "${KEYCLOAK_CLIENT_ID:apify-test-client}"
+    client_secret: "${KEYCLOAK_CLIENT_SECRET:apify-test-secret}"
+    audience: "apify-api"
+    introspection: true
 
 datasource:
   sqlite1:
@@ -28,22 +38,8 @@ datasource:
     ssl_mode: disable
     max_pool_size: 10
 
-# Observability configuration (optional)
 observability:
-  # Log level: trace, debug, info, warn, error
-  # Can be overridden with RUST_LOG environment variable
   log_level: "info"
-
-  # OpenTelemetry OTLP endpoint for distributed tracing
-  # Set to null or omit to disable tracing
-  # Example: "http://localhost:4317" for local Jaeger
   otlp_endpoint: http://jaeger:4317
-
-  # Enable Prometheus metrics endpoint
-  # Default: true
   metrics_enabled: true
-
-  # Port for Prometheus metrics HTTP endpoint
-  # Access metrics at http://localhost:9090/metrics
-  # Default: 9090
   metrics_port: 9090
