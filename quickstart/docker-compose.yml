@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: apify
+      POSTGRES_PASSWORD: apify_password
+      POSTGRES_DB: apify_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apify -d apify_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  apify:
+    image: apifyhost/apify:latest
+    ports:
+      - "3000:3000"
+      - "9090:9090"
+    volumes:
+      - ./config:/app/config:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - RUST_LOG=info
+
+volumes:
+  postgres_data:
