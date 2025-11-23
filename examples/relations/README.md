@@ -250,6 +250,9 @@ Run the comprehensive test scripts:
 
 # Test hasOne and belongsTo relations (users with profiles)
 ./test_relations_advanced.sh
+
+# Test UPDATE and DELETE operations
+./test_relations_crud.sh
 ```
 
 Or manually test:
