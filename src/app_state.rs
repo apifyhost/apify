@@ -66,6 +66,12 @@ impl AppState {
         // Build CRUD handler if OpenAPI configs exist and datasources are configured
         let crud_handler = if let Some(ds_map) = datasources.as_ref() {
             if !openapi_configs.is_empty() {
+                tracing::debug!(
+                    available_datasources = ?ds_map.keys().collect::<Vec<_>>(),
+                    openapi_count = openapi_configs.len(),
+                    "Building CRUD handler"
+                );
+
                 // Determine which datasource to use (from first API config or first available)
                 let datasource_name = openapi_configs
                     .first()
@@ -76,6 +82,12 @@ impl AppState {
                 let ds = ds_map.get(&datasource_name).ok_or_else(|| {
                     format!("Datasource '{}' not found in config", datasource_name)
                 })?;
+
+                tracing::debug!(
+                    datasource_name = %datasource_name,
+                    driver = %ds.driver,
+                    "Selected datasource for AppState"
+                );
 
                 // Build database URL
                 let url = match ds.driver.as_str() {
@@ -99,6 +111,12 @@ impl AppState {
                     }
                     _ => return Err(format!("Unsupported database driver: {}", ds.driver).into()),
                 };
+
+                tracing::debug!(
+                    url = %url,
+                    max_size = ds.max_pool_size.unwrap_or(10),
+                    "Constructed database URL"
+                );
 
                 let max_size = ds.max_pool_size.unwrap_or(10) as u32;
                 let db_cfg = crate::database::DatabaseRuntimeConfig {
