@@ -541,6 +541,7 @@ mod tests {
                 columns: vec!["email".to_string()],
                 unique: false,
             }],
+            relations: vec![],
         };
 
         let sql = SchemaGenerator::generate_create_table_sql_sqlite(&schema);
