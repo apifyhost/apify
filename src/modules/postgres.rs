@@ -30,12 +30,10 @@ impl PostgresBackend {
     ) -> Result<(), DatabaseError> {
         // Use advisory lock to prevent concurrent schema creation across threads
         // Lock ID: 123456789 (arbitrary number for schema creation)
-        let lock_acquired = sqlx::query_scalar::<_, bool>(
-            "SELECT pg_try_advisory_lock(123456789)"
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(DatabaseError::QueryError)?;
+        let lock_acquired = sqlx::query_scalar::<_, bool>("SELECT pg_try_advisory_lock(123456789)")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(DatabaseError::QueryError)?;
 
         if !lock_acquired {
             // Another thread is creating the schema, wait for the lock to be released
