@@ -147,6 +147,13 @@ impl Module for OAuthModule {
             // Replace localhost with keycloak for Docker network access
             let actual_introspect_url = introspect_url.replace("localhost", "keycloak");
 
+            // Log token details for debugging (first 50 chars to avoid exposing full token)
+            tracing::debug!(
+                token_preview = &token[..token.len().min(50)],
+                token_length = token.len(),
+                "Introspecting token"
+            );
+
             tracing::debug!(
                 introspect_url = %actual_introspect_url,
                 "Attempting token introspection"
@@ -162,8 +169,8 @@ impl Module for OAuthModule {
                 && let Ok(json) = r.json::<serde_json::Value>()
             {
                 tracing::debug!(
-                    active = ?json.get("active"),
-                    "Token introspection response received"
+                    response = %json,
+                    "Token introspection full response"
                 );
                 if json
                     .get("active")

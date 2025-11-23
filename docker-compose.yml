@@ -24,7 +24,7 @@ services:
       - ./config:/app/config:ro
       - sqlite_data:/app/data
     environment:
-      - RUST_LOG=info
+      - RUST_LOG=debug,apify=debug,apify::modules::oauth=debug
       - APIFY_THREADS=2
       # OAuth/OIDC configuration
       # Use localhost as KEYCLOAK_URL to match Keycloak's KC_HOSTNAME (for issuer URL)
@@ -45,7 +45,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      - RUST_LOG=info
+      - RUST_LOG=debug,apify=debug,apify::modules::oauth=debug
       - APIFY_THREADS=2
       # OAuth/OIDC configuration
       # Use localhost as KEYCLOAK_URL to match Keycloak's KC_HOSTNAME (for issuer URL)
