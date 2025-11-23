@@ -28,20 +28,55 @@ impl PostgresBackend {
         &self,
         table_schemas: Vec<TableSchema>,
     ) -> Result<(), DatabaseError> {
-        for schema in table_schemas {
-            let full_sql = SchemaGenerator::generate_create_table_sql_postgres(&schema);
-            for stmt in full_sql.split(';') {
-                let s = stmt.trim();
-                if s.is_empty() {
-                    continue;
-                }
-                sqlx::raw_sql(s)
-                    .execute(&self.pool)
-                    .await
-                    .map_err(DatabaseError::QueryError)?;
-            }
+        // Use advisory lock to prevent concurrent schema creation across threads
+        // Lock ID: 123456789 (arbitrary number for schema creation)
+        let lock_acquired = sqlx::query_scalar::<_, bool>(
+            "SELECT pg_try_advisory_lock(123456789)"
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(DatabaseError::QueryError)?;
+
+        if !lock_acquired {
+            // Another thread is creating the schema, wait for the lock to be released
+            sqlx::query_scalar::<_, bool>("SELECT pg_advisory_lock(123456789)")
+                .fetch_one(&self.pool)
+                .await
+                .map_err(DatabaseError::QueryError)?;
+            // Lock acquired after waiting, but schema should be ready now, so just unlock and return
+            sqlx::query("SELECT pg_advisory_unlock(123456789)")
+                .execute(&self.pool)
+                .await
+                .map_err(DatabaseError::QueryError)?;
+            return Ok(());
         }
-        Ok(())
+
+        // We have the lock, proceed with schema creation
+        let result = async {
+            for schema in table_schemas {
+                let full_sql = SchemaGenerator::generate_create_table_sql_postgres(&schema);
+                for stmt in full_sql.split(';') {
+                    let s = stmt.trim();
+                    if s.is_empty() {
+                        continue;
+                    }
+                    sqlx::raw_sql(s)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(DatabaseError::QueryError)?;
+                }
+            }
+            Ok::<(), DatabaseError>(())
+        }
+        .await;
+
+        // Always unlock, even if there was an error
+        sqlx::query("SELECT pg_advisory_unlock(123456789)")
+            .execute(&self.pool)
+            .await
+            .map_err(DatabaseError::QueryError)?;
+
+        result
     }
 
     async fn do_select(
@@ -394,9 +429,8 @@ fn push_where_postgres(qb: &mut QueryBuilder<Postgres>, conds: HashMap<String, V
                 qb.push_bind(b);
             }
             Value::Number(n) => {
-                if let Some(i) = n.as_i64() {
-                    qb.push_bind(i);
-                } else if let Some(f) = n.as_f64() {
+                // Always bind numbers as f64 for consistency with REAL columns
+                if let Some(f) = n.as_f64() {
                     qb.push_bind(f);
                 } else {
                     qb.push_bind(n.to_string());
@@ -421,11 +455,12 @@ fn push_bind_postgres(sep: &mut sqlx::query_builder::Separated<'_, '_, Postgres,
             sep.push_bind(*b);
         }
         Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                sep.push_bind(i);
-            } else if let Some(f) = n.as_f64() {
+            // Always bind numbers as f64 to avoid type mismatch with REAL columns
+            // Convert i64 to f64 first to ensure compatibility
+            if let Some(f) = n.as_f64() {
                 sep.push_bind(f);
             } else {
+                // Fallback to string representation for very large numbers
                 sep.push_bind(n.to_string());
             }
         }
