@@ -195,8 +195,11 @@ impl SchemaGenerator {
                             "[extract_relations_from_paths] Found operation"
                         );
 
+                        println!("DEBUG: [extract_relations_from_paths] Checking requestBody for {} {}", method, path_str);
+
                         // Extract relations from requestBody schema
                         if let Some(request_body) = op_obj.get("requestBody") {
+                            println!("DEBUG: [extract_relations_from_paths] Found requestBody for {} {}", method, path_str);
                             let before_count: usize =
                                 schemas.iter().map(|s| s.relations.len()).sum();
                             tracing::info!(
@@ -204,6 +207,7 @@ impl SchemaGenerator {
                                 "[extract_relations_from_paths] Checking requestBody"
                             );
                             Self::extract_relations_from_schema(schemas, &table_name, request_body);
+                            println!("DEBUG: [extract_relations_from_paths] Returned from extract_relations_from_schema for requestBody");
                             let after_count: usize =
                                 schemas.iter().map(|s| s.relations.len()).sum();
                             let new_relations = after_count - before_count;
@@ -214,11 +218,14 @@ impl SchemaGenerator {
                                 );
                                 relations_found += new_relations;
                             }
+                        } else {
+                            println!("DEBUG: [extract_relations_from_paths] No requestBody for {} {}", method, path_str);
                         }
 
                         // Extract relations from response schema
                         if let Some(responses) = op_obj.get("responses").and_then(|r| r.as_object())
                         {
+                            println!("DEBUG: [extract_relations_from_paths] Checking responses for {} {}", method, path_str);
                             tracing::info!(
                                 response_count = responses.len(),
                                 table = %table_name,
@@ -273,6 +280,7 @@ impl SchemaGenerator {
         table_name: &str,
         schema_container: &Value,
     ) {
+        println!("DEBUG: [extract_relations_from_schema] ENTERED for table {}", table_name);
         tracing::info!(table = %table_name, "[extract_relations_from_schema] ENTERED");
         use std::io::Write;
         // Navigate to the actual schema (might be in content.application/json.schema)
