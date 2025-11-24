@@ -2,10 +2,12 @@ package e2e_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -386,13 +388,14 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 func toString(v interface{}) string {
 	switch val := v.(type) {
 	case float64:
-		return strings.TrimSuffix(strings.TrimSuffix(json.Number(string(rune(val))).String(), ".0"), ".")
+		return strconv.FormatFloat(val, 'f', -1, 64)
 	case int:
-		return string(rune(val))
+		return strconv.Itoa(val)
+	case int64:
+		return strconv.FormatInt(val, 10)
 	case string:
 		return val
 	default:
-		b, _ := json.Marshal(v)
-		return strings.Trim(string(b), "\"")
+		return fmt.Sprintf("%v", v)
 	}
 }

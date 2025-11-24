@@ -84,6 +84,11 @@ impl SchemaGenerator {
             }
         }
 
+        // Extract relations from paths (requestBody and responses)
+        if let Some(paths) = spec.get("paths").and_then(|p| p.as_object()) {
+            Self::extract_relations_from_paths(&mut schemas, paths);
+        }
+
         // Fallback: derive from components.schemas if no explicit schemas found
         if schemas.is_empty()
             && let Some(derived) = Self::derive_from_components(spec)
@@ -93,6 +98,128 @@ impl SchemaGenerator {
         }
 
         Ok(schemas)
+    }
+
+    /// Extract relation definitions from API paths and merge into table schemas
+    fn extract_relations_from_paths(
+        schemas: &mut [TableSchema],
+        paths: &serde_json::Map<String, Value>,
+    ) {
+        for (_path, path_item) in paths.iter() {
+            if let Some(path_obj) = path_item.as_object() {
+                for (_method, operation) in path_obj.iter() {
+                    if let Some(op_obj) = operation.as_object() {
+                        // Get table name from operation
+                        let table_name = match op_obj.get("x-table-name").and_then(|v| v.as_str()) {
+                            Some(name) => name.to_string(),
+                            None => continue,
+                        };
+
+                        // Extract relations from requestBody schema
+                        if let Some(request_body) = op_obj.get("requestBody") {
+                            Self::extract_relations_from_schema(
+                                schemas,
+                                &table_name,
+                                request_body,
+                            );
+                        }
+
+                        // Extract relations from response schema
+                        if let Some(responses) = op_obj.get("responses").and_then(|r| r.as_object()) {
+                            for (_status, response) in responses.iter() {
+                                Self::extract_relations_from_schema(
+                                    schemas,
+                                    &table_name,
+                                    response,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Extract relation definitions from a schema object
+    fn extract_relations_from_schema(
+        schemas: &mut [TableSchema],
+        table_name: &str,
+        schema_container: &Value,
+    ) {
+        // Navigate to the actual schema (might be in content.application/json.schema)
+        let schema = if let Some(content) = schema_container.get("content") {
+            content
+                .get("application/json")
+                .and_then(|v| v.get("schema"))
+                .unwrap_or(schema_container)
+        } else if let Some(schema) = schema_container.get("schema") {
+            schema
+        } else {
+            schema_container
+        };
+
+        // Extract properties with x-relation
+        if let Some(props) = schema.get("properties").and_then(|p| p.as_object()) {
+            let mut new_relations = Vec::new();
+
+            for (prop_name, prop_schema) in props.iter() {
+                if let Some(relation_obj) = prop_schema.get("x-relation").and_then(|r| r.as_object()) {
+                    let relation_type = relation_obj
+                        .get("type")
+                        .and_then(|t| t.as_str())
+                        .and_then(|t| match t {
+                            "hasMany" => Some(RelationType::HasMany),
+                            "belongsTo" => Some(RelationType::BelongsTo),
+                            "hasOne" => Some(RelationType::HasOne),
+                            "belongsToMany" => Some(RelationType::BelongsToMany),
+                            _ => None,
+                        });
+
+                    let target_table = relation_obj
+                        .get("target")
+                        .and_then(|t| t.as_str())
+                        .map(Self::to_table_name);
+
+                    let foreign_key = relation_obj
+                        .get("foreignKey")
+                        .and_then(|fk| fk.as_str())
+                        .map(|s| s.to_string());
+
+                    let local_key = relation_obj
+                        .get("localKey")
+                        .and_then(|lk| lk.as_str())
+                        .map(|s| s.to_string());
+
+                    if let (Some(rel_type), Some(target), Some(fk)) =
+                        (relation_type, target_table, foreign_key)
+                    {
+                        new_relations.push(RelationDefinition {
+                            field_name: prop_name.clone(),
+                            relation_type: rel_type,
+                            target_table: target,
+                            foreign_key: fk,
+                            local_key,
+                        });
+                    }
+                }
+            }
+
+            // Merge relations into the corresponding table schema
+            if !new_relations.is_empty()
+                && let Some(table_schema) = schemas.iter_mut().find(|s| s.table_name == table_name)
+            {
+                // Add new relations, avoiding duplicates
+                for new_rel in new_relations {
+                    if !table_schema
+                        .relations
+                        .iter()
+                        .any(|r| r.field_name == new_rel.field_name)
+                    {
+                        table_schema.relations.push(new_rel);
+                    }
+                }
+            }
+        }
     }
 
     /// Derive table schemas from OpenAPI components.schemas (best-effort)
