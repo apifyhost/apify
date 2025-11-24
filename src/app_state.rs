@@ -129,10 +129,24 @@ impl AppState {
 
                 // Extract table schemas from all OpenAPI specs
                 let mut all_schemas = Vec::new();
-                for (openapi_config, _, _) in &openapi_configs {
+                eprintln!(
+                    "Extracting schemas from {} OpenAPI configs",
+                    openapi_configs.len()
+                );
+                for (i, (openapi_config, _, _)) in openapi_configs.iter().enumerate() {
+                    eprintln!("  [{}] Extracting from OpenAPI config...", i + 1);
                     let schemas = SchemaGenerator::extract_schemas_from_openapi(
                         &openapi_config.openapi.spec,
                     )?;
+                    eprintln!("  [{}] Found {} schemas", i + 1, schemas.len());
+                    for schema in &schemas {
+                        eprintln!(
+                            "    - {} ({} columns, {} relations)",
+                            schema.table_name,
+                            schema.columns.len(),
+                            schema.relations.len()
+                        );
+                    }
                     all_schemas.extend(schemas);
                 }
 
