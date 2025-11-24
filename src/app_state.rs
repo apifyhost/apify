@@ -167,7 +167,12 @@ impl AppState {
                         datasource_name,
                         all_schemas.len()
                     );
+                    eprintln!("  Calling db_manager.initialize_schema...");
+                    use std::io::Write;
+                    let _ = std::io::stderr().flush();
                     db_manager.initialize_schema(all_schemas).await?;
+                    eprintln!("  Database initialization complete");
+                    let _ = std::io::stderr().flush();
                 } else {
                     eprintln!("Warning: No table schemas found in OpenAPI configurations");
                 }
