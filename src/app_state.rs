@@ -135,19 +135,29 @@ impl AppState {
                 );
                 for (i, (openapi_config, _, _)) in openapi_configs.iter().enumerate() {
                     eprintln!("  [{}] Extracting from OpenAPI config...", i + 1);
-                    let schemas = SchemaGenerator::extract_schemas_from_openapi(
+                    use std::io::Write;
+                    let _ = std::io::stderr().flush();
+                    
+                    match SchemaGenerator::extract_schemas_from_openapi(
                         &openapi_config.openapi.spec,
-                    )?;
-                    eprintln!("  [{}] Found {} schemas", i + 1, schemas.len());
-                    for schema in &schemas {
-                        eprintln!(
-                            "    - {} ({} columns, {} relations)",
-                            schema.table_name,
-                            schema.columns.len(),
-                            schema.relations.len()
-                        );
+                    ) {
+                        Ok(schemas) => {
+                            eprintln!("  [{}] Found {} schemas", i + 1, schemas.len());
+                            for schema in &schemas {
+                                eprintln!(
+                                    "    - {} ({} columns, {} relations)",
+                                    schema.table_name,
+                                    schema.columns.len(),
+                                    schema.relations.len()
+                                );
+                            }
+                            all_schemas.extend(schemas);
+                        }
+                        Err(e) => {
+                            eprintln!("  [{}] ERROR extracting schemas: {}", i + 1, e);
+                            return Err(e);
+                        }
                     }
-                    all_schemas.extend(schemas);
                 }
 
                 // Always initialize schema if schemas are defined (removed opt-in gating)
