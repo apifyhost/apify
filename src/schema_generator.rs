@@ -61,6 +61,7 @@ impl SchemaGenerator {
     pub fn extract_schemas_from_openapi(
         spec: &Value,
     ) -> Result<Vec<TableSchema>, Box<dyn std::error::Error + Send + Sync>> {
+        eprintln!("    extract_schemas_from_openapi: START");
         let mut schemas = Vec::new();
 
         tracing::debug!(
@@ -68,12 +69,23 @@ impl SchemaGenerator {
             has_paths = spec.get("paths").is_some(),
             "Starting schema extraction from OpenAPI spec"
         );
+        eprintln!("    extract_schemas_from_openapi: After debug log");
 
         // Look for x-table-schema extensions in the OpenAPI spec
+        eprintln!("    extract_schemas_from_openapi: Checking x-table-schemas");
         if let Some(extensions) = spec.get("x-table-schemas").and_then(|v| v.as_array()) {
+            eprintln!(
+                "    extract_schemas_from_openapi: Found {} x-table-schemas",
+                extensions.len()
+            );
             tracing::debug!(schemas_count = extensions.len(), "Found x-table-schemas");
             for schema_value in extensions {
+                eprintln!("    extract_schemas_from_openapi: Parsing schema...");
                 let schema: TableSchema = serde_json::from_value(schema_value.clone())?;
+                eprintln!(
+                    "    extract_schemas_from_openapi: Parsed schema: {}",
+                    schema.table_name
+                );
                 tracing::debug!(
                     table = %schema.table_name,
                     columns_count = schema.columns.len(),
@@ -83,6 +95,10 @@ impl SchemaGenerator {
                 schemas.push(schema);
             }
         }
+        eprintln!(
+            "    extract_schemas_from_openapi: After x-table-schemas, schemas.len()={}",
+            schemas.len()
+        );
 
         // Also try to extract from paths (alternative approach)
         if let Some(paths) = spec.get("paths").and_then(|p| p.as_object()) {
@@ -98,18 +114,34 @@ impl SchemaGenerator {
         }
 
         // Extract relations from paths (requestBody and responses)
+        eprintln!("    extract_schemas_from_openapi: About to extract relations from paths");
         if let Some(paths) = spec.get("paths").and_then(|p| p.as_object()) {
+            eprintln!(
+                "    extract_schemas_from_openapi: Calling extract_relations_from_paths with {} paths",
+                paths.len()
+            );
             Self::extract_relations_from_paths(&mut schemas, paths);
+            eprintln!("    extract_schemas_from_openapi: After extract_relations_from_paths");
         }
+        eprintln!("    extract_schemas_from_openapi: After relations extraction");
 
         // Fallback: derive from components.schemas if no explicit schemas found
+        eprintln!(
+            "    extract_schemas_from_openapi: Checking fallback, schemas.len()={}",
+            schemas.len()
+        );
         if schemas.is_empty()
             && let Some(derived) = Self::derive_from_components(spec)
             && !derived.is_empty()
         {
+            eprintln!("    extract_schemas_from_openapi: Using fallback derived schemas");
             return Ok(derived);
         }
 
+        eprintln!(
+            "    extract_schemas_from_openapi: DONE, returning {} schemas",
+            schemas.len()
+        );
         Ok(schemas)
     }
 

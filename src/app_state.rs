@@ -137,7 +137,7 @@ impl AppState {
                     eprintln!("  [{}] Extracting from OpenAPI config...", i + 1);
                     use std::io::Write;
                     let _ = std::io::stderr().flush();
-                    
+
                     match SchemaGenerator::extract_schemas_from_openapi(
                         &openapi_config.openapi.spec,
                     ) {
