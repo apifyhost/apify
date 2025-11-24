@@ -484,19 +484,19 @@ impl SchemaGenerator {
         // Convert PascalCase to snake_case (e.g., "UserProfile" -> "user_profiles")
         let mut result = String::new();
         let mut chars = schema_name.chars().peekable();
-        
+
         while let Some(c) = chars.next() {
             if c.is_uppercase() && !result.is_empty() {
                 result.push('_');
             }
             result.push(c.to_ascii_lowercase());
         }
-        
+
         // Pluralize if not already plural
         if !result.ends_with('s') {
             result.push('s');
         }
-        
+
         result
     }
 
