@@ -167,17 +167,10 @@ impl SchemaGenerator {
         schemas: &mut [TableSchema],
         paths: &serde_json::Map<String, Value>,
     ) {
-        use std::io::Write;
-        eprintln!(
-            "      [extract_relations_from_paths] START: {} schemas, {} paths",
-            schemas.len(),
-            paths.len()
-        );
-        let _ = std::io::stderr().flush();
-        tracing::debug!(
+        tracing::info!(
             schema_count = schemas.len(),
             paths_count = paths.len(),
-            "Extracting relations from paths"
+            "[extract_relations_from_paths] START"
         );
 
         let mut operations_found = 0;
@@ -194,42 +187,31 @@ impl SchemaGenerator {
                         };
 
                         operations_found += 1;
-                        eprintln!(
-                            "      [extract_relations_from_paths] Found operation #{}: {} {} -> table '{}'",
-                            operations_found, method, path_str, table_name
-                        );
-                        let _ = std::io::stderr().flush();
-
-                        tracing::debug!(
+                        tracing::info!(
+                            operation_num = operations_found,
                             path = %path_str,
                             method = %method,
                             table = %table_name,
-                            "Found operation with table name"
+                            "[extract_relations_from_paths] Found operation"
                         );
 
                         // Extract relations from requestBody schema
                         if let Some(request_body) = op_obj.get("requestBody") {
-                            eprintln!(
-                                "      [extract_relations_from_paths] Checking requestBody for table '{}'",
-                                table_name
-                            );
-                            let _ = std::io::stderr().flush();
                             let before_count: usize =
                                 schemas.iter().map(|s| s.relations.len()).sum();
-                            tracing::debug!(
+                            tracing::info!(
                                 table = %table_name,
-                                "Extracting relations from requestBody"
+                                "[extract_relations_from_paths] Checking requestBody"
                             );
                             Self::extract_relations_from_schema(schemas, &table_name, request_body);
                             let after_count: usize =
                                 schemas.iter().map(|s| s.relations.len()).sum();
                             let new_relations = after_count - before_count;
                             if new_relations > 0 {
-                                eprintln!(
-                                    "      [extract_relations_from_paths] Found {} new relation(s) in requestBody",
-                                    new_relations
+                                tracing::info!(
+                                    new_relations = new_relations,
+                                    "[extract_relations_from_paths] Found new relations in requestBody"
                                 );
-                                let _ = std::io::stderr().flush();
                                 relations_found += new_relations;
                             }
                         }
@@ -237,70 +219,52 @@ impl SchemaGenerator {
                         // Extract relations from response schema
                         if let Some(responses) = op_obj.get("responses").and_then(|r| r.as_object())
                         {
-                            eprintln!(
-                                "      [extract_relations_from_paths] Checking {} response(s) for table '{}'",
-                                responses.len(),
-                                table_name
+                            tracing::info!(
+                                response_count = responses.len(),
+                                table = %table_name,
+                                "[extract_relations_from_paths] Checking responses"
                             );
-                            let _ = std::io::stderr().flush();
                             for (status, response) in responses.iter() {
-                                eprintln!(
-                                    "      [extract_relations_from_paths] Processing response {} for table '{}'",
-                                    status, table_name
-                                );
-                                let _ = std::io::stderr().flush();
-                                tracing::debug!(
-                                    table = %table_name,
+                                tracing::info!(
                                     status = %status,
-                                    "Extracting relations from response"
+                                    table = %table_name,
+                                    "[extract_relations_from_paths] Processing response"
                                 );
                                 Self::extract_relations_from_schema(schemas, &table_name, response);
-                                eprintln!(
-                                    "      [extract_relations_from_paths] Finished processing response {} for table '{}'",
-                                    status, table_name
+                                tracing::info!(
+                                    status = %status,
+                                    "[extract_relations_from_paths] Finished response"
                                 );
-                                let _ = std::io::stderr().flush();
                             }
-                            eprintln!(
-                                "      [extract_relations_from_paths] Finished all responses for table '{}'",
-                                table_name
+                            tracing::info!(
+                                table = %table_name,
+                                "[extract_relations_from_paths] Finished all responses"
                             );
-                            let _ = std::io::stderr().flush();
                         }
-                        eprintln!(
-                            "      [extract_relations_from_paths] Finished operation #{}",
-                            operations_found
+                        tracing::info!(
+                            operation_num = operations_found,
+                            "[extract_relations_from_paths] Finished operation"
                         );
-                        let _ = std::io::stderr().flush();
                     }
                 }
             }
         }
 
-        eprintln!(
-            "      [extract_relations_from_paths] DONE: processed {} operations, found {} relations",
-            operations_found, relations_found
+        tracing::info!(
+            operations_found = operations_found,
+            relations_found = relations_found,
+            "[extract_relations_from_paths] DONE"
         );
         for schema in schemas.iter() {
             if !schema.relations.is_empty() {
-                eprintln!(
-                    "      [extract_relations_from_paths] Table '{}' has {} relation(s): {:?}",
-                    schema.table_name,
-                    schema.relations.len(),
-                    schema
-                        .relations
-                        .iter()
-                        .map(|r| &r.field_name)
-                        .collect::<Vec<_>>()
+                tracing::info!(
+                    table = %schema.table_name,
+                    relation_count = schema.relations.len(),
+                    relations = ?schema.relations.iter().map(|r| &r.field_name).collect::<Vec<_>>(),
+                    "[extract_relations_from_paths] Table has relations"
                 );
             }
         }
-        let _ = std::io::stderr().flush();
-
-        tracing::debug!(
-            schemas = ?schemas.iter().map(|s| (&s.table_name, s.relations.len())).collect::<Vec<_>>(),
-            "Finished extracting relations"
-        );
     }
 
     /// Extract relation definitions from a schema object
@@ -323,42 +287,30 @@ impl SchemaGenerator {
         };
 
         let has_properties = schema.get("properties").is_some();
-        eprintln!(
-            "        [extract_relations_from_schema] Scanning table '{}', has_properties={}",
-            table_name, has_properties
-        );
-        let _ = std::io::stderr().flush();
-
-        tracing::debug!(
+        tracing::info!(
             table = %table_name,
-            has_properties = schema.get("properties").is_some(),
-            "Extracting relations from schema"
+            has_properties = has_properties,
+            "[extract_relations_from_schema] Scanning table"
         );
 
         // Extract properties with x-relation
         if let Some(props) = schema.get("properties").and_then(|p| p.as_object()) {
-            eprintln!(
-                "        [extract_relations_from_schema] Found {} properties in table '{}'",
-                props.len(),
-                table_name
+            tracing::info!(
+                property_count = props.len(),
+                table = %table_name,
+                "[extract_relations_from_schema] Found properties"
             );
-            let _ = std::io::stderr().flush();
             let mut new_relations = Vec::new();
 
             for (prop_name, prop_schema) in props.iter() {
                 if let Some(relation_obj) =
                     prop_schema.get("x-relation").and_then(|r| r.as_object())
                 {
-                    eprintln!(
-                        "        [extract_relations_from_schema] Found x-relation on property '{}' in table '{}'",
-                        prop_name, table_name
-                    );
-                    let _ = std::io::stderr().flush();
-                    tracing::debug!(
+                    tracing::info!(
+                        property = %prop_name,
                         table = %table_name,
-                        field = %prop_name,
                         relation_def = ?relation_obj,
-                        "Found x-relation"
+                        "[extract_relations_from_schema] Found x-relation"
                     );
 
                     let relation_type =
@@ -391,18 +343,13 @@ impl SchemaGenerator {
                     if let (Some(rel_type), Some(target), Some(fk)) =
                         (relation_type, target_table, foreign_key)
                     {
-                        eprintln!(
-                            "        [extract_relations_from_schema] Adding relation: {}.{} -> {} (type={:?}, fk={})",
-                            table_name, prop_name, target, rel_type, fk
-                        );
-                        let _ = std::io::stderr().flush();
                         tracing::info!(
                             table = %table_name,
                             field = %prop_name,
                             relation_type = ?rel_type,
                             target = %target,
                             foreign_key = %fk,
-                            "Adding relation"
+                            "[extract_relations_from_schema] Adding relation"
                         );
 
                         new_relations.push(RelationDefinition {
@@ -420,16 +367,10 @@ impl SchemaGenerator {
             if !new_relations.is_empty()
                 && let Some(table_schema) = schemas.iter_mut().find(|s| s.table_name == table_name)
             {
-                eprintln!(
-                    "        [extract_relations_from_schema] Merging {} new relation(s) into table '{}'",
-                    new_relations.len(),
-                    table_name
-                );
-                let _ = std::io::stderr().flush();
                 tracing::info!(
                     table = %table_name,
                     new_relations_count = new_relations.len(),
-                    "Merging relations into table schema"
+                    "[extract_relations_from_schema] Merging relations"
                 );
 
                 // Add new relations, avoiding duplicates
@@ -442,36 +383,24 @@ impl SchemaGenerator {
                         table_schema.relations.push(new_rel);
                     }
                 }
-                eprintln!(
-                    "        [extract_relations_from_schema] Table '{}' now has {} total relation(s)",
-                    table_name,
-                    table_schema.relations.len()
+                tracing::info!(
+                    table = %table_name,
+                    total_relations = table_schema.relations.len(),
+                    "[extract_relations_from_schema] Merge complete"
                 );
-                let _ = std::io::stderr().flush();
             } else if !new_relations.is_empty() {
-                eprintln!(
-                    "        [extract_relations_from_schema] WARNING: Table '{}' not found in schemas, cannot add {} relation(s)",
-                    table_name,
-                    new_relations.len()
-                );
-                eprintln!(
-                    "        [extract_relations_from_schema] Available tables: {:?}",
-                    schemas.iter().map(|s| &s.table_name).collect::<Vec<_>>()
-                );
-                let _ = std::io::stderr().flush();
                 tracing::warn!(
                     table = %table_name,
                     relations_count = new_relations.len(),
                     available_tables = ?schemas.iter().map(|s| &s.table_name).collect::<Vec<_>>(),
-                    "Could not find table schema to merge relations"
+                    "[extract_relations_from_schema] Table not found, cannot add relations"
                 );
             }
         } else {
-            eprintln!(
-                "        [extract_relations_from_schema] No properties found in schema for table '{}'",
-                table_name
+            tracing::info!(
+                table = %table_name,
+                "[extract_relations_from_schema] No properties found"
             );
-            let _ = std::io::stderr().flush();
         }
     }
 
