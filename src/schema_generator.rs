@@ -481,11 +481,23 @@ impl SchemaGenerator {
     }
 
     fn to_table_name(schema_name: &str) -> String {
-        let mut s = schema_name.to_lowercase();
-        if !s.ends_with('s') {
-            s.push('s');
+        // Convert PascalCase to snake_case (e.g., "UserProfile" -> "user_profiles")
+        let mut result = String::new();
+        let mut chars = schema_name.chars().peekable();
+        
+        while let Some(c) = chars.next() {
+            if c.is_uppercase() && !result.is_empty() {
+                result.push('_');
+            }
+            result.push(c.to_ascii_lowercase());
         }
-        s
+        
+        // Pluralize if not already plural
+        if !result.ends_with('s') {
+            result.push('s');
+        }
+        
+        result
     }
 
     fn infer_sql_type_and_default(
