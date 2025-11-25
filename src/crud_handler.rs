@@ -347,10 +347,13 @@ impl CRUDHandler {
                                             } else if col.name == "createdAt"
                                                 || col.name == "updatedAt"
                                             {
-                                                item_map.insert(
-                                                    col.name.clone(),
-                                                    Value::String(now.clone()),
-                                                );
+                                                // Only inject if not already present
+                                                if !item_map.contains_key(&col.name) {
+                                                    item_map.insert(
+                                                        col.name.clone(),
+                                                        Value::String(now.clone()),
+                                                    );
+                                                }
                                             }
                                         }
                                     }
@@ -405,10 +408,13 @@ impl CRUDHandler {
                                             }
                                         } else if col.name == "createdAt" || col.name == "updatedAt"
                                         {
-                                            item_map.insert(
-                                                col.name.clone(),
-                                                Value::String(now.clone()),
-                                            );
+                                            // Only inject if not already present
+                                            if !item_map.contains_key(&col.name) {
+                                                item_map.insert(
+                                                    col.name.clone(),
+                                                    Value::String(now.clone()),
+                                                );
+                                            }
                                         }
                                     }
                                 }
@@ -754,6 +760,14 @@ impl CRUDHandler {
                                         col.name.clone(),
                                         Value::String(identity.name.clone()),
                                     );
+                                } else if col.name == "createdAt" || col.name == "updatedAt" {
+                                    // Only inject if not already present
+                                    if !item_map.contains_key(&col.name) {
+                                        item_map.insert(
+                                            col.name.clone(),
+                                            Value::String(Utc::now().to_rfc3339()),
+                                        );
+                                    }
                                 }
                             }
                         }

@@ -668,12 +668,12 @@ impl SchemaGenerator {
             }
             "createdAt" | "created_at" => {
                 return (
-                    "DATETIME".to_string(),
+                    "TIMESTAMP".to_string(),
                     Some("CURRENT_TIMESTAMP".to_string()),
                 );
             }
             "updatedAt" | "updated_at" => {
-                return ("DATETIME".to_string(), None);
+                return ("TIMESTAMP".to_string(), None);
             }
             _ => {}
         }
@@ -688,7 +688,7 @@ impl SchemaGenerator {
             .unwrap_or("");
 
         match (t, format) {
-            ("string", "date-time") => ("DATETIME".to_string(), None),
+            ("string", "date-time") => ("TIMESTAMP".to_string(), None),
             ("string", "date") => ("DATE".to_string(), None),
             ("string", _) => ("TEXT".to_string(), None),
             ("integer", _) => ("INTEGER".to_string(), None),
@@ -847,7 +847,7 @@ impl SchemaGenerator {
             "decimal" | "numeric" => "NUMERIC".to_string(),
             "boolean" | "bool" => "BOOLEAN".to_string(),
             "blob" | "binary" => "BYTEA".to_string(),
-            "datetime" | "timestamp" => "TIMESTAMP".to_string(),
+            "datetime" | "timestamp" => "TIMESTAMPTZ".to_string(),
             "date" => "DATE".to_string(),
             "time" => "TIME".to_string(),
             _ => "TEXT".to_string(), // Default to TEXT for unknown types
