@@ -969,11 +969,9 @@ impl CRUDHandler {
                     .columns
                     .iter()
                     .find(|c| c.name.eq_ignore_ascii_case(key))
-                {
-                    if col.name != *key {
+                    && col.name != *key {
                         replacements.push((key.clone(), col.name.clone()));
                     }
-                }
             }
 
             for (old_key, new_key) in replacements {
