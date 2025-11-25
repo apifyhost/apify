@@ -657,11 +657,10 @@ impl CRUDHandler {
                         if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>() {
                             data_map.insert(col.name.clone(), Value::String(identity.name.clone()));
                         }
-                    } else if matches!(col.name.as_str(), "updatedAt" | "updated_at") {
-                        if !data_map.contains_key(&col.name) {
+                    } else if matches!(col.name.as_str(), "updatedAt" | "updated_at")
+                        && !data_map.contains_key(&col.name) {
                             data_map.insert(col.name.clone(), Value::String(now.clone()));
                         }
-                    }
                 }
             }
         }
@@ -734,14 +733,13 @@ impl CRUDHandler {
                                         } else if matches!(
                                             col.name.as_str(),
                                             "createdAt" | "updatedAt" | "created_at" | "updated_at"
-                                        ) {
-                                            if !item_map.contains_key(&col.name) {
+                                        )
+                                            && !item_map.contains_key(&col.name) {
                                                 item_map.insert(
                                                     col.name.clone(),
                                                     Value::String(now.clone()),
                                                 );
                                             }
-                                        }
                                     }
                                 }
                             }
