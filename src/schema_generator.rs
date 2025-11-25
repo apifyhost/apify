@@ -288,7 +288,6 @@ impl SchemaGenerator {
     ) {
         println!("DEBUG: [extract_relations_from_schema] ENTERED for table {}", table_name);
         tracing::info!(table = %table_name, "[extract_relations_from_schema] ENTERED");
-        use std::io::Write;
         // Navigate to the actual schema (might be in content.application/json.schema)
         let schema = if let Some(content) = schema_container.get("content") {
             content

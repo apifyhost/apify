@@ -170,7 +170,7 @@ impl AppState {
                         "Initializing database with table schemas"
                     );
                     tracing::info!("Calling db_manager.initialize_schema...");
-                    db_manager.initialize_schema(all_schemas).await?;
+                    db_manager.initialize_schema(all_schemas.clone()).await?;
                     tracing::info!("Database initialization complete");
                 } else {
                     tracing::warn!("No table schemas found in OpenAPI configurations");
@@ -200,7 +200,7 @@ impl AppState {
                 merged_spec.insert("paths".to_string(), serde_json::Value::Object(merged_paths));
 
                 let merged_value = serde_json::Value::Object(merged_spec);
-                let api_generator = APIGenerator::new(merged_value.clone())?;
+                let api_generator = APIGenerator::new(merged_value.clone(), all_schemas)?;
                 Some(Arc::new(CRUDHandler::new(db_manager, api_generator)))
             } else {
                 None
