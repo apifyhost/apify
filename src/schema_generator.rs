@@ -195,11 +195,17 @@ impl SchemaGenerator {
                             "[extract_relations_from_paths] Found operation"
                         );
 
-                        println!("DEBUG: [extract_relations_from_paths] Checking requestBody for {} {}", method, path_str);
+                        println!(
+                            "DEBUG: [extract_relations_from_paths] Checking requestBody for {} {}",
+                            method, path_str
+                        );
 
                         // Extract relations from requestBody schema
                         if let Some(request_body) = op_obj.get("requestBody") {
-                            println!("DEBUG: [extract_relations_from_paths] Found requestBody for {} {}", method, path_str);
+                            println!(
+                                "DEBUG: [extract_relations_from_paths] Found requestBody for {} {}",
+                                method, path_str
+                            );
                             let before_count: usize =
                                 schemas.iter().map(|s| s.relations.len()).sum();
                             tracing::info!(
@@ -207,7 +213,9 @@ impl SchemaGenerator {
                                 "[extract_relations_from_paths] Checking requestBody"
                             );
                             Self::extract_relations_from_schema(schemas, &table_name, request_body);
-                            println!("DEBUG: [extract_relations_from_paths] Returned from extract_relations_from_schema for requestBody");
+                            println!(
+                                "DEBUG: [extract_relations_from_paths] Returned from extract_relations_from_schema for requestBody"
+                            );
                             let after_count: usize =
                                 schemas.iter().map(|s| s.relations.len()).sum();
                             let new_relations = after_count - before_count;
@@ -219,41 +227,62 @@ impl SchemaGenerator {
                                 relations_found += new_relations;
                             }
                         } else {
-                            println!("DEBUG: [extract_relations_from_paths] No requestBody for {} {}", method, path_str);
+                            println!(
+                                "DEBUG: [extract_relations_from_paths] No requestBody for {} {}",
+                                method, path_str
+                            );
                         }
 
                         // Extract relations from response schema
                         if let Some(responses) = op_obj.get("responses").and_then(|r| r.as_object())
                         {
-                            println!("DEBUG: [extract_relations_from_paths] Checking responses for {} {}", method, path_str);
+                            println!(
+                                "DEBUG: [extract_relations_from_paths] Checking responses for {} {}",
+                                method, path_str
+                            );
                             tracing::info!(
                                 response_count = responses.len(),
                                 table = %table_name,
                                 "[extract_relations_from_paths] Checking responses"
                             );
                             for (status, response) in responses.iter() {
-                                println!("DEBUG: [extract_relations_from_paths] Processing response {} for {} {}", status, method, path_str);
+                                println!(
+                                    "DEBUG: [extract_relations_from_paths] Processing response {} for {} {}",
+                                    status, method, path_str
+                                );
                                 tracing::info!(
                                     status = %status,
                                     table = %table_name,
                                     "[extract_relations_from_paths] Processing response"
                                 );
                                 Self::extract_relations_from_schema(schemas, &table_name, response);
-                                println!("DEBUG: [extract_relations_from_paths] Finished response {} for {} {}", status, method, path_str);
+                                println!(
+                                    "DEBUG: [extract_relations_from_paths] Finished response {} for {} {}",
+                                    status, method, path_str
+                                );
                                 tracing::info!(
                                     status = %status,
                                     "[extract_relations_from_paths] Finished response"
                                 );
                             }
-                            println!("DEBUG: [extract_relations_from_paths] Finished all responses for {} {}", method, path_str);
+                            println!(
+                                "DEBUG: [extract_relations_from_paths] Finished all responses for {} {}",
+                                method, path_str
+                            );
                             tracing::info!(
                                 table = %table_name,
                                 "[extract_relations_from_paths] Finished all responses"
                             );
                         } else {
-                            println!("DEBUG: [extract_relations_from_paths] No responses for {} {}", method, path_str);
+                            println!(
+                                "DEBUG: [extract_relations_from_paths] No responses for {} {}",
+                                method, path_str
+                            );
                         }
-                        println!("DEBUG: [extract_relations_from_paths] Finished operation {} {}", method, path_str);
+                        println!(
+                            "DEBUG: [extract_relations_from_paths] Finished operation {} {}",
+                            method, path_str
+                        );
                         tracing::info!(
                             operation_num = operations_found,
                             "[extract_relations_from_paths] Finished operation"
@@ -286,7 +315,10 @@ impl SchemaGenerator {
         table_name: &str,
         schema_container: &Value,
     ) {
-        println!("DEBUG: [extract_relations_from_schema] ENTERED for table {}", table_name);
+        println!(
+            "DEBUG: [extract_relations_from_schema] ENTERED for table {}",
+            table_name
+        );
         tracing::info!(table = %table_name, "[extract_relations_from_schema] ENTERED");
         // Navigate to the actual schema (might be in content.application/json.schema)
         let schema = if let Some(content) = schema_container.get("content") {
@@ -610,7 +642,7 @@ impl SchemaGenerator {
         let mut result = String::new();
         let mut chars = schema_name.chars().peekable();
 
-        while let Some(c) = chars.next() {
+        for c in chars {
             if c.is_uppercase() && !result.is_empty() {
                 result.push('_');
             }

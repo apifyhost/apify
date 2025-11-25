@@ -5,6 +5,7 @@ use crate::database::DatabaseManager;
 use crate::modules::ConsumerIdentity;
 use crate::phases::RequestContext;
 use serde_json::Value;
+use sqlx::types::chrono::Utc;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -327,19 +328,30 @@ impl CRUDHandler {
                                 // Inject foreign key
                                 item_map.insert(relation.foreign_key.clone(), parent_id.clone());
 
-                                // Inject audit fields if user is authenticated
-                                if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>()
-                                    && let Some(target_schema) =
-                                        self.api_generator.get_table_schema(&relation.target_table)
+                                // Inject audit fields
+                                if let Some(target_schema) =
+                                    self.api_generator.get_table_schema(&relation.target_table)
                                 {
+                                    let now = Utc::now().to_rfc3339();
                                     for col in &target_schema.columns {
-                                        if col.auto_field
-                                            && (col.name == "createdBy" || col.name == "updatedBy")
-                                        {
-                                            item_map.insert(
-                                                col.name.clone(),
-                                                Value::String(identity.name.clone()),
-                                            );
+                                        if col.auto_field {
+                                            if col.name == "createdBy" || col.name == "updatedBy" {
+                                                if let Some(identity) =
+                                                    ctx.extensions.get::<ConsumerIdentity>()
+                                                {
+                                                    item_map.insert(
+                                                        col.name.clone(),
+                                                        Value::String(identity.name.clone()),
+                                                    );
+                                                }
+                                            } else if col.name == "createdAt"
+                                                || col.name == "updatedAt"
+                                            {
+                                                item_map.insert(
+                                                    col.name.clone(),
+                                                    Value::String(now.clone()),
+                                                );
+                                            }
                                         }
                                     }
                                 }
@@ -375,19 +387,29 @@ impl CRUDHandler {
                             // Inject foreign key
                             item_map.insert(relation.foreign_key.clone(), parent_id.clone());
 
-                            // Inject audit fields if user is authenticated
-                            if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>()
-                                && let Some(target_schema) =
-                                    self.api_generator.get_table_schema(&relation.target_table)
+                            // Inject audit fields
+                            if let Some(target_schema) =
+                                self.api_generator.get_table_schema(&relation.target_table)
                             {
+                                let now = Utc::now().to_rfc3339();
                                 for col in &target_schema.columns {
-                                    if col.auto_field
-                                        && (col.name == "createdBy" || col.name == "updatedBy")
-                                    {
-                                        item_map.insert(
-                                            col.name.clone(),
-                                            Value::String(identity.name.clone()),
-                                        );
+                                    if col.auto_field {
+                                        if col.name == "createdBy" || col.name == "updatedBy" {
+                                            if let Some(identity) =
+                                                ctx.extensions.get::<ConsumerIdentity>()
+                                            {
+                                                item_map.insert(
+                                                    col.name.clone(),
+                                                    Value::String(identity.name.clone()),
+                                                );
+                                            }
+                                        } else if col.name == "createdAt" || col.name == "updatedAt"
+                                        {
+                                            item_map.insert(
+                                                col.name.clone(),
+                                                Value::String(now.clone()),
+                                            );
+                                        }
                                     }
                                 }
                             }

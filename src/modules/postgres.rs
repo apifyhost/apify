@@ -357,6 +357,14 @@ fn row_to_json_postgres(row: &PgRow) -> Value {
             obj.insert(name, Value::String(v.to_string()));
             continue;
         }
+        if let Ok(v) = row.try_get::<chrono::DateTime<chrono::Utc>, _>(i) {
+            obj.insert(name, Value::String(v.to_rfc3339()));
+            continue;
+        }
+        if let Ok(v) = row.try_get::<chrono::DateTime<chrono::Local>, _>(i) {
+            obj.insert(name, Value::String(v.to_rfc3339()));
+            continue;
+        }
         if let Ok(v) = row.try_get::<chrono::NaiveDate, _>(i) {
             obj.insert(name, Value::String(v.to_string()));
             continue;
