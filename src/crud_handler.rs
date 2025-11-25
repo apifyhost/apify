@@ -134,13 +134,20 @@ impl CRUDHandler {
         {
             let mut enriched_results = Vec::new();
             for record in results {
-                let enriched = self.load_relations_for_record(table, record).await?;
+                let normalized = self.normalize_record_casing(table, record);
+                let enriched = self.load_relations_for_record(table, normalized).await?;
                 enriched_results.push(enriched);
             }
             return Ok(Value::Array(enriched_results));
         }
 
-        Ok(Value::Array(results))
+        // Normalize results even if no relations
+        let normalized_results = results
+            .into_iter()
+            .map(|r| self.normalize_record_casing(table, r))
+            .collect();
+
+        Ok(Value::Array(normalized_results))
     }
 
     /// Handle GET /table/{id} (get single record)
@@ -180,9 +187,11 @@ impl CRUDHandler {
             .select(table, None, Some(where_clause), Some(1), None)
             .await?;
 
-        results.into_iter().next().ok_or_else(|| {
+        let record = results.into_iter().next().ok_or_else(|| {
             CRUDError::NotFoundError(format!("Record with {} = {} not found", id_param, id_value))
-        })
+        })?;
+
+        Ok(self.normalize_record_casing(table, record))
     }
 
     /// Handle POST /table (create new record)
@@ -286,6 +295,17 @@ impl CRUDHandler {
 
         // Insert main record
         let result = self.db_manager.insert(table, data_hashmap).await?;
+
+        // Normalize the returned record
+        let result = if let Value::Object(mut map) = result {
+            if let Some(record) = map.remove("record") {
+                let normalized = self.normalize_record_casing(table, record);
+                map.insert("record".to_string(), normalized);
+            }
+            Value::Object(map)
+        } else {
+            result
+        };
 
         let has_nested_data = !nested_relations.is_empty() || !nested_single_relations.is_empty();
 
@@ -474,8 +494,10 @@ impl CRUDHandler {
             .next()
             .ok_or_else(|| CRUDError::NotFoundError("Record not found".to_string()))?;
 
+        let normalized = self.normalize_record_casing(table, record);
+
         // Load relations
-        self.load_relations_for_record(table, record).await
+        self.load_relations_for_record(table, normalized).await
     }
 
     /// Load all relations for a single record
@@ -516,7 +538,15 @@ impl CRUDHandler {
                         .await
                         .unwrap_or_else(|_| Vec::new());
 
-                    record_obj.insert(relation.field_name.clone(), Value::Array(children));
+                    let normalized_children: Vec<Value> = children
+                        .into_iter()
+                        .map(|c| self.normalize_record_casing(&relation.target_table, c))
+                        .collect();
+
+                    record_obj.insert(
+                        relation.field_name.clone(),
+                        Value::Array(normalized_children),
+                    );
                 }
                 crate::schema_generator::RelationType::HasOne => {
                     // Query single related record
@@ -536,7 +566,9 @@ impl CRUDHandler {
                         .unwrap_or_else(|_| Vec::new());
 
                     if let Some(related_record) = related.into_iter().next() {
-                        record_obj.insert(relation.field_name.clone(), related_record);
+                        let normalized =
+                            self.normalize_record_casing(&relation.target_table, related_record);
+                        record_obj.insert(relation.field_name.clone(), normalized);
                     } else {
                         record_obj.insert(relation.field_name.clone(), Value::Null);
                     }
@@ -560,7 +592,9 @@ impl CRUDHandler {
                             .unwrap_or_else(|_| Vec::new());
 
                         if let Some(parent_record) = parent.into_iter().next() {
-                            record_obj.insert(relation.field_name.clone(), parent_record);
+                            let normalized =
+                                self.normalize_record_casing(&relation.target_table, parent_record);
+                            record_obj.insert(relation.field_name.clone(), normalized);
                         } else {
                             record_obj.insert(relation.field_name.clone(), Value::Null);
                         }
@@ -658,9 +692,10 @@ impl CRUDHandler {
                             data_map.insert(col.name.clone(), Value::String(identity.name.clone()));
                         }
                     } else if matches!(col.name.as_str(), "updatedAt" | "updated_at")
-                        && !data_map.contains_key(&col.name) {
-                            data_map.insert(col.name.clone(), Value::String(now.clone()));
-                        }
+                        && !data_map.contains_key(&col.name)
+                    {
+                        data_map.insert(col.name.clone(), Value::String(now.clone()));
+                    }
                 }
             }
         }
@@ -733,13 +768,13 @@ impl CRUDHandler {
                                         } else if matches!(
                                             col.name.as_str(),
                                             "createdAt" | "updatedAt" | "created_at" | "updated_at"
-                                        )
-                                            && !item_map.contains_key(&col.name) {
-                                                item_map.insert(
-                                                    col.name.clone(),
-                                                    Value::String(now.clone()),
-                                                );
-                                            }
+                                        ) && !item_map.contains_key(&col.name)
+                                        {
+                                            item_map.insert(
+                                                col.name.clone(),
+                                                Value::String(now.clone()),
+                                            );
+                                        }
                                     }
                                 }
                             }
@@ -915,5 +950,38 @@ impl CRUDHandler {
         );
 
         Ok(Value::Object(response.into_iter().collect()))
+    }
+
+    /// Normalize record keys to match schema casing
+    fn normalize_record_casing(&self, table: &str, mut record: Value) -> Value {
+        let schema = match self.api_generator.get_table_schema(table) {
+            Some(s) => s,
+            None => return record,
+        };
+
+        if let Value::Object(ref mut map) = record {
+            // Collect all keys that need renaming
+            let mut replacements = Vec::new();
+
+            for (key, _) in map.iter() {
+                // Find matching column in schema
+                if let Some(col) = schema
+                    .columns
+                    .iter()
+                    .find(|c| c.name.eq_ignore_ascii_case(key))
+                {
+                    if col.name != *key {
+                        replacements.push((key.clone(), col.name.clone()));
+                    }
+                }
+            }
+
+            for (old_key, new_key) in replacements {
+                if let Some(val) = map.remove(&old_key) {
+                    map.insert(new_key, val);
+                }
+            }
+        }
+        record
     }
 }
