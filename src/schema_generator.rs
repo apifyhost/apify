@@ -640,7 +640,7 @@ impl SchemaGenerator {
     fn to_table_name(schema_name: &str) -> String {
         // Convert PascalCase to snake_case (e.g., "UserProfile" -> "user_profiles")
         let mut result = String::new();
-        let mut chars = schema_name.chars().peekable();
+        let chars = schema_name.chars().peekable();
 
         for c in chars {
             if c.is_uppercase() && !result.is_empty() {
