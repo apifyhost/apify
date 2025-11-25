@@ -232,22 +232,28 @@ impl SchemaGenerator {
                                 "[extract_relations_from_paths] Checking responses"
                             );
                             for (status, response) in responses.iter() {
+                                println!("DEBUG: [extract_relations_from_paths] Processing response {} for {} {}", status, method, path_str);
                                 tracing::info!(
                                     status = %status,
                                     table = %table_name,
                                     "[extract_relations_from_paths] Processing response"
                                 );
                                 Self::extract_relations_from_schema(schemas, &table_name, response);
+                                println!("DEBUG: [extract_relations_from_paths] Finished response {} for {} {}", status, method, path_str);
                                 tracing::info!(
                                     status = %status,
                                     "[extract_relations_from_paths] Finished response"
                                 );
                             }
+                            println!("DEBUG: [extract_relations_from_paths] Finished all responses for {} {}", method, path_str);
                             tracing::info!(
                                 table = %table_name,
                                 "[extract_relations_from_paths] Finished all responses"
                             );
+                        } else {
+                            println!("DEBUG: [extract_relations_from_paths] No responses for {} {}", method, path_str);
                         }
+                        println!("DEBUG: [extract_relations_from_paths] Finished operation {} {}", method, path_str);
                         tracing::info!(
                             operation_num = operations_found,
                             "[extract_relations_from_paths] Finished operation"
@@ -256,7 +262,7 @@ impl SchemaGenerator {
                 }
             }
         }
-
+        println!("DEBUG: [extract_relations_from_paths] DONE loop");
         tracing::info!(
             operations_found = operations_found,
             relations_found = relations_found,
