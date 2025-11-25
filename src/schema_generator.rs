@@ -520,6 +520,18 @@ impl SchemaGenerator {
                         .unwrap_or(false);
 
                     // Check for auto-field markers (x-auto-field or readOnly)
+                    let is_audit_field = matches!(
+                        prop_name.as_str(),
+                        "createdAt"
+                            | "updatedAt"
+                            | "createdBy"
+                            | "updatedBy"
+                            | "created_at"
+                            | "updated_at"
+                            | "created_by"
+                            | "updated_by"
+                    );
+
                     let auto_field = prop_schema
                         .as_object()
                         .and_then(|o| o.get("x-auto-field"))
@@ -529,7 +541,8 @@ impl SchemaGenerator {
                             .as_object()
                             .and_then(|o| o.get("readOnly"))
                             .and_then(|v| v.as_bool())
-                            .unwrap_or(false);
+                            .unwrap_or(false)
+                        || is_audit_field;
 
                     // indexes via x-index
                     let index = prop_schema

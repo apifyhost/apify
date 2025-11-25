@@ -257,24 +257,22 @@ impl CRUDHandler {
             }
 
             // Inject audit fields for create operation
-            if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>() {
-                for col in &schema.columns {
-                    if col.auto_field {
-                        match col.name.as_str() {
-                            "createdBy" => {
-                                data_map.insert(
-                                    "createdBy".to_string(),
-                                    Value::String(identity.name.clone()),
-                                );
+            let now = Utc::now().to_rfc3339();
+            for col in &schema.columns {
+                if col.auto_field {
+                    match col.name.as_str() {
+                        "createdBy" | "updatedBy" | "created_by" | "updated_by" => {
+                            if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>() {
+                                data_map
+                                    .insert(col.name.clone(), Value::String(identity.name.clone()));
                             }
-                            "updatedBy" => {
-                                data_map.insert(
-                                    "updatedBy".to_string(),
-                                    Value::String(identity.name.clone()),
-                                );
-                            }
-                            _ => {}
                         }
+                        "createdAt" | "updatedAt" | "created_at" | "updated_at" => {
+                            if !data_map.contains_key(&col.name) {
+                                data_map.insert(col.name.clone(), Value::String(now.clone()));
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -335,7 +333,13 @@ impl CRUDHandler {
                                     let now = Utc::now().to_rfc3339();
                                     for col in &target_schema.columns {
                                         if col.auto_field {
-                                            if col.name == "createdBy" || col.name == "updatedBy" {
+                                            if matches!(
+                                                col.name.as_str(),
+                                                "createdBy"
+                                                    | "updatedBy"
+                                                    | "created_by"
+                                                    | "updated_by"
+                                            ) {
                                                 if let Some(identity) =
                                                     ctx.extensions.get::<ConsumerIdentity>()
                                                 {
@@ -344,9 +348,13 @@ impl CRUDHandler {
                                                         Value::String(identity.name.clone()),
                                                     );
                                                 }
-                                            } else if col.name == "createdAt"
-                                                || col.name == "updatedAt"
-                                            {
+                                            } else if matches!(
+                                                col.name.as_str(),
+                                                "createdAt"
+                                                    | "updatedAt"
+                                                    | "created_at"
+                                                    | "updated_at"
+                                            ) {
                                                 // Only inject if not already present
                                                 if !item_map.contains_key(&col.name) {
                                                     item_map.insert(
@@ -397,7 +405,10 @@ impl CRUDHandler {
                                 let now = Utc::now().to_rfc3339();
                                 for col in &target_schema.columns {
                                     if col.auto_field {
-                                        if col.name == "createdBy" || col.name == "updatedBy" {
+                                        if matches!(
+                                            col.name.as_str(),
+                                            "createdBy" | "updatedBy" | "created_by" | "updated_by"
+                                        ) {
                                             if let Some(identity) =
                                                 ctx.extensions.get::<ConsumerIdentity>()
                                             {
@@ -406,8 +417,10 @@ impl CRUDHandler {
                                                     Value::String(identity.name.clone()),
                                                 );
                                             }
-                                        } else if col.name == "createdAt" || col.name == "updatedAt"
-                                        {
+                                        } else if matches!(
+                                            col.name.as_str(),
+                                            "createdAt" | "updatedAt" | "created_at" | "updated_at"
+                                        ) {
                                             // Only inject if not already present
                                             if !item_map.contains_key(&col.name) {
                                                 item_map.insert(
@@ -636,15 +649,19 @@ impl CRUDHandler {
         }
 
         // Inject audit fields for update operation
-        if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>()
-            && let Some(schema) = &table_schema
-        {
+        if let Some(schema) = &table_schema {
+            let now = Utc::now().to_rfc3339();
             for col in &schema.columns {
-                if col.auto_field && col.name == "updatedBy" {
-                    data_map.insert(
-                        "updatedBy".to_string(),
-                        Value::String(identity.name.clone()),
-                    );
+                if col.auto_field {
+                    if matches!(col.name.as_str(), "updatedBy" | "updated_by") {
+                        if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>() {
+                            data_map.insert(col.name.clone(), Value::String(identity.name.clone()));
+                        }
+                    } else if matches!(col.name.as_str(), "updatedAt" | "updated_at") {
+                        if !data_map.contains_key(&col.name) {
+                            data_map.insert(col.name.clone(), Value::String(now.clone()));
+                        }
+                    }
                 }
             }
         }
@@ -696,18 +713,35 @@ impl CRUDHandler {
                             item_map.insert(relation.foreign_key.clone(), record_id.clone());
 
                             // Inject audit fields
-                            if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>()
-                                && let Some(target_schema) =
-                                    self.api_generator.get_table_schema(&relation.target_table)
+                            if let Some(target_schema) =
+                                self.api_generator.get_table_schema(&relation.target_table)
                             {
+                                let now = Utc::now().to_rfc3339();
                                 for col in &target_schema.columns {
-                                    if col.auto_field
-                                        && (col.name == "createdBy" || col.name == "updatedBy")
-                                    {
-                                        item_map.insert(
-                                            col.name.clone(),
-                                            Value::String(identity.name.clone()),
-                                        );
+                                    if col.auto_field {
+                                        if matches!(
+                                            col.name.as_str(),
+                                            "createdBy" | "updatedBy" | "created_by" | "updated_by"
+                                        ) {
+                                            if let Some(identity) =
+                                                ctx.extensions.get::<ConsumerIdentity>()
+                                            {
+                                                item_map.insert(
+                                                    col.name.clone(),
+                                                    Value::String(identity.name.clone()),
+                                                );
+                                            }
+                                        } else if matches!(
+                                            col.name.as_str(),
+                                            "createdAt" | "updatedAt" | "created_at" | "updated_at"
+                                        ) {
+                                            if !item_map.contains_key(&col.name) {
+                                                item_map.insert(
+                                                    col.name.clone(),
+                                                    Value::String(now.clone()),
+                                                );
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -748,25 +782,35 @@ impl CRUDHandler {
                         item_map.insert(relation.foreign_key.clone(), record_id.clone());
 
                         // Inject audit fields
-                        if let Some(identity) = ctx.extensions.get::<ConsumerIdentity>()
-                            && let Some(target_schema) =
-                                self.api_generator.get_table_schema(&relation.target_table)
+                        if let Some(target_schema) =
+                            self.api_generator.get_table_schema(&relation.target_table)
                         {
+                            let now = Utc::now().to_rfc3339();
                             for col in &target_schema.columns {
-                                if col.auto_field
-                                    && (col.name == "createdBy" || col.name == "updatedBy")
-                                {
-                                    item_map.insert(
-                                        col.name.clone(),
-                                        Value::String(identity.name.clone()),
-                                    );
-                                } else if col.name == "createdAt" || col.name == "updatedAt" {
-                                    // Only inject if not already present
-                                    if !item_map.contains_key(&col.name) {
-                                        item_map.insert(
-                                            col.name.clone(),
-                                            Value::String(Utc::now().to_rfc3339()),
-                                        );
+                                if col.auto_field {
+                                    if matches!(
+                                        col.name.as_str(),
+                                        "createdBy" | "updatedBy" | "created_by" | "updated_by"
+                                    ) {
+                                        if let Some(identity) =
+                                            ctx.extensions.get::<ConsumerIdentity>()
+                                        {
+                                            item_map.insert(
+                                                col.name.clone(),
+                                                Value::String(identity.name.clone()),
+                                            );
+                                        }
+                                    } else if matches!(
+                                        col.name.as_str(),
+                                        "createdAt" | "updatedAt" | "created_at" | "updated_at"
+                                    ) {
+                                        // Only inject if not already present
+                                        if !item_map.contains_key(&col.name) {
+                                            item_map.insert(
+                                                col.name.clone(),
+                                                Value::String(now.clone()),
+                                            );
+                                        }
                                     }
                                 }
                             }
