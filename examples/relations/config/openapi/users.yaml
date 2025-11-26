@@ -1,0 +1,161 @@
+openapi:
+  spec:
+    openapi: 3.0.0
+    info:
+      title: User Management API with Relations
+      version: 1.0.0
+      description: Demonstrates hasOne and belongsTo relations
+
+    components:
+      schemas:
+        User:
+          type: object
+          required:
+            - username
+            - email
+          properties:
+            id:
+              type: integer
+              readOnly: true
+            username:
+              type: string
+            email:
+              type: string
+              format: email
+            profile:
+              type: object
+              description: User profile (hasOne)
+              x-relation:
+                type: hasOne
+                target: UserProfile
+                foreignKey: user_id
+              allOf:
+                - $ref: '#/components/schemas/UserProfile'
+            createdAt:
+              type: string
+              format: date-time
+              readOnly: true
+            updatedAt:
+              type: string
+              format: date-time
+              readOnly: true
+
+        UserProfile:
+          type: object
+          properties:
+            id:
+              type: integer
+              readOnly: true
+            user_id:
+              type: integer
+              description: Foreign key to users table
+            full_name:
+              type: string
+            bio:
+              type: string
+            avatar_url:
+              type: string
+            user:
+              type: object
+              description: Parent user (belongsTo)
+              x-relation:
+                type: belongsTo
+                target: User
+                foreignKey: user_id
+              allOf:
+                - $ref: '#/components/schemas/User'
+            createdAt:
+              type: string
+              format: date-time
+              readOnly: true
+            updatedAt:
+              type: string
+              format: date-time
+              readOnly: true
+
+    paths:
+      /users:
+        get:
+          summary: List all users
+          responses:
+            '200':
+              description: List of users
+              content:
+                application/json:
+                  schema:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+
+        post:
+          summary: Create a new user with profile
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/User'
+                examples:
+                  userWithProfile:
+                    summary: User with profile
+                    value:
+                      username: "alice"
+                      email: "alice@example.com"
+                      profile:
+                        full_name: "Alice Johnson"
+                        bio: "Software engineer"
+                        avatar_url: "https://example.com/avatar.jpg"
+          responses:
+            '200':
+              description: User created
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/User'
+
+      /users/{id}:
+        get:
+          summary: Get user by ID
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          responses:
+            '200':
+              description: User details
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/User'
+
+      /userprofiles:
+        get:
+          summary: List all user profiles
+          responses:
+            '200':
+              description: List of profiles
+              content:
+                application/json:
+                  schema:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserProfile'
+
+      /userprofiles/{id}:
+        get:
+          summary: Get profile by ID
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          responses:
+            '200':
+              description: Profile details
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/UserProfile'

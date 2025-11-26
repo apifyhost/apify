@@ -123,13 +123,54 @@ impl PostgresBackend {
                 "No data provided for insert".to_string(),
             ));
         }
-        let cols: Vec<String> = data.keys().cloned().collect();
+        // Ensure keys and values are aligned by collecting them together
+        let mut keys = Vec::new();
+        let mut values = Vec::new();
+        for (k, v) in data {
+            keys.push(k);
+            values.push(v);
+        }
+
         let mut qb = QueryBuilder::<Postgres>::new("INSERT INTO ");
         qb.push(table).push(" (");
-        qb.push(cols.join(", ")).push(") VALUES (");
-        let mut sep = qb.separated(", ");
-        for v in data.values() {
-            push_bind_postgres(&mut sep, v);
+        qb.push(keys.join(", ")).push(") VALUES (");
+
+        let mut first = true;
+        for (i, v) in values.iter().enumerate() {
+            if !first {
+                qb.push(", ");
+            }
+            first = false;
+
+            match v {
+                Value::Null => {
+                    qb.push("NULL");
+                }
+                Value::Bool(b) => {
+                    qb.push_bind(b);
+                }
+                Value::Number(n) => {
+                    if let Some(f) = n.as_f64() {
+                        qb.push_bind(f);
+                    } else {
+                        qb.push_bind(n.to_string());
+                    }
+                }
+                Value::String(s) => {
+                    qb.push_bind(s);
+                    // Explicitly cast audit fields to TIMESTAMPTZ to avoid type mismatch errors
+                    // when Postgres expects a timestamp but receives a text parameter.
+                    let key = &keys[i];
+                    if key.eq_ignore_ascii_case("createdAt")
+                        || key.eq_ignore_ascii_case("updatedAt")
+                    {
+                        qb.push("::TIMESTAMPTZ");
+                    }
+                }
+                Value::Array(_) | Value::Object(_) => {
+                    qb.push_bind(serde_json::to_string(v).unwrap_or_default());
+                }
+            }
         }
         qb.push(") RETURNING *");
         let row = qb
@@ -138,7 +179,16 @@ impl PostgresBackend {
             .await
             .map_err(DatabaseError::QueryError)?;
         let inserted = row_to_json_postgres(&row);
-        Ok(json!({"message": "Record inserted", "affected_rows": 1, "record": inserted}))
+
+        // Extract the id field from the inserted record
+        let id = inserted.get("id").cloned();
+
+        Ok(json!({
+            "message": "Record inserted",
+            "affected_rows": 1,
+            "record": inserted,
+            "id": id
+        }))
     }
 
     async fn do_update(
@@ -184,6 +234,9 @@ impl PostgresBackend {
                 }
                 Value::String(s) => {
                     qb.push_bind(s);
+                    if k.eq_ignore_ascii_case("createdAt") || k.eq_ignore_ascii_case("updatedAt") {
+                        qb.push("::TIMESTAMPTZ");
+                    }
                 }
                 Value::Array(_) | Value::Object(_) => {
                     qb.push_bind(serde_json::to_string(&v).unwrap_or_default());
@@ -216,6 +269,9 @@ impl PostgresBackend {
                 }
                 Value::String(s) => {
                     qb.push_bind(s);
+                    if k.eq_ignore_ascii_case("createdAt") || k.eq_ignore_ascii_case("updatedAt") {
+                        qb.push("::TIMESTAMPTZ");
+                    }
                 }
                 Value::Array(_) | Value::Object(_) => {
                     qb.push_bind(serde_json::to_string(&v).unwrap_or_default());
@@ -348,6 +404,14 @@ fn row_to_json_postgres(row: &PgRow) -> Value {
             obj.insert(name, Value::String(v.to_string()));
             continue;
         }
+        if let Ok(v) = row.try_get::<chrono::DateTime<chrono::Utc>, _>(i) {
+            obj.insert(name, Value::String(v.to_rfc3339()));
+            continue;
+        }
+        if let Ok(v) = row.try_get::<chrono::DateTime<chrono::Local>, _>(i) {
+            obj.insert(name, Value::String(v.to_rfc3339()));
+            continue;
+        }
         if let Ok(v) = row.try_get::<chrono::NaiveDate, _>(i) {
             obj.insert(name, Value::String(v.to_string()));
             continue;
@@ -436,6 +500,9 @@ fn push_where_postgres(qb: &mut QueryBuilder<Postgres>, conds: HashMap<String, V
             }
             Value::String(s) => {
                 qb.push_bind(s);
+                if k.eq_ignore_ascii_case("createdAt") || k.eq_ignore_ascii_case("updatedAt") {
+                    qb.push("::TIMESTAMPTZ");
+                }
             }
             Value::Array(_) | Value::Object(_) => {
                 qb.push_bind(serde_json::to_string(&v).unwrap_or_default());
@@ -444,6 +511,7 @@ fn push_where_postgres(qb: &mut QueryBuilder<Postgres>, conds: HashMap<String, V
     }
 }
 
+#[allow(dead_code)]
 fn push_bind_postgres(sep: &mut sqlx::query_builder::Separated<'_, '_, Postgres, &str>, v: &Value) {
     match v {
         Value::Null => {

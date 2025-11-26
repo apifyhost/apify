@@ -129,23 +129,51 @@ impl AppState {
 
                 // Extract table schemas from all OpenAPI specs
                 let mut all_schemas = Vec::new();
-                for (openapi_config, _, _) in &openapi_configs {
-                    let schemas = SchemaGenerator::extract_schemas_from_openapi(
+                tracing::info!(
+                    config_count = openapi_configs.len(),
+                    "Extracting schemas from OpenAPI configs"
+                );
+                for (i, (openapi_config, _, _)) in openapi_configs.iter().enumerate() {
+                    tracing::info!(index = i, "Extracting from OpenAPI config");
+
+                    match SchemaGenerator::extract_schemas_from_openapi(
                         &openapi_config.openapi.spec,
-                    )?;
-                    all_schemas.extend(schemas);
+                    ) {
+                        Ok(schemas) => {
+                            tracing::info!(
+                                index = i,
+                                schema_count = schemas.len(),
+                                "Found schemas"
+                            );
+                            for schema in &schemas {
+                                tracing::info!(
+                                    table = %schema.table_name,
+                                    columns = schema.columns.len(),
+                                    relations = schema.relations.len(),
+                                    "Schema details"
+                                );
+                            }
+                            all_schemas.extend(schemas);
+                        }
+                        Err(e) => {
+                            tracing::error!(index = i, error = %e, "ERROR extracting schemas");
+                            return Err(e);
+                        }
+                    }
                 }
 
                 // Always initialize schema if schemas are defined (removed opt-in gating)
                 if !all_schemas.is_empty() {
-                    eprintln!(
-                        "Initializing database '{}' with {} table schemas",
-                        datasource_name,
-                        all_schemas.len()
+                    tracing::info!(
+                        datasource = %datasource_name,
+                        schema_count = all_schemas.len(),
+                        "Initializing database with table schemas"
                     );
-                    db_manager.initialize_schema(all_schemas).await?;
+                    tracing::info!("Calling db_manager.initialize_schema...");
+                    db_manager.initialize_schema(all_schemas.clone()).await?;
+                    tracing::info!("Database initialization complete");
                 } else {
-                    eprintln!("Warning: No table schemas found in OpenAPI configurations");
+                    tracing::warn!("No table schemas found in OpenAPI configurations");
                 }
 
                 // Merge all OpenAPI specs into one - deep merge for paths
@@ -172,7 +200,7 @@ impl AppState {
                 merged_spec.insert("paths".to_string(), serde_json::Value::Object(merged_paths));
 
                 let merged_value = serde_json::Value::Object(merged_spec);
-                let api_generator = APIGenerator::new(merged_value.clone())?;
+                let api_generator = APIGenerator::new(merged_value.clone(), all_schemas)?;
                 Some(Arc::new(CRUDHandler::new(db_manager, api_generator)))
             } else {
                 None

@@ -61,6 +61,15 @@ Each phase can have custom modules with flexible configuration at multiple level
 - Automatic DDL generation and execution
 - Support for constraints, indexes, foreign keys
 - Database schema versioning ready
+- **Relations & Nested Objects** ✅ - Full CRUD support for related records
+  - `hasMany` (one-to-many) - Parent with multiple children
+  - `hasOne` (one-to-one) - Parent with single child
+  - `belongsTo` (many-to-one) - Child references parent
+  - Automatic foreign key injection
+  - Nested data creation and retrieval
+  - Auto-loading of relations in GET requests
+  - Update nested relations (replace children)
+  - Cascade delete for hasMany/hasOne
 
 #### 🎯 **Flexible Configuration**
 - YAML-based configuration
@@ -1160,6 +1169,12 @@ The E2E test suite validates:
 - ✅ CRUD operations (Create, Read, Update, Delete)
 - ✅ Authentication and authorization
 - ✅ API key validation
+- ✅ OAuth 2.0 / OIDC authentication
+- ✅ Relations (hasMany, hasOne, belongsTo)
+- ✅ Nested data creation and auto-loading
+- ✅ CASCADE DELETE operations
+- ✅ Audit trail propagation
+- ✅ Observability (metrics and tracing)
 - ✅ Error handling
 - ✅ Large payload handling
 - ✅ Content-Type validation

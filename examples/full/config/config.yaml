@@ -7,6 +7,10 @@ listeners:
         datasource: postgres1
       - path: ./openapi/items_oauth.yaml
         datasource: postgres1
+      - path: ./openapi/orders.yaml
+        datasource: postgres1
+      - path: ./openapi/users.yaml
+        datasource: postgres1
 
 consumers:
   - name: default

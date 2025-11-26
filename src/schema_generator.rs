@@ -9,6 +9,27 @@ pub struct TableSchema {
     pub table_name: String,
     pub columns: Vec<ColumnDefinition>,
     pub indexes: Vec<IndexDefinition>,
+    #[serde(default)]
+    pub relations: Vec<RelationDefinition>,
+}
+
+/// Relation definition for nested object support
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RelationDefinition {
+    pub field_name: String,          // Property name in the schema (e.g., "items")
+    pub relation_type: RelationType, // hasMany, belongsTo, hasOne, belongsToMany
+    pub target_table: String,        // Related table name
+    pub foreign_key: String,         // Foreign key column name
+    pub local_key: Option<String>,   // Local key (default: "id")
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum RelationType {
+    HasMany,
+    BelongsTo,
+    HasOne,
+    BelongsToMany, // For future many-to-many support
 }
 
 /// Column definition
@@ -40,15 +61,55 @@ impl SchemaGenerator {
     pub fn extract_schemas_from_openapi(
         spec: &Value,
     ) -> Result<Vec<TableSchema>, Box<dyn std::error::Error + Send + Sync>> {
+        use std::io::Write;
+        eprintln!("    extract_schemas_from_openapi: START");
+        let _ = std::io::stderr().flush();
         let mut schemas = Vec::new();
 
+        tracing::debug!(
+            has_x_table_schemas = spec.get("x-table-schemas").is_some(),
+            has_paths = spec.get("paths").is_some(),
+            "Starting schema extraction from OpenAPI spec"
+        );
+        eprintln!("    extract_schemas_from_openapi: After debug log");
+        let _ = std::io::stderr().flush();
+
         // Look for x-table-schema extensions in the OpenAPI spec
+        eprintln!("    extract_schemas_from_openapi: Checking x-table-schemas");
+        let _ = std::io::stderr().flush();
         if let Some(extensions) = spec.get("x-table-schemas").and_then(|v| v.as_array()) {
+            eprintln!(
+                "    extract_schemas_from_openapi: Found {} x-table-schemas",
+                extensions.len()
+            );
+            let _ = std::io::stderr().flush();
+            tracing::debug!(schemas_count = extensions.len(), "Found x-table-schemas");
             for schema_value in extensions {
+                eprintln!("    extract_schemas_from_openapi: Parsing schema...");
+                let _ = std::io::stderr().flush();
                 let schema: TableSchema = serde_json::from_value(schema_value.clone())?;
+                eprintln!(
+                    "    extract_schemas_from_openapi: Parsed schema: {}",
+                    schema.table_name
+                );
+                let _ = std::io::stderr().flush();
+                tracing::debug!(
+                    table = %schema.table_name,
+                    columns_count = schema.columns.len(),
+                    relations_count = schema.relations.len(),
+                    "Loaded table schema from x-table-schemas"
+                );
                 schemas.push(schema);
             }
+        } else {
+            eprintln!("    extract_schemas_from_openapi: NO x-table-schemas found");
+            let _ = std::io::stderr().flush();
         }
+        eprintln!(
+            "    extract_schemas_from_openapi: After x-table-schemas, schemas.len()={}",
+            schemas.len()
+        );
+        let _ = std::io::stderr().flush();
 
         // Also try to extract from paths (alternative approach)
         if let Some(paths) = spec.get("paths").and_then(|p| p.as_object()) {
@@ -63,15 +124,330 @@ impl SchemaGenerator {
             }
         }
 
+        // Extract relations from paths (requestBody and responses)
+        eprintln!("    extract_schemas_from_openapi: About to extract relations from paths");
+        let _ = std::io::stderr().flush();
+        if let Some(paths) = spec.get("paths").and_then(|p| p.as_object()) {
+            eprintln!(
+                "    extract_schemas_from_openapi: Calling extract_relations_from_paths with {} paths",
+                paths.len()
+            );
+            let _ = std::io::stderr().flush();
+            Self::extract_relations_from_paths(&mut schemas, paths);
+            eprintln!("    extract_schemas_from_openapi: After extract_relations_from_paths");
+            let _ = std::io::stderr().flush();
+        }
+        eprintln!("    extract_schemas_from_openapi: After relations extraction");
+        let _ = std::io::stderr().flush();
+
         // Fallback: derive from components.schemas if no explicit schemas found
+        eprintln!(
+            "    extract_schemas_from_openapi: Checking fallback, schemas.len()={}",
+            schemas.len()
+        );
+        let _ = std::io::stderr().flush();
         if schemas.is_empty()
             && let Some(derived) = Self::derive_from_components(spec)
             && !derived.is_empty()
         {
+            eprintln!("    extract_schemas_from_openapi: Using fallback derived schemas");
             return Ok(derived);
         }
 
+        eprintln!(
+            "    extract_schemas_from_openapi: DONE, returning {} schemas",
+            schemas.len()
+        );
+        let _ = std::io::stderr().flush();
         Ok(schemas)
+    }
+
+    /// Extract relation definitions from API paths and merge into table schemas
+    fn extract_relations_from_paths(
+        schemas: &mut [TableSchema],
+        paths: &serde_json::Map<String, Value>,
+    ) {
+        tracing::info!(
+            schema_count = schemas.len(),
+            paths_count = paths.len(),
+            "[extract_relations_from_paths] START"
+        );
+
+        let mut operations_found = 0;
+        let mut relations_found = 0;
+
+        for (path_str, path_item) in paths.iter() {
+            if let Some(path_obj) = path_item.as_object() {
+                for (method, operation) in path_obj.iter() {
+                    if let Some(op_obj) = operation.as_object() {
+                        // Get table name from operation
+                        let table_name = match op_obj.get("x-table-name").and_then(|v| v.as_str()) {
+                            Some(name) => name.to_string(),
+                            None => continue,
+                        };
+
+                        operations_found += 1;
+                        tracing::info!(
+                            operation_num = operations_found,
+                            path = %path_str,
+                            method = %method,
+                            table = %table_name,
+                            "[extract_relations_from_paths] Found operation"
+                        );
+
+                        println!(
+                            "DEBUG: [extract_relations_from_paths] Checking requestBody for {} {}",
+                            method, path_str
+                        );
+
+                        // Extract relations from requestBody schema
+                        if let Some(request_body) = op_obj.get("requestBody") {
+                            println!(
+                                "DEBUG: [extract_relations_from_paths] Found requestBody for {} {}",
+                                method, path_str
+                            );
+                            let before_count: usize =
+                                schemas.iter().map(|s| s.relations.len()).sum();
+                            tracing::info!(
+                                table = %table_name,
+                                "[extract_relations_from_paths] Checking requestBody"
+                            );
+                            Self::extract_relations_from_schema(schemas, &table_name, request_body);
+                            println!(
+                                "DEBUG: [extract_relations_from_paths] Returned from extract_relations_from_schema for requestBody"
+                            );
+                            let after_count: usize =
+                                schemas.iter().map(|s| s.relations.len()).sum();
+                            let new_relations = after_count - before_count;
+                            if new_relations > 0 {
+                                tracing::info!(
+                                    new_relations = new_relations,
+                                    "[extract_relations_from_paths] Found new relations in requestBody"
+                                );
+                                relations_found += new_relations;
+                            }
+                        } else {
+                            println!(
+                                "DEBUG: [extract_relations_from_paths] No requestBody for {} {}",
+                                method, path_str
+                            );
+                        }
+
+                        // Extract relations from response schema
+                        if let Some(responses) = op_obj.get("responses").and_then(|r| r.as_object())
+                        {
+                            println!(
+                                "DEBUG: [extract_relations_from_paths] Checking responses for {} {}",
+                                method, path_str
+                            );
+                            tracing::info!(
+                                response_count = responses.len(),
+                                table = %table_name,
+                                "[extract_relations_from_paths] Checking responses"
+                            );
+                            for (status, response) in responses.iter() {
+                                println!(
+                                    "DEBUG: [extract_relations_from_paths] Processing response {} for {} {}",
+                                    status, method, path_str
+                                );
+                                tracing::info!(
+                                    status = %status,
+                                    table = %table_name,
+                                    "[extract_relations_from_paths] Processing response"
+                                );
+                                Self::extract_relations_from_schema(schemas, &table_name, response);
+                                println!(
+                                    "DEBUG: [extract_relations_from_paths] Finished response {} for {} {}",
+                                    status, method, path_str
+                                );
+                                tracing::info!(
+                                    status = %status,
+                                    "[extract_relations_from_paths] Finished response"
+                                );
+                            }
+                            println!(
+                                "DEBUG: [extract_relations_from_paths] Finished all responses for {} {}",
+                                method, path_str
+                            );
+                            tracing::info!(
+                                table = %table_name,
+                                "[extract_relations_from_paths] Finished all responses"
+                            );
+                        } else {
+                            println!(
+                                "DEBUG: [extract_relations_from_paths] No responses for {} {}",
+                                method, path_str
+                            );
+                        }
+                        println!(
+                            "DEBUG: [extract_relations_from_paths] Finished operation {} {}",
+                            method, path_str
+                        );
+                        tracing::info!(
+                            operation_num = operations_found,
+                            "[extract_relations_from_paths] Finished operation"
+                        );
+                    }
+                }
+            }
+        }
+        println!("DEBUG: [extract_relations_from_paths] DONE loop");
+        tracing::info!(
+            operations_found = operations_found,
+            relations_found = relations_found,
+            "[extract_relations_from_paths] DONE"
+        );
+        for schema in schemas.iter() {
+            if !schema.relations.is_empty() {
+                tracing::info!(
+                    table = %schema.table_name,
+                    relation_count = schema.relations.len(),
+                    relations = ?schema.relations.iter().map(|r| &r.field_name).collect::<Vec<_>>(),
+                    "[extract_relations_from_paths] Table has relations"
+                );
+            }
+        }
+    }
+
+    /// Extract relation definitions from a schema object
+    fn extract_relations_from_schema(
+        schemas: &mut [TableSchema],
+        table_name: &str,
+        schema_container: &Value,
+    ) {
+        println!(
+            "DEBUG: [extract_relations_from_schema] ENTERED for table {}",
+            table_name
+        );
+        tracing::info!(table = %table_name, "[extract_relations_from_schema] ENTERED");
+        // Navigate to the actual schema (might be in content.application/json.schema)
+        let schema = if let Some(content) = schema_container.get("content") {
+            content
+                .get("application/json")
+                .and_then(|v| v.get("schema"))
+                .unwrap_or(schema_container)
+        } else if let Some(schema) = schema_container.get("schema") {
+            schema
+        } else {
+            schema_container
+        };
+
+        let has_properties = schema.get("properties").is_some();
+        tracing::info!(
+            table = %table_name,
+            has_properties = has_properties,
+            "[extract_relations_from_schema] Scanning table"
+        );
+
+        // Extract properties with x-relation
+        if let Some(props) = schema.get("properties").and_then(|p| p.as_object()) {
+            tracing::info!(
+                property_count = props.len(),
+                table = %table_name,
+                "[extract_relations_from_schema] Found properties"
+            );
+            let mut new_relations = Vec::new();
+
+            for (prop_name, prop_schema) in props.iter() {
+                if let Some(relation_obj) =
+                    prop_schema.get("x-relation").and_then(|r| r.as_object())
+                {
+                    tracing::info!(
+                        property = %prop_name,
+                        table = %table_name,
+                        relation_def = ?relation_obj,
+                        "[extract_relations_from_schema] Found x-relation"
+                    );
+
+                    let relation_type =
+                        relation_obj
+                            .get("type")
+                            .and_then(|t| t.as_str())
+                            .and_then(|t| match t {
+                                "hasMany" => Some(RelationType::HasMany),
+                                "belongsTo" => Some(RelationType::BelongsTo),
+                                "hasOne" => Some(RelationType::HasOne),
+                                "belongsToMany" => Some(RelationType::BelongsToMany),
+                                _ => None,
+                            });
+
+                    let target_table = relation_obj
+                        .get("target")
+                        .and_then(|t| t.as_str())
+                        .map(Self::to_table_name);
+
+                    let foreign_key = relation_obj
+                        .get("foreignKey")
+                        .and_then(|fk| fk.as_str())
+                        .map(|s| s.to_string());
+
+                    let local_key = relation_obj
+                        .get("localKey")
+                        .and_then(|lk| lk.as_str())
+                        .map(|s| s.to_string());
+
+                    if let (Some(rel_type), Some(target), Some(fk)) =
+                        (relation_type, target_table, foreign_key)
+                    {
+                        tracing::info!(
+                            table = %table_name,
+                            field = %prop_name,
+                            relation_type = ?rel_type,
+                            target = %target,
+                            foreign_key = %fk,
+                            "[extract_relations_from_schema] Adding relation"
+                        );
+
+                        new_relations.push(RelationDefinition {
+                            field_name: prop_name.clone(),
+                            relation_type: rel_type,
+                            target_table: target,
+                            foreign_key: fk,
+                            local_key,
+                        });
+                    }
+                }
+            }
+
+            // Merge relations into the corresponding table schema
+            if !new_relations.is_empty()
+                && let Some(table_schema) = schemas.iter_mut().find(|s| s.table_name == table_name)
+            {
+                tracing::info!(
+                    table = %table_name,
+                    new_relations_count = new_relations.len(),
+                    "[extract_relations_from_schema] Merging relations"
+                );
+
+                // Add new relations, avoiding duplicates
+                for new_rel in new_relations {
+                    if !table_schema
+                        .relations
+                        .iter()
+                        .any(|r| r.field_name == new_rel.field_name)
+                    {
+                        table_schema.relations.push(new_rel);
+                    }
+                }
+                tracing::info!(
+                    table = %table_name,
+                    total_relations = table_schema.relations.len(),
+                    "[extract_relations_from_schema] Merge complete"
+                );
+            } else if !new_relations.is_empty() {
+                tracing::warn!(
+                    table = %table_name,
+                    relations_count = new_relations.len(),
+                    available_tables = ?schemas.iter().map(|s| &s.table_name).collect::<Vec<_>>(),
+                    "[extract_relations_from_schema] Table not found, cannot add relations"
+                );
+            }
+        } else {
+            tracing::info!(
+                table = %table_name,
+                "[extract_relations_from_schema] No properties found"
+            );
+        }
     }
 
     /// Derive table schemas from OpenAPI components.schemas (best-effort)
@@ -144,6 +520,18 @@ impl SchemaGenerator {
                         .unwrap_or(false);
 
                     // Check for auto-field markers (x-auto-field or readOnly)
+                    let is_audit_field = matches!(
+                        prop_name.as_str(),
+                        "createdAt"
+                            | "updatedAt"
+                            | "createdBy"
+                            | "updatedBy"
+                            | "created_at"
+                            | "updated_at"
+                            | "created_by"
+                            | "updated_by"
+                    );
+
                     let auto_field = prop_schema
                         .as_object()
                         .and_then(|o| o.get("x-auto-field"))
@@ -153,7 +541,8 @@ impl SchemaGenerator {
                             .as_object()
                             .and_then(|o| o.get("readOnly"))
                             .and_then(|v| v.as_bool())
-                            .unwrap_or(false);
+                            .unwrap_or(false)
+                        || is_audit_field;
 
                     // indexes via x-index
                     let index = prop_schema
@@ -200,11 +589,61 @@ impl SchemaGenerator {
                 );
             }
 
+            // Extract relations from properties with x-relation
+            let mut relations = Vec::new();
+            if let Some(props) = obj.get("properties").and_then(|p| p.as_object()) {
+                for (prop_name, prop_schema) in props.iter() {
+                    if let Some(relation_obj) =
+                        prop_schema.get("x-relation").and_then(|r| r.as_object())
+                    {
+                        // Extract relation configuration
+                        let relation_type = relation_obj
+                            .get("type")
+                            .and_then(|t| t.as_str())
+                            .and_then(|t| match t {
+                                "hasMany" => Some(RelationType::HasMany),
+                                "belongsTo" => Some(RelationType::BelongsTo),
+                                "hasOne" => Some(RelationType::HasOne),
+                                "belongsToMany" => Some(RelationType::BelongsToMany),
+                                _ => None,
+                            });
+
+                        let target_table = relation_obj
+                            .get("target")
+                            .and_then(|t| t.as_str())
+                            .map(Self::to_table_name);
+
+                        let foreign_key = relation_obj
+                            .get("foreignKey")
+                            .and_then(|fk| fk.as_str())
+                            .map(|s| s.to_string());
+
+                        let local_key = relation_obj
+                            .get("localKey")
+                            .and_then(|lk| lk.as_str())
+                            .map(|s| s.to_string());
+
+                        if let (Some(rel_type), Some(target), Some(fk)) =
+                            (relation_type, target_table, foreign_key)
+                        {
+                            relations.push(RelationDefinition {
+                                field_name: prop_name.clone(),
+                                relation_type: rel_type,
+                                target_table: target,
+                                foreign_key: fk,
+                                local_key,
+                            });
+                        }
+                    }
+                }
+            }
+
             let table_name = Self::to_table_name(schema_name);
             tables.push(TableSchema {
                 table_name,
                 columns,
                 indexes,
+                relations,
             });
         }
 
@@ -212,11 +651,23 @@ impl SchemaGenerator {
     }
 
     fn to_table_name(schema_name: &str) -> String {
-        let mut s = schema_name.to_lowercase();
-        if !s.ends_with('s') {
-            s.push('s');
+        // Convert PascalCase to snake_case (e.g., "UserProfile" -> "user_profiles")
+        let mut result = String::new();
+        let chars = schema_name.chars().peekable();
+
+        for c in chars {
+            if c.is_uppercase() && !result.is_empty() {
+                result.push('_');
+            }
+            result.push(c.to_ascii_lowercase());
         }
-        s
+
+        // Pluralize if not already plural
+        if !result.ends_with('s') {
+            result.push('s');
+        }
+
+        result
     }
 
     fn infer_sql_type_and_default(
@@ -230,12 +681,12 @@ impl SchemaGenerator {
             }
             "createdAt" | "created_at" => {
                 return (
-                    "DATETIME".to_string(),
+                    "TIMESTAMP".to_string(),
                     Some("CURRENT_TIMESTAMP".to_string()),
                 );
             }
             "updatedAt" | "updated_at" => {
-                return ("DATETIME".to_string(), None);
+                return ("TIMESTAMP".to_string(), None);
             }
             _ => {}
         }
@@ -250,7 +701,7 @@ impl SchemaGenerator {
             .unwrap_or("");
 
         match (t, format) {
-            ("string", "date-time") => ("DATETIME".to_string(), None),
+            ("string", "date-time") => ("TIMESTAMP".to_string(), None),
             ("string", "date") => ("DATE".to_string(), None),
             ("string", _) => ("TEXT".to_string(), None),
             ("integer", _) => ("INTEGER".to_string(), None),
@@ -409,7 +860,7 @@ impl SchemaGenerator {
             "decimal" | "numeric" => "NUMERIC".to_string(),
             "boolean" | "bool" => "BOOLEAN".to_string(),
             "blob" | "binary" => "BYTEA".to_string(),
-            "datetime" | "timestamp" => "TIMESTAMP".to_string(),
+            "datetime" | "timestamp" => "TIMESTAMPTZ".to_string(),
             "date" => "DATE".to_string(),
             "time" => "TIME".to_string(),
             _ => "TEXT".to_string(), // Default to TEXT for unknown types
@@ -470,6 +921,7 @@ mod tests {
                 columns: vec!["email".to_string()],
                 unique: false,
             }],
+            relations: vec![],
         };
 
         let sql = SchemaGenerator::generate_create_table_sql_sqlite(&schema);
