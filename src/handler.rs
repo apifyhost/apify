@@ -55,7 +55,94 @@ async fn handle_request_inner(
         ));
     }
 
-    // Try CRUD handler first if available
+        // Serve OpenAPI JSON if CRUD is enabled
+        if method == hyper::Method::GET && ctx.path == "/openapi.json" {
+                if let Some(crud) = &state.crud_handler {
+                        let spec = crud.api_generator.get_spec();
+                        let body = match serde_json::to_string(spec) {
+                                Ok(s) => s,
+                                Err(e) => {
+                                        return Ok(create_error_response(
+                                                StatusCode::INTERNAL_SERVER_ERROR,
+                                                &format!("Failed to serialize OpenAPI spec: {}", e),
+                                        ))
+                                }
+                        };
+                        return Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .header("Content-Type", "application/json")
+                                .body(Full::new(Bytes::from(body)))
+                                .map_err(|e| format!("Failed to build response: {}", e))?);
+                } else {
+                        return Ok(create_error_response(
+                                StatusCode::NOT_FOUND,
+                                "OpenAPI not available",
+                        ));
+                }
+        }
+
+    // Serve Swagger UI assets (embedded)
+    if method == hyper::Method::GET {
+        match ctx.path.as_str() {
+            "/docs/swagger-ui.css" => {
+                return Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", "text/css")
+                    .body(Full::new(Bytes::from(include_str!("static/swagger-ui.css"))))
+                    .map_err(|e| format!("Failed to build response: {}", e))?);
+            }
+            "/docs/swagger-ui-bundle.js" => {
+                return Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", "application/javascript")
+                    .body(Full::new(Bytes::from(include_str!("static/swagger-ui-bundle.js"))))
+                    .map_err(|e| format!("Failed to build response: {}", e))?);
+            }
+            "/docs/swagger-ui-standalone-preset.js" => {
+                return Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", "application/javascript")
+                    .body(Full::new(Bytes::from(include_str!("static/swagger-ui-standalone-preset.js"))))
+                    .map_err(|e| format!("Failed to build response: {}", e))?);
+            }
+            "/docs" | "/docs/" => {
+                let html = r#"<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>API Docs</title>
+    <link rel="stylesheet" href="/docs/swagger-ui.css" />
+    <style>body { margin: 0; } #swagger-ui { min-height: 100vh; }</style>
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="/docs/swagger-ui-bundle.js"></script>
+    <script src="/docs/swagger-ui-standalone-preset.js"></script>
+    <script>
+      window.onload = () => {
+        SwaggerUIBundle({
+          url: '/openapi.json',
+          dom_id: '#swagger-ui',
+          presets: [
+            SwaggerUIBundle.presets.apis,
+            SwaggerUIStandalonePreset
+          ],
+          layout: 'StandaloneLayout'
+        });
+      };
+    </script>
+  </body>
+</html>"#;
+
+                return Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", "text/html; charset=utf-8")
+                    .body(Full::new(Bytes::from(html)))
+                    .map_err(|e| format!("Failed to build response: {}", e))?);
+            }
+            _ => {}
+        }
+    }    // Try CRUD handler first if available
     if let Some(crud_handler) = &state.crud_handler {
         // Phase: BodyParse (only for methods that expect body)
         if matches!(method.as_str(), "POST" | "PUT" | "PATCH") {
