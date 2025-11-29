@@ -23,3 +23,5 @@ observability:
   otlp_endpoint: null
   metrics_enabled: true
   metrics_port: 9090
+
+docs_port: 3001

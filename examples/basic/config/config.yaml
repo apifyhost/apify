@@ -28,6 +28,10 @@ datasource:
     ssl_mode: disable
     max_pool_size: 10
 
+# Port for OpenAPI docs (Swagger UI)
+# If set, docs will be served on this port instead of the main API port
+# docs_port: 3001
+
 # Observability configuration (optional)
 observability:
   # Log level: trace, debug, info, warn, error

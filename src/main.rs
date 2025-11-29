@@ -1,9 +1,9 @@
 //! Application entry point, responsible for parsing CLI args, loading config, and starting services
 
-use apify::{
+    use apify::{
     config::{ApiRef, Config, OpenAPIConfig},
     observability::{init_metrics, init_tracing, shutdown_tracing},
-    server::start_listener,
+    server::{start_docs_server, start_listener},
 };
 use clap::Parser;
 use std::path::Path;
@@ -187,6 +187,76 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 },
             );
             handles.push(handle);
+        }
+
+        // Start docs server if configured
+        if let Some(docs_port) = config.docs_port {
+            // We need to construct a minimal AppState for the docs server
+            // For now, we can reuse the logic from start_listener but simplified,
+            // or better yet, we need access to the AppState created inside start_listener.
+            // However, AppState is created per-thread inside start_listener.
+            // To support a separate docs server that needs access to the generated OpenAPI spec (which is in AppState -> CRUDHandler),
+            // we should probably create the AppState ONCE here in main (or at least the CRUDHandler part) and pass it down.
+            // But AppState creation is async and involves DB connection.
+
+            // Alternative: The docs server needs to know the OpenAPI spec.
+            // The spec is loaded from files in main().
+            // We can reconstruct the AppState or just the relevant parts for the docs server.
+            // Actually, the docs server only needs the OpenAPI spec JSON.
+            // We can pass the loaded openapi_configs to the docs server and let it build a minimal state or just serve the JSON.
+
+            // Let's modify start_docs_server to take openapi_configs directly or build a minimal state.
+            // But wait, start_docs_server takes Arc<AppState>.
+            // And AppState::new_with_crud is what builds the merged spec.
+
+            // To avoid refactoring everything, let's spawn the docs server thread
+            // and inside it, create a dedicated AppState just for serving docs.
+            // This means double DB connection initialization if we are not careful,
+            // but for docs we might not need DB connection if we only serve the JSON?
+            // AppState::new_with_crud DOES initialize DB.
+
+            // Optimization: Refactor AppState creation to separate Spec generation from DB init?
+            // For now, let's just create a separate AppState for the docs server.
+            // It might be slightly inefficient (extra DB pool) but it's robust.
+
+            let listener_config_clone = listener_config.clone();
+            let datasources_clone = datasources.clone();
+            let openapi_configs_clone = openapi_configs.clone();
+            let consumers_clone = all_consumers.clone();
+            let oauth_clone = config.oauth_providers.clone();
+
+            // Only start docs server once (e.g. for the first listener, or globally?)
+            // The user asked for "separate port", implying one global docs port.
+            // But config structure has listeners.
+            // If we have multiple listeners, do we have one docs port for all?
+            // The config.docs_port is global.
+            // So we should start it only once.
+            if listener_idx == 0 {
+                let handle = thread::spawn(move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+                    tracing::info!(port = docs_port, "Starting docs server");
+                    
+                    // Create a runtime for AppState creation
+                    let rt = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()?;
+
+                    let state = rt.block_on(async {
+                         apify::app_state::AppState::new_with_crud(
+                            listener_config_clone.routes,
+                            datasources_clone,
+                            openapi_configs_clone,
+                            listener_config_clone.modules,
+                            consumers_clone,
+                            oauth_clone,
+                            Some(format!("http://localhost:{}", listener_config_clone.port)),
+                        ).await
+                    })?;
+
+                    start_docs_server(docs_port, std::sync::Arc::new(state))?;
+                    Ok(())
+                });
+                handles.push(handle);
+            }
         }
     }
 
