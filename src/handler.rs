@@ -257,7 +257,7 @@ pub async fn handle_docs_request(
                     return Ok(create_error_response(
                         StatusCode::INTERNAL_SERVER_ERROR,
                         &format!("Failed to serialize OpenAPI spec: {}", e),
-                    ))
+                    ));
                 }
             };
             return Ok(Response::builder()
@@ -280,14 +280,18 @@ pub async fn handle_docs_request(
                 return Ok(Response::builder()
                     .status(StatusCode::OK)
                     .header("Content-Type", "text/css")
-                    .body(Full::new(Bytes::from(include_str!("static/swagger-ui.css"))))
+                    .body(Full::new(Bytes::from(include_str!(
+                        "static/swagger-ui.css"
+                    ))))
                     .map_err(|e| format!("Failed to build response: {}", e))?);
             }
             "/docs/swagger-ui-bundle.js" => {
                 return Ok(Response::builder()
                     .status(StatusCode::OK)
                     .header("Content-Type", "application/javascript")
-                    .body(Full::new(Bytes::from(include_str!("static/swagger-ui-bundle.js"))))
+                    .body(Full::new(Bytes::from(include_str!(
+                        "static/swagger-ui-bundle.js"
+                    ))))
                     .map_err(|e| format!("Failed to build response: {}", e))?);
             }
             "/docs/swagger-ui-standalone-preset.js" => {

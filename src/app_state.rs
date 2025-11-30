@@ -199,10 +199,7 @@ impl AppState {
 
                 // Inject servers if public_url is provided
                 if let Some(url) = public_url {
-                    merged_spec.insert(
-                        "servers".to_string(),
-                        serde_json::json!([{ "url": url }]),
-                    );
+                    merged_spec.insert("servers".to_string(), serde_json::json!([{ "url": url }]));
                 }
 
                 // Add merged paths to the spec

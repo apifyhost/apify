@@ -1,6 +1,6 @@
 //! Application entry point, responsible for parsing CLI args, loading config, and starting services
 
-    use apify::{
+use apify::{
     config::{ApiRef, Config, OpenAPIConfig},
     observability::{init_metrics, init_tracing, shutdown_tracing},
     server::{start_docs_server, start_listener},
@@ -232,29 +232,32 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             // The config.docs_port is global.
             // So we should start it only once.
             if listener_idx == 0 {
-                let handle = thread::spawn(move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-                    tracing::info!(port = docs_port, "Starting docs server");
-                    
-                    // Create a runtime for AppState creation
-                    let rt = tokio::runtime::Builder::new_current_thread()
-                        .enable_all()
-                        .build()?;
+                let handle = thread::spawn(
+                    move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+                        tracing::info!(port = docs_port, "Starting docs server");
 
-                    let state = rt.block_on(async {
-                         apify::app_state::AppState::new_with_crud(
-                            listener_config_clone.routes,
-                            datasources_clone,
-                            openapi_configs_clone,
-                            listener_config_clone.modules,
-                            consumers_clone,
-                            oauth_clone,
-                            Some(format!("http://localhost:{}", listener_config_clone.port)),
-                        ).await
-                    })?;
+                        // Create a runtime for AppState creation
+                        let rt = tokio::runtime::Builder::new_current_thread()
+                            .enable_all()
+                            .build()?;
 
-                    start_docs_server(docs_port, std::sync::Arc::new(state))?;
-                    Ok(())
-                });
+                        let state = rt.block_on(async {
+                            apify::app_state::AppState::new_with_crud(
+                                listener_config_clone.routes,
+                                datasources_clone,
+                                openapi_configs_clone,
+                                listener_config_clone.modules,
+                                consumers_clone,
+                                oauth_clone,
+                                Some(format!("http://localhost:{}", listener_config_clone.port)),
+                            )
+                            .await
+                        })?;
+
+                        start_docs_server(docs_port, std::sync::Arc::new(state))?;
+                        Ok(())
+                    },
+                );
                 handles.push(handle);
             }
         }

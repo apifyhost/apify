@@ -157,9 +157,7 @@ pub fn start_docs_server(
                         let service = service_fn(move |req| {
                             handle_docs_request(req, Arc::clone(&state_clone))
                         });
-                        if let Err(err) = http1::Builder::new()
-                            .serve_connection(io, service)
-                            .await
+                        if let Err(err) = http1::Builder::new().serve_connection(io, service).await
                         {
                             eprintln!("Docs connection error: {:?}", err);
                         }
