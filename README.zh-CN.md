@@ -793,12 +793,12 @@ curl -H "X-Api-Key: key-123" http://localhost:3000/users
 
 #### BodyParse 阶段模块
 
-**`body_validator`** - 请求体验证
+**`request_validator`** - 请求验证 (Body, Query, Headers)
 验证请求体大小和 Content-Type 头。
 
 ```rust
 // 使用示例（代码中）
-use apify::modules::body_validator::{BodyValidator, BodyValidatorConfig};
+use apify::modules::request_validator::{RequestValidator, RequestValidatorConfig};
 
 let validator = BodyValidator::new(BodyValidatorConfig {
     max_body_size: 1024 * 1024, // 1MB 限制

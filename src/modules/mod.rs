@@ -8,7 +8,7 @@ use crate::phases::{Phase, RequestContext};
 use std::error::Error;
 use std::sync::Arc;
 
-pub mod body_validator;
+pub mod request_validator;
 pub mod key_auth;
 pub mod oauth;
 pub mod postgres;
