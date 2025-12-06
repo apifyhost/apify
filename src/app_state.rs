@@ -55,6 +55,7 @@ impl AppState {
         listener_modules: Option<ModulesConfig>,
         consumers: Vec<ConsumerConfig>,
         oauth_providers: Option<Vec<OAuthProviderConfig>>,
+        public_url: Option<String>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let routes = routes.unwrap_or_default();
         let mut route_responses = HashMap::new();
@@ -194,6 +195,11 @@ impl AppState {
                             }
                         }
                     }
+                }
+
+                // Inject servers if public_url is provided
+                if let Some(url) = public_url {
+                    merged_spec.insert("servers".to_string(), serde_json::json!([{ "url": url }]));
                 }
 
                 // Add merged paths to the spec

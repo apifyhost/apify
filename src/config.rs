@@ -13,6 +13,7 @@ pub struct Config {
     pub datasource: Option<std::collections::HashMap<String, DatabaseSettings>>, // Global datasources
     pub observability: Option<ObservabilityConfig>, // Observability settings
     pub oauth_providers: Option<Vec<OAuthProviderConfig>>, // OAuth/OIDC providers
+    pub docs_port: Option<u16>,                     // Port for OpenAPI docs (Swagger UI)
 }
 
 /// Observability configuration

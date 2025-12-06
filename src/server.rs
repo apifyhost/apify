@@ -2,7 +2,7 @@
 
 use super::app_state::AppState;
 use super::config::ListenerConfig;
-use super::handler::handle_request;
+use super::handler::{handle_docs_request, handle_request};
 use super::hyper::server::conn::http1;
 use super::hyper::service::service_fn;
 use super::tokio::net::TcpListener;
@@ -79,6 +79,7 @@ pub fn start_listener(
             listener_config.modules,
             consumers,
             oauth_providers,
+            None,
         )
         .await
         {
@@ -129,5 +130,46 @@ pub fn start_listener(
                 tokio::time::sleep(Duration::from_secs(3600)).await;
             }
         }
+    })
+}
+
+/// Start documentation server (runs independently)
+pub fn start_docs_server(
+    port: u16,
+    state: Arc<AppState>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| format!("Failed to build docs runtime: {}", e))?;
+
+    rt.block_on(async move {
+        let addr: SocketAddr = format!("0.0.0.0:{}", port).parse()?;
+        let listener = create_reuse_port_socket(addr)?;
+        println!("Docs server listening on http://{}", addr);
+
+        loop {
+            match listener.accept().await {
+                Ok((stream, _)) => {
+                    let io = TokioIo::new(stream);
+                    let state_clone = Arc::clone(&state);
+                    tokio::task::spawn(async move {
+                        let service = service_fn(move |req| {
+                            handle_docs_request(req, Arc::clone(&state_clone))
+                        });
+                        if let Err(err) = http1::Builder::new().serve_connection(io, service).await
+                        {
+                            eprintln!("Docs connection error: {:?}", err);
+                        }
+                    });
+                }
+                Err(e) => {
+                    eprintln!("Docs accept error: {}", e);
+                    continue;
+                }
+            }
+        }
+        #[allow(unreachable_code)]
+        Ok(())
     })
 }

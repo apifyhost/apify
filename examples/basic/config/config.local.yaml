@@ -1,0 +1,27 @@
+listeners:
+  - port: 3000
+    ip: 0.0.0.0
+    protocol: HTTP
+    apis:
+      - path: ./openapi/items.yaml
+        datasource: sqlite1
+
+consumers:
+  - name: default
+    keys:
+      - dev-key-123
+      - my-api-key-001
+
+datasource:
+  sqlite1:
+    driver: sqlite
+    database: ":memory:"
+    max_pool_size: 5
+
+observability:
+  log_level: "info"
+  otlp_endpoint: null
+  metrics_enabled: true
+  metrics_port: 9090
+
+docs_port: 3001
