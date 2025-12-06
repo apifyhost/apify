@@ -48,6 +48,7 @@ tracing-opentelemetry = "0.32"
 # Observability: Prometheus metrics
 prometheus = { version = "0.14", features = ["process"] }
 lazy_static = "1.4"
+jsonschema = "0.17"
 
 [dev-dependencies]
 assert_cmd = "2"

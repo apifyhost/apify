@@ -89,7 +89,7 @@ async fn handle_request_inner(
                 .extract_path_params(pattern, &ctx.path);
         }
 
-        // Phase: Access
+        // Determine active registry for Access and BodyParse phases
         // Prefer operation-level modules > route-level > listener-level
         let op_registry = if let Some(ref pattern) = ctx.matched_route {
             let key = format!(
@@ -107,16 +107,39 @@ async fn handle_request_inner(
             None
         };
 
-        if let Some(reg) = op_registry
+        let active_registry = op_registry
             .as_ref()
             .or(route_registry.as_ref())
             .or_else(|| {
-                if state.modules.has_phase(Phase::Access) {
+                // Fallback to listener modules if they have relevant phases
+                if state.modules.has_phase(Phase::Access) || state.modules.has_phase(Phase::BodyParse) {
                     Some(&state.modules)
                 } else {
                     None
                 }
-            })
+            });
+
+        // Phase: BodyParse (Validation)
+        if let Some(reg) = active_registry {
+            if let Some(outcome) = reg.run_phase(Phase::BodyParse, &mut ctx, &state) {
+                match outcome {
+                    ModuleOutcome::Continue => {}
+                    ModuleOutcome::Respond(resp) => {
+                        return Ok(resp);
+                    }
+                    ModuleOutcome::Error(e) => {
+                        eprintln!("BodyParse Module error: {e}");
+                        return Ok(create_error_response(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Module error",
+                        ));
+                    }
+                }
+            }
+        }
+
+        // Phase: Access
+        if let Some(reg) = active_registry
             && let Some(outcome) = reg.run_phase(Phase::Access, &mut ctx, &state)
         {
             match outcome {

@@ -967,12 +967,12 @@ Features:
 
 ##### BodyParse Phase Modules
 
-**`body_validator`** - Request Body Validation
+**`request_validator`** - Request Validation (Body, Query, Headers)
 Validates request body size and content-type headers.
 
 ```rust
 // Usage example (in code)
-use apify::modules::body_validator::{BodyValidator, BodyValidatorConfig};
+use apify::modules::request_validator::{RequestValidator, RequestValidatorConfig};
 
 let validator = BodyValidator::new(BodyValidatorConfig {
     max_body_size: 1024 * 1024, // 1MB limit
