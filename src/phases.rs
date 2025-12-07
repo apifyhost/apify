@@ -33,6 +33,7 @@ pub struct RequestContext {
     pub uri: Uri,
     pub path: String,
     pub headers: HeaderMap,
+    pub response_headers: HeaderMap, // Response headers
     pub query_params: HashMap<String, String>,
     pub path_params: HashMap<String, String>,
     pub raw_body: Option<Vec<u8>>, // avoid extra dependency for now
@@ -53,6 +54,7 @@ impl RequestContext {
             uri,
             path,
             headers,
+            response_headers: HeaderMap::new(),
             query_params: HashMap::new(),
             path_params: HashMap::new(),
             raw_body: None,

@@ -48,6 +48,17 @@ modules:
     # Enable Prometheus metrics endpoint
     # Default: true
     enabled: true
+    port: 9090
+
+  access_log:
+    enabled: true
+    path: "logs/access.log"
+    format: "json"
+    # Optional: Customize what to log
+    headers: ["user-agent", "content-type", "x-request-id"]
+    query: true
+    body: false
+    cookies: false
 
     # Port for Prometheus metrics HTTP endpoint
     # Default: 9090
