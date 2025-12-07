@@ -385,9 +385,16 @@ async fn test_multiple_phases_integration() -> Result<(), Box<dyn std::error::Er
     database: {}
     max_pool_size: 5
 
-consumers:
-  - name: testuser
-    keys: [ test-key-999 ]
+auth:
+  - type: api-key
+    name: default-api-key
+    enabled: true
+    config:
+      source: header
+      key_name: X-Api-Key
+      consumers:
+        - name: testuser
+          keys: [ test-key-999 ]
 
 listeners:
   - port: {port}

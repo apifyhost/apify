@@ -83,9 +83,16 @@ async fn users_crud_flow() -> Result<(), Box<dyn std::error::Error>> {
     driver: sqlite
     database: {}
     max_pool_size: 5
-consumers:
-  - name: test
-    keys: [ t-key-001 ]
+auth:
+  - type: api-key
+    name: default-api-key
+    enabled: true
+    config:
+      source: header
+      key_name: X-Api-Key
+      consumers:
+        - name: test
+          keys: [ t-key-001 ]
 listeners:
   - port: {port}
     ip: 127.0.0.1

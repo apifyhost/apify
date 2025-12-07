@@ -9,11 +9,62 @@ use std::net::SocketAddr;
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub listeners: Vec<ListenerConfig>,
-    pub consumers: Option<Vec<ConsumerConfig>>, // Global consumers
+    pub auth: Option<Vec<Authenticator>>, // Unified authentication configuration
     pub datasource: Option<std::collections::HashMap<String, DatabaseSettings>>, // Global datasources
     pub modules: Option<GlobalModulesConfig>, // Global modules (tracing, metrics, etc.)
-    pub oauth_providers: Option<Vec<OAuthProviderConfig>>, // OAuth/OIDC providers
     pub log_level: Option<String>,            // Global log level (trace, debug, info, warn, error)
+}
+
+/// Authenticator Enum (Polymorphic)
+#[derive(Debug, Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum Authenticator {
+    #[serde(rename = "api-key")]
+    ApiKey(ApiKeyAuthenticator),
+    #[serde(rename = "oidc")]
+    Oidc(OidcAuthenticator),
+}
+
+/// API Key Authenticator
+#[derive(Debug, Deserialize, Clone)]
+pub struct ApiKeyAuthenticator {
+    pub name: String,
+    pub enabled: Option<bool>,
+    pub config: ApiKeyConfig,
+}
+
+/// API Key Configuration
+#[derive(Debug, Deserialize, Clone)]
+pub struct ApiKeyConfig {
+    pub source: Option<ApiKeySource>, // "header" or "query"
+    pub key_name: Option<String>,     // default "X-Api-Key"
+    pub consumers: Vec<ConsumerConfig>,
+}
+
+/// API Key Source
+#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum ApiKeySource {
+    Header,
+    Query,
+}
+
+/// OIDC Authenticator
+#[derive(Debug, Deserialize, Clone)]
+pub struct OidcAuthenticator {
+    pub name: String,
+    pub enabled: Option<bool>,
+    pub config: OidcConfig,
+}
+
+/// OIDC Configuration
+#[derive(Debug, Deserialize, Clone)]
+pub struct OidcConfig {
+    pub issuer: String,
+    pub client_id: Option<String>,
+    pub client_secret: Option<String>,
+    pub audience: Option<String>,
+    pub introspection: Option<bool>,
 }
 
 /// Global modules configuration
@@ -154,16 +205,6 @@ pub struct ConsumerConfig {
     pub name: String,
     pub keys: Vec<String>, // API keys bound to this consumer
                            // Future: rate limits, roles, metadata, etc.
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct OAuthProviderConfig {
-    pub name: String,
-    pub issuer: String,
-    pub client_id: Option<String>,
-    pub client_secret: Option<String>,
-    pub audience: Option<String>,
-    pub introspection: Option<bool>, // enable introspection endpoint usage
 }
 
 impl Config {

@@ -56,8 +56,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tracing::info!(datasource_count = ds.len(), "Datasources configured");
     }
 
-    // Use consumers from config (global or listener-level)
-    let global_consumers = config.consumers.clone().unwrap_or_default();
+    // Use auth config
+    let auth_config = config.auth.clone();
 
     // Start worker threads (multiple threads per listener, sharing port via SO_REUSEPORT)
     // Allow override via APIFY_THREADS env var (useful for tests)
@@ -114,11 +114,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 
     for (listener_idx, listener_config) in config.listeners.into_iter().enumerate() {
-        // Merge global consumers with listener-specific consumers
-        let mut all_consumers = global_consumers.clone();
-        if let Some(ref listener_consumers) = listener_config.consumers {
-            all_consumers.extend(listener_consumers.clone());
-        }
+        let auth_config_clone = auth_config.clone();
 
         // Load OpenAPI configurations for this listener with datasource info
         let mut openapi_configs = Vec::new();
@@ -182,8 +178,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let listener_config_clone = listener_config.clone();
             let datasources_clone = datasources.clone();
             let openapi_configs_clone = openapi_configs.clone();
-            let consumers_clone = all_consumers.clone();
-            let oauth_clone = config.oauth_providers.clone();
+            let auth_config_clone = auth_config_clone.clone();
             let access_log_config = config.modules.as_ref().and_then(|m| m.access_log.clone());
             let access_log_config_clone = access_log_config.clone();
 
@@ -200,8 +195,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         thread_id,
                         datasources_clone,
                         openapi_configs_clone,
-                        consumers_clone,
-                        oauth_clone,
+                        auth_config_clone,
                         access_log_config_clone,
                     )?;
                     Ok(())
@@ -253,8 +247,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let listener_config_clone = listener_config.clone();
             let datasources_clone = datasources.clone();
             let openapi_configs_clone = openapi_configs.clone();
-            let consumers_clone = all_consumers.clone();
-            let oauth_clone = config.oauth_providers.clone();
+            let auth_config_clone = auth_config_clone.clone();
             let access_log_config = config.modules.as_ref().and_then(|m| m.access_log.clone());
             let access_log_config_clone = access_log_config.clone();
 
@@ -281,8 +274,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                     datasources: datasources_clone,
                                     openapi_configs: openapi_configs_clone,
                                     listener_modules: listener_config_clone.modules,
-                                    consumers: consumers_clone,
-                                    oauth_providers: oauth_clone,
+                                    auth_config: auth_config_clone,
                                     public_url: Some(format!(
                                         "http://localhost:{}",
                                         listener_config_clone.port

@@ -6,10 +6,17 @@ listeners:
       - path: ./openapi/items.yaml
         datasource: postgres1
 
-consumers:
-  - name: default
-    keys:
-      - demo-key-123
+auth:
+  - name: default-api-keys
+    type: api-key
+    enabled: true
+    config:
+      source: header
+      key_name: X-Api-Key
+      consumers:
+        - name: default
+          keys:
+            - demo-key-123
 
 datasource:
   postgres1:
