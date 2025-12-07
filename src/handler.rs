@@ -112,7 +112,9 @@ async fn handle_request_inner(
             .or(route_registry.as_ref())
             .or_else(|| {
                 // Fallback to listener modules if they have relevant phases
-                if state.modules.has_phase(Phase::Access) || state.modules.has_phase(Phase::BodyParse) {
+                if state.modules.has_phase(Phase::Access)
+                    || state.modules.has_phase(Phase::BodyParse)
+                {
                     Some(&state.modules)
                 } else {
                     None
@@ -120,20 +122,20 @@ async fn handle_request_inner(
             });
 
         // Phase: BodyParse (Validation)
-        if let Some(reg) = active_registry {
-            if let Some(outcome) = reg.run_phase(Phase::BodyParse, &mut ctx, &state) {
-                match outcome {
-                    ModuleOutcome::Continue => {}
-                    ModuleOutcome::Respond(resp) => {
-                        return Ok(resp);
-                    }
-                    ModuleOutcome::Error(e) => {
-                        eprintln!("BodyParse Module error: {e}");
-                        return Ok(create_error_response(
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            "Module error",
-                        ));
-                    }
+        if let Some(reg) = active_registry
+            && let Some(outcome) = reg.run_phase(Phase::BodyParse, &mut ctx, &state)
+        {
+            match outcome {
+                ModuleOutcome::Continue => {}
+                ModuleOutcome::Respond(resp) => {
+                    return Ok(resp);
+                }
+                ModuleOutcome::Error(e) => {
+                    eprintln!("BodyParse Module error: {e}");
+                    return Ok(create_error_response(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Module error",
+                    ));
                 }
             }
         }

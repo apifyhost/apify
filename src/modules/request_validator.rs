@@ -63,15 +63,15 @@ impl RequestValidator {
     }
 
     fn resolve_ref<'a>(spec: &'a Value, node: &'a Value) -> Option<&'a Value> {
-        if let Some(ref_str) = node.get("$ref").and_then(|s| s.as_str()) {
-            if ref_str.starts_with("#/") {
-                let parts: Vec<&str> = ref_str[2..].split('/').collect();
-                let mut current = spec;
-                for part in parts {
-                    current = current.get(part)?;
-                }
-                return Some(current);
+        if let Some(ref_str) = node.get("$ref").and_then(|s| s.as_str())
+            && ref_str.starts_with("#/")
+        {
+            let parts: Vec<&str> = ref_str[2..].split('/').collect();
+            let mut current = spec;
+            for part in parts {
+                current = current.get(part)?;
             }
+            return Some(current);
         }
         Some(node)
     }
@@ -92,9 +92,11 @@ impl RequestValidator {
                     }
 
                     for (method, operation) in path_obj {
-                        if method == "parameters" { continue; }
+                        if method == "parameters" {
+                            continue;
+                        }
                         let method_upper = method.to_uppercase();
-                        
+
                         if let Some(op_obj) = operation.as_object() {
                             let mut route_val = RouteValidators {
                                 body_schema: None,
@@ -102,67 +104,86 @@ impl RequestValidator {
                             };
 
                             // Compile Body Schema
-                             if let Some(body) = op_obj.get("requestBody") {
-                                 if let Some(content) = body.get("content") {
-                                     if let Some(json_media) = content.get("application/json") {
-                                         if let Some(schema) = json_media.get("schema") {
-                                             match JSONSchema::options()
-                                                 .with_document("root.json".to_string(), spec.clone())
-                                                 .compile(schema) {
-                                                     Ok(compiled) => {
-                                                         route_val.body_schema = Some(compiled);
-                                                     }
-                                                     Err(e) => {
-                                                         tracing::warn!("Failed to compile body schema for {} {}: {}", method, path, e);
-                                                     }
-                                                 }
-                                         }
-                                     }
-                                 }
-                             }
+                            if let Some(body) = op_obj.get("requestBody")
+                                && let Some(content) = body.get("content")
+                                && let Some(json_media) = content.get("application/json")
+                                && let Some(schema) = json_media.get("schema")
+                            {
+                                match JSONSchema::options()
+                                    .with_document("root.json".to_string(), spec.clone())
+                                    .compile(schema)
+                                {
+                                    Ok(compiled) => {
+                                        route_val.body_schema = Some(compiled);
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            "Failed to compile body schema for {} {}: {}",
+                                            method,
+                                            path,
+                                            e
+                                        );
+                                    }
+                                }
+                            }
 
-                             // Compile Parameters
-                             let mut op_params = path_params.clone();
-                             if let Some(params) = op_obj.get("parameters").and_then(|p| p.as_array()) {
-                                 for param in params {
-                                     if let Some(resolved) = Self::resolve_ref(spec, param) {
-                                         op_params.push(resolved);
-                                     }
-                                 }
-                             }
+                            // Compile Parameters
+                            let mut op_params = path_params.clone();
+                            if let Some(params) =
+                                op_obj.get("parameters").and_then(|p| p.as_array())
+                            {
+                                for param in params {
+                                    if let Some(resolved) = Self::resolve_ref(spec, param) {
+                                        op_params.push(resolved);
+                                    }
+                                }
+                            }
 
-                             for param in op_params {
-                                 if let (Some(name), Some(location)) = (
-                                     param.get("name").and_then(|s| s.as_str()),
-                                     param.get("in").and_then(|s| s.as_str())
-                                 ) {
-                                     let required = param.get("required").and_then(|b| b.as_bool()).unwrap_or(false);
-                                     let mut validator = ParameterValidator {
-                                         name: name.to_string(),
-                                         location: location.to_string(),
-                                         required,
-                                         schema: None,
-                                         type_hint: None,
-                                     };
+                            for param in op_params {
+                                if let (Some(name), Some(location)) = (
+                                    param.get("name").and_then(|s| s.as_str()),
+                                    param.get("in").and_then(|s| s.as_str()),
+                                ) {
+                                    let required = param
+                                        .get("required")
+                                        .and_then(|b| b.as_bool())
+                                        .unwrap_or(false);
+                                    let mut validator = ParameterValidator {
+                                        name: name.to_string(),
+                                        location: location.to_string(),
+                                        required,
+                                        schema: None,
+                                        type_hint: None,
+                                    };
 
-                                     if let Some(schema) = param.get("schema") {
-                                         validator.type_hint = schema.get("type").and_then(|s| s.as_str()).map(|s| s.to_string());
-                                         match JSONSchema::options()
-                                             .with_document("root.json".to_string(), spec.clone())
-                                             .compile(schema) {
-                                                 Ok(compiled) => {
-                                                     validator.schema = Some(compiled);
-                                                 }
-                                                 Err(e) => {
-                                                     tracing::warn!("Failed to compile param schema for {} {} param {}: {}", method, path, name, e);
-                                                 }
-                                             }
-                                     }
-                                     route_val.parameters.push(validator);
-                                 }
-                             }
+                                    if let Some(schema) = param.get("schema") {
+                                        validator.type_hint = schema
+                                            .get("type")
+                                            .and_then(|s| s.as_str())
+                                            .map(|s| s.to_string());
+                                        match JSONSchema::options()
+                                            .with_document("root.json".to_string(), spec.clone())
+                                            .compile(schema)
+                                        {
+                                            Ok(compiled) => {
+                                                validator.schema = Some(compiled);
+                                            }
+                                            Err(e) => {
+                                                tracing::warn!(
+                                                    "Failed to compile param schema for {} {} param {}: {}",
+                                                    method,
+                                                    path,
+                                                    name,
+                                                    e
+                                                );
+                                            }
+                                        }
+                                    }
+                                    route_val.parameters.push(validator);
+                                }
+                            }
 
-                             validators.insert((method_upper, path.clone()), route_val);
+                            validators.insert((method_upper, path.clone()), route_val);
                         }
                     }
                 }
@@ -218,23 +239,25 @@ impl Module for RequestValidator {
 
         // Validate against OpenAPI schema if available
         if let Some(ref route) = ctx.matched_route {
-            let key = (ctx.method.as_str().to_uppercase(), route.path_pattern.clone());
+            let key = (
+                ctx.method.as_str().to_uppercase(),
+                route.path_pattern.clone(),
+            );
             if let Some(validators) = self.validators.get(&key) {
                 // 1. Validate Body
-                if let Some(ref schema) = validators.body_schema {
-                    if let Some(ref json_body) = ctx.json_body {
-                        if let Err(errors) = schema.validate(json_body) {
-                            let error_msg = errors
-                                .map(|e| format!("Body validation error: {}", e))
-                                .collect::<Vec<_>>()
-                                .join("; ");
-                            
-                            return ModuleOutcome::Respond(error_response(
-                                StatusCode::BAD_REQUEST,
-                                &error_msg,
-                            ));
-                        }
-                    }
+                if let Some(ref schema) = validators.body_schema
+                    && let Some(ref json_body) = ctx.json_body
+                    && let Err(errors) = schema.validate(json_body)
+                {
+                    let error_msg = errors
+                        .map(|e| format!("Body validation error: {}", e))
+                        .collect::<Vec<_>>()
+                        .join("; ");
+
+                    return ModuleOutcome::Respond(error_response(
+                        StatusCode::BAD_REQUEST,
+                        &error_msg,
+                    ));
                 }
 
                 // 2. Validate Parameters
@@ -249,37 +272,45 @@ impl Module for RequestValidator {
                     if param.required && value_str.is_none() {
                         return ModuleOutcome::Respond(error_response(
                             StatusCode::BAD_REQUEST,
-                            &format!("Missing required {} parameter: {}", param.location, param.name),
+                            &format!(
+                                "Missing required {} parameter: {}",
+                                param.location, param.name
+                            ),
                         ));
                     }
 
-                    if let Some(val_str) = value_str {
-                        if let Some(ref schema) = param.schema {
-                            // Attempt type coercion for validation
-                            let json_val = match param.type_hint.as_deref() {
-                                Some("integer") => {
-                                    val_str.parse::<i64>().map(Value::from).unwrap_or(Value::String(val_str.to_string()))
-                                },
-                                Some("number") => {
-                                    val_str.parse::<f64>().map(Value::from).unwrap_or(Value::String(val_str.to_string()))
-                                },
-                                Some("boolean") => {
-                                    val_str.parse::<bool>().map(Value::from).unwrap_or(Value::String(val_str.to_string()))
-                                },
-                                _ => Value::String(val_str.to_string()),
-                            };
+                    if let Some(val_str) = value_str
+                        && let Some(ref schema) = param.schema
+                    {
+                        // Attempt type coercion for validation
+                        let json_val = match param.type_hint.as_deref() {
+                            Some("integer") => val_str
+                                .parse::<i64>()
+                                .map(Value::from)
+                                .unwrap_or(Value::String(val_str.to_string())),
+                            Some("number") => val_str
+                                .parse::<f64>()
+                                .map(Value::from)
+                                .unwrap_or(Value::String(val_str.to_string())),
+                            Some("boolean") => val_str
+                                .parse::<bool>()
+                                .map(Value::from)
+                                .unwrap_or(Value::String(val_str.to_string())),
+                            _ => Value::String(val_str.to_string()),
+                        };
 
-                            if let Err(errors) = schema.validate(&json_val) {
-                                let error_msg = errors
-                                    .map(|e| format!("Parameter '{}' validation error: {}", param.name, e))
-                                    .collect::<Vec<_>>()
-                                    .join("; ");
-                                
-                                return ModuleOutcome::Respond(error_response(
-                                    StatusCode::BAD_REQUEST,
-                                    &error_msg,
-                                ));
-                            }
+                        if let Err(errors) = schema.validate(&json_val) {
+                            let error_msg = errors
+                                .map(|e| {
+                                    format!("Parameter '{}' validation error: {}", param.name, e)
+                                })
+                                .collect::<Vec<_>>()
+                                .join("; ");
+
+                            return ModuleOutcome::Respond(error_response(
+                                StatusCode::BAD_REQUEST,
+                                &error_msg,
+                            ));
                         }
                     }
                 }

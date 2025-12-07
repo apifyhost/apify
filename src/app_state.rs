@@ -225,22 +225,28 @@ impl AppState {
         let mut route_modules: HashMap<String, crate::modules::ModuleRegistry> = HashMap::new();
         for (openapi_config, per_api_modules, _) in &openapi_configs {
             let mut reg = crate::modules::ModuleRegistry::new();
-            
+
             // Apply configured modules
             if let Some(cfg) = per_api_modules.clone() {
                 reg = apply_modules_cfg(reg, cfg);
             }
 
             // Check if validation is enabled
-            let validate_request = openapi_config.openapi.validation.as_ref()
+            let validate_request = openapi_config
+                .openapi
+                .validation
+                .as_ref()
                 .and_then(|v| v.enabled)
                 .unwrap_or(false);
 
             if validate_request {
                 tracing::info!("Enabling request validation for API");
-                let mut validator_config = crate::modules::request_validator::RequestValidatorConfig::default();
-                validator_config.openapi_spec = Some(openapi_config.openapi.spec.clone());
-                let validator = crate::modules::request_validator::RequestValidator::new(validator_config);
+                let validator_config = crate::modules::request_validator::RequestValidatorConfig {
+                    openapi_spec: Some(openapi_config.openapi.spec.clone()),
+                    ..Default::default()
+                };
+                let validator =
+                    crate::modules::request_validator::RequestValidator::new(validator_config);
                 reg = reg.with(Arc::new(validator));
             }
 
