@@ -1,6 +1,6 @@
 //! Configuration file parsing and structure definitions
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
 use std::net::SocketAddr;
@@ -16,7 +16,7 @@ pub struct Config {
 }
 
 /// Authenticator Enum (Polymorphic)
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(tag = "type")]
 pub enum Authenticator {
     #[serde(rename = "api-key")]
@@ -26,7 +26,7 @@ pub enum Authenticator {
 }
 
 /// API Key Authenticator
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ApiKeyAuthenticator {
     pub name: String,
     pub enabled: Option<bool>,
@@ -34,7 +34,7 @@ pub struct ApiKeyAuthenticator {
 }
 
 /// API Key Configuration
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ApiKeyConfig {
     pub source: Option<ApiKeySource>, // "header" or "query"
     pub key_name: Option<String>,     // default "X-Api-Key"
@@ -42,7 +42,7 @@ pub struct ApiKeyConfig {
 }
 
 /// API Key Source
-#[derive(Debug, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ApiKeySource {
     Header,
@@ -50,7 +50,7 @@ pub enum ApiKeySource {
 }
 
 /// OIDC Authenticator
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct OidcAuthenticator {
     pub name: String,
     pub enabled: Option<bool>,
@@ -58,7 +58,7 @@ pub struct OidcAuthenticator {
 }
 
 /// OIDC Configuration
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct OidcConfig {
     pub issuer: String,
     pub client_id: Option<String>,
@@ -200,7 +200,7 @@ pub enum ApiRef {
     },
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ConsumerConfig {
     pub name: String,
     pub keys: Vec<String>, // API keys bound to this consumer

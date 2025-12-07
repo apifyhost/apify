@@ -128,6 +128,9 @@ run_go_tests() {
     elif [ "$TEST_MODE" = "crud" ]; then
         log_info "Running CRUD tests only..."
         ginkgo -v --focus="CRUD"
+    elif [ "$TEST_MODE" = "relations" ]; then
+        log_info "Running Relations tests only..."
+        ginkgo -v --focus="Relations"
     else
         log_info "Running all tests..."
         ginkgo -v
@@ -192,7 +195,7 @@ main() {
         quick)
             run_quick_test
             ;;
-        go|observability|crud)
+        go|observability|crud|relations)
             run_go_tests
             ;;
         *)

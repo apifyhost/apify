@@ -52,6 +52,7 @@ pub fn start_listener(
     openapi_configs: Vec<super::app_state::OpenApiStateConfig>,
     auth_config: Option<Vec<super::config::Authenticator>>,
     access_log_config: Option<super::config::AccessLogConfig>,
+    control_plane_db: Option<super::database::DatabaseManager>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Critical: Create single-threaded runtime using new_current_thread
     let rt = tokio::runtime::Builder::new_current_thread() // <-- Restored critical line
@@ -76,6 +77,7 @@ pub fn start_listener(
             auth_config,
             public_url: None,
             access_log_config,
+            control_plane_db,
         })
         .await
         {

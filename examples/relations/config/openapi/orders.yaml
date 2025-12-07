@@ -188,7 +188,7 @@ openapi:
             '204':
               description: Order deleted
 
-      /orderitems:
+      /order_items:
         get:
           summary: List all order items
           operationId: listOrderItems

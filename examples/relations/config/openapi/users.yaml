@@ -130,7 +130,41 @@ openapi:
                   schema:
                     $ref: '#/components/schemas/User'
 
-      /userprofiles:
+        put:
+          summary: Update a user
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/User'
+          responses:
+            '200':
+              description: User updated
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/User'
+
+        delete:
+          summary: Delete a user
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          responses:
+            '204':
+              description: User deleted
+
+      /user_profiles:
         get:
           summary: List all user profiles
           responses:
@@ -143,7 +177,7 @@ openapi:
                     items:
                       $ref: '#/components/schemas/UserProfile'
 
-      /userprofiles/{id}:
+      /user_profiles/{id}:
         get:
           summary: Get profile by ID
           parameters:

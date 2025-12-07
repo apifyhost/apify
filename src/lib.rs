@@ -1,6 +1,7 @@
 pub mod api_generator;
 pub mod app_state;
 pub mod config;
+pub mod control_plane;
 pub mod crud_handler;
 pub mod database;
 pub mod handler;

@@ -20,6 +20,10 @@ struct Cli {
     /// Path to the configuration file (YAML format)
     #[arg(short, long, default_value = "config.yaml")]
     config: String,
+
+    /// Enable Control Plane mode
+    #[arg(long)]
+    control_plane: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -28,6 +32,55 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Load main configuration from specified file path
     let config = Config::from_file(&cli.config)?;
+
+    // Initialize Metadata DB connection and load configs
+    let db_config = apify::database::DatabaseRuntimeConfig::sqlite_default();
+    let rt_init = apify::tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+
+    let (control_plane_db, db_openapi_configs, db_auth_config): (Option<apify::database::DatabaseManager>, Vec<apify::app_state::OpenApiStateConfig>, Option<Vec<apify::config::Authenticator>>) = rt_init.block_on(async {
+        let db = apify::database::DatabaseManager::new(db_config)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if cli.control_plane {
+            tracing::info!("Starting in Control Plane mode");
+            // Initialize metadata schema
+            db.initialize_schema(apify::control_plane::get_metadata_schemas())
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok::<_, String>((Some(db), Vec::new(), None))
+        } else {
+            tracing::info!("Starting in Data Plane mode");
+            // Load configs from DB
+            let api_configs = match apify::control_plane::load_api_configs(&db).await {
+                Ok(configs) => {
+                    tracing::info!(count = configs.len(), "Loaded API configs from Metadata DB");
+                    configs
+                },
+                Err(e) => {
+                    tracing::warn!("Failed to load API configs from DB: {}", e);
+                    Vec::new()
+                }
+            };
+            
+            let auth_configs = match apify::control_plane::load_auth_configs(&db).await {
+                Ok(configs) => {
+                    if let Some(c) = &configs {
+                        tracing::info!(count = c.len(), "Loaded Auth configs from Metadata DB");
+                    }
+                    configs
+                },
+                Err(e) => {
+                    tracing::warn!("Failed to load Auth configs from DB: {}", e);
+                    None
+                }
+            };
+            
+            Ok::<_, String>((None, api_configs, auth_configs))
+        }
+    })?;
 
     // Get global modules configuration
     let tracing_config = config.modules.as_ref().and_then(|m| m.tracing.as_ref());
@@ -57,7 +110,14 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 
     // Use auth config
-    let auth_config = config.auth.clone();
+    let mut auth_config = config.auth.clone();
+    if let Some(db_auth) = db_auth_config {
+        if let Some(existing) = &mut auth_config {
+            existing.extend(db_auth);
+        } else {
+            auth_config = Some(db_auth);
+        }
+    }
 
     // Start worker threads (multiple threads per listener, sharing port via SO_REUSEPORT)
     // Allow override via APIFY_THREADS env var (useful for tests)
@@ -174,6 +234,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             }
         }
 
+        // Append configs loaded from DB
+        openapi_configs.extend(db_openapi_configs.clone());
+
         for thread_id in 0..num_threads {
             let listener_config_clone = listener_config.clone();
             let datasources_clone = datasources.clone();
@@ -181,6 +244,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let auth_config_clone = auth_config_clone.clone();
             let access_log_config = config.modules.as_ref().and_then(|m| m.access_log.clone());
             let access_log_config_clone = access_log_config.clone();
+            let control_plane_db_clone = control_plane_db.clone();
 
             let handle = thread::spawn(
                 move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -197,6 +261,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         openapi_configs_clone,
                         auth_config_clone,
                         access_log_config_clone,
+                        control_plane_db_clone,
                     )?;
                     Ok(())
                 },
@@ -280,6 +345,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                         listener_config_clone.port
                                     )),
                                     access_log_config: access_log_config_clone,
+                                    control_plane_db: None,
                                 },
                             )
                             .await

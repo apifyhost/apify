@@ -80,11 +80,11 @@ impl CRUDHandler {
             })?;
 
         match pattern.operation_type {
-            OperationType::List => self.handle_list(pattern, query_params).await,
-            OperationType::Get => self.handle_get(pattern, path_params).await,
-            OperationType::Create => self.handle_create(pattern, body, ctx).await,
-            OperationType::Update => self.handle_update(pattern, path_params, body, ctx).await,
-            OperationType::Delete => self.handle_delete(pattern, path_params).await,
+            OperationType::List => self.handle_list(&pattern, query_params).await,
+            OperationType::Get => self.handle_get(&pattern, path_params).await,
+            OperationType::Create => self.handle_create(&pattern, body, ctx).await,
+            OperationType::Update => self.handle_update(&pattern, path_params, body, ctx).await,
+            OperationType::Delete => self.handle_delete(&pattern, path_params).await,
         }
     }
 
