@@ -40,13 +40,13 @@ impl Module for KeyAuthModule {
 
                     let key_name = cfg.config.key_name.as_deref().unwrap_or("X-Api-Key");
                     // TODO: Support Query source
-                    if let Some(key) = ctx.headers.get(key_name).and_then(|v| v.to_str().ok()) {
-                        if let Some(consumer) = state.lookup_consumer_by_key(key) {
-                            ctx.extensions.insert(ConsumerIdentity {
-                                name: consumer.name.clone(),
-                            });
-                            return ModuleOutcome::Continue;
-                        }
+                    if let Some(key) = ctx.headers.get(key_name).and_then(|v| v.to_str().ok())
+                        && let Some(consumer) = state.lookup_consumer_by_key(key)
+                    {
+                        ctx.extensions.insert(ConsumerIdentity {
+                            name: consumer.name.clone(),
+                        });
+                        return ModuleOutcome::Continue;
                     }
                 }
             }
