@@ -7,6 +7,7 @@ use crate::modules::{Module, ModuleOutcome};
 use crate::phases::{Phase, RequestContext};
 use serde::Serialize;
 use serde_json::Value;
+use sqlx::types::chrono::Local;
 use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -14,7 +15,6 @@ use std::path::Path;
 use std::sync::Arc;
 use std::thread;
 use tokio::sync::mpsc;
-use sqlx::types::chrono::Local;
 
 /// Access log entry structure
 #[derive(Serialize)]
@@ -79,7 +79,7 @@ impl RequestLogger {
                 .path
                 .clone()
                 .unwrap_or_else(|| "logs/access.log".to_string());
-            
+
             // Ensure directory exists
             if let Some(parent) = Path::new(&path_str).parent() {
                 let _ = fs::create_dir_all(parent);
@@ -87,10 +87,7 @@ impl RequestLogger {
 
             // Spawn a dedicated thread for logging to avoid blocking async runtime with file I/O
             thread::spawn(move || {
-                let file = OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(&path_str);
+                let file = OpenOptions::new().create(true).append(true).open(&path_str);
 
                 let mut output: Box<dyn Write + Send> = match file {
                     Ok(f) => Box::new(f),
@@ -127,15 +124,15 @@ impl Module for RequestLogger {
 
         let duration = ctx.start_time.elapsed().as_millis() as u64;
         let status = ctx.response_status.unwrap_or(500);
-        
+
         // Request Headers
         let req_headers = if let Some(header_names) = &self.config.headers {
             let mut h = HashMap::new();
             for name in header_names {
-                if let Some(val) = ctx.headers.get(name) {
-                    if let Ok(s) = val.to_str() {
-                        h.insert(name.clone(), s.to_string());
-                    }
+                if let Some(val) = ctx.headers.get(name)
+                    && let Ok(s) = val.to_str()
+                {
+                    h.insert(name.clone(), s.to_string());
                 }
             }
             if h.is_empty() { None } else { Some(h) }
@@ -147,10 +144,10 @@ impl Module for RequestLogger {
         let res_headers = if let Some(header_names) = &self.config.headers {
             let mut h = HashMap::new();
             for name in header_names {
-                if let Some(val) = ctx.response_headers.get(name) {
-                    if let Ok(s) = val.to_str() {
-                        h.insert(name.clone(), s.to_string());
-                    }
+                if let Some(val) = ctx.response_headers.get(name)
+                    && let Ok(s) = val.to_str()
+                {
+                    h.insert(name.clone(), s.to_string());
                 }
             }
             if h.is_empty() { None } else { Some(h) }
@@ -159,7 +156,11 @@ impl Module for RequestLogger {
         };
 
         let query = if self.config.query.unwrap_or(false) {
-            if ctx.query_params.is_empty() { None } else { Some(ctx.query_params.clone()) }
+            if ctx.query_params.is_empty() {
+                None
+            } else {
+                Some(ctx.query_params.clone())
+            }
         } else {
             None
         };
@@ -187,8 +188,12 @@ impl Module for RequestLogger {
                         }
                     }
                     if c.is_empty() { None } else { Some(c) }
-                } else { None }
-            } else { None }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         } else {
             None
         };
@@ -220,7 +225,10 @@ impl Module for RequestLogger {
             path: ctx.path.to_string(),
             status,
             duration_ms: duration,
-            ip: ctx.client_ip.map(|ip| ip.to_string()).unwrap_or_else(|| "0.0.0.0".to_string()),
+            ip: ctx
+                .client_ip
+                .map(|ip| ip.to_string())
+                .unwrap_or_else(|| "0.0.0.0".to_string()),
             user_agent: ctx
                 .headers
                 .get("user-agent")

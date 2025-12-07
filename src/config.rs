@@ -29,12 +29,12 @@ pub struct GlobalModulesConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct AccessLogConfig {
     pub enabled: Option<bool>,
-    pub path: Option<String>,   // Path to log file (default: "logs/access.log")
+    pub path: Option<String>, // Path to log file (default: "logs/access.log")
     pub format: Option<String>, // "json" or "text" (default: "json")
     pub headers: Option<Vec<String>>, // List of headers to log (case-insensitive)
-    pub query: Option<bool>,          // Log query parameters
-    pub body: Option<bool>,           // Log request body (if available as JSON)
-    pub cookies: Option<bool>,        // Log cookies
+    pub query: Option<bool>,  // Log query parameters
+    pub body: Option<bool>,   // Log request body (if available as JSON)
+    pub cookies: Option<bool>, // Log cookies
 }
 
 /// Tracing module configuration

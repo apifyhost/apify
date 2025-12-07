@@ -21,13 +21,21 @@ pub async fn handle_request(
     let (parts, body_stream) = req.into_parts();
     let method = parts.method.clone();
     let path = parts.uri.path().to_string();
-    let client_ip = parts.extensions.get::<std::net::SocketAddr>().map(|addr| addr.ip());
+    let client_ip = parts
+        .extensions
+        .get::<std::net::SocketAddr>()
+        .map(|addr| addr.ip());
 
     // Start metrics tracking
     let metrics = RequestMetrics::new(method.as_str(), &path);
 
     // Phase: HeaderParse (and build initial context)
-    let mut ctx = RequestContext::new(method.clone(), parts.uri.clone(), parts.headers.clone(), client_ip);
+    let mut ctx = RequestContext::new(
+        method.clone(),
+        parts.uri.clone(),
+        parts.headers.clone(),
+        client_ip,
+    );
     ctx.extensions = parts.extensions; // carry over existing request extensions
     ctx.query_params = extract_query_params(parts.uri.query());
 

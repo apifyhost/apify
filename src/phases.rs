@@ -44,7 +44,12 @@ pub struct RequestContext {
 }
 
 impl RequestContext {
-    pub fn new(method: Method, uri: Uri, headers: HeaderMap, client_ip: Option<std::net::IpAddr>) -> Self {
+    pub fn new(
+        method: Method,
+        uri: Uri,
+        headers: HeaderMap,
+        client_ip: Option<std::net::IpAddr>,
+    ) -> Self {
         let path = uri.path().to_string();
         Self {
             start_time: Instant::now(),

@@ -73,16 +73,16 @@ pub fn start_listener(
 
         // Create application state
         println!("Thread {} creating AppState...", thread_id);
-        let state = match AppState::new_with_crud(
-            listener_config.routes,
+        let state = match AppState::new_with_crud(crate::app_state::AppStateConfig {
+            routes: listener_config.routes,
             datasources,
             openapi_configs,
-            listener_config.modules,
+            listener_modules: listener_config.modules,
             consumers,
             oauth_providers,
-            None,
+            public_url: None,
             access_log_config,
-        )
+        })
         .await
         {
             Ok(s) => {

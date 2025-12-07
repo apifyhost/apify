@@ -264,14 +264,19 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
                         let state = rt.block_on(async {
                             apify::app_state::AppState::new_with_crud(
-                                listener_config_clone.routes,
-                                datasources_clone,
-                                openapi_configs_clone,
-                                listener_config_clone.modules,
-                                consumers_clone,
-                                oauth_clone,
-                                Some(format!("http://localhost:{}", listener_config_clone.port)),
-                                access_log_config_clone,
+                                apify::app_state::AppStateConfig {
+                                    routes: listener_config_clone.routes,
+                                    datasources: datasources_clone,
+                                    openapi_configs: openapi_configs_clone,
+                                    listener_modules: listener_config_clone.modules,
+                                    consumers: consumers_clone,
+                                    oauth_providers: oauth_clone,
+                                    public_url: Some(format!(
+                                        "http://localhost:{}",
+                                        listener_config_clone.port
+                                    )),
+                                    access_log_config: access_log_config_clone,
+                                },
                             )
                             .await
                         })?;
