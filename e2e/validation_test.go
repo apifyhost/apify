@@ -17,7 +17,7 @@ var _ = Describe("OpenAPI Validation", func() {
 	var (
 		serverCmd   *exec.Cmd
 		serverPort  = "3006"
-		baseURL     = "http://localhost:" + serverPort
+		baseURL     = "http://127.0.0.1:" + serverPort
 		configFile  string
 		apiFile     string
 		dbFile      string
@@ -39,7 +39,7 @@ var _ = Describe("OpenAPI Validation", func() {
 		apiContent := `
 openapi:
   validation:
-    validate_request_body: true
+    enabled: true
   spec:
     openapi: "3.0.0"
     info:
