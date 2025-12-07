@@ -75,10 +75,17 @@ async fn key_auth_required_for_users() -> Result<(), Box<dyn std::error::Error>>
     database: {}
     max_pool_size: 5
 
-consumers:
-  - name: test
-    keys:
-      - t-key-001
+auth:
+  - type: api-key
+    name: default-api-key
+    enabled: true
+    config:
+      source: header
+      key_name: X-Api-Key
+      consumers:
+        - name: test
+          keys:
+            - t-key-001
 
 listeners:
   - port: {port}

@@ -88,9 +88,16 @@ async fn books_is_open_users_is_protected() -> Result<(), Box<dyn std::error::Er
     database: {}
     max_pool_size: 5
 
-consumers:
-  - name: test
-    keys: [ t-key-001 ]
+auth:
+  - type: api-key
+    name: default-api-key
+    enabled: true
+    config:
+      source: header
+      key_name: X-Api-Key
+      consumers:
+        - name: test
+          keys: [ t-key-001 ]
 
 listeners:
   - port: {port}
