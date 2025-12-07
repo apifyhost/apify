@@ -161,7 +161,7 @@ pub async fn load_auth_configs(
         let auth_config: Authenticator = serde_json::from_str(&auth_record.config)?;
         authenticators.push(auth_config);
     }
-    
+
     if authenticators.is_empty() {
         Ok(None)
     } else {
@@ -172,7 +172,10 @@ pub async fn load_auth_configs(
 pub async fn handle_control_plane_request(
     req: hyper::Request<hyper::body::Incoming>,
     db: &DatabaseManager,
-) -> Result<hyper::Response<http_body_util::Full<hyper::body::Bytes>>, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<
+    hyper::Response<http_body_util::Full<hyper::body::Bytes>>,
+    Box<dyn std::error::Error + Send + Sync>,
+> {
     let (parts, body) = req.into_parts();
     let method = parts.method;
     let path = parts.uri.path();
@@ -180,7 +183,9 @@ pub async fn handle_control_plane_request(
     if path == "/_meta/apis" {
         match method {
             hyper::Method::GET => {
-                let records = db.select("_meta_api_configs", None, None, None, None).await?;
+                let records = db
+                    .select("_meta_api_configs", None, None, None, None)
+                    .await?;
                 let json = serde_json::to_string(&records)?;
                 return Ok(hyper::Response::builder()
                     .status(hyper::StatusCode::OK)
@@ -190,38 +195,54 @@ pub async fn handle_control_plane_request(
             hyper::Method::POST => {
                 let body_bytes = http_body_util::BodyExt::collect(body).await?.to_bytes();
                 let payload: Value = serde_json::from_slice(&body_bytes)?;
-                
-                let name = payload.get("name").and_then(|v| v.as_str()).ok_or("Missing name")?;
-                let version = payload.get("version").and_then(|v| v.as_str()).ok_or("Missing version")?;
+
+                let name = payload
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .ok_or("Missing name")?;
+                let version = payload
+                    .get("version")
+                    .and_then(|v| v.as_str())
+                    .ok_or("Missing version")?;
                 let spec = payload.get("spec").ok_or("Missing spec")?;
-                
+
                 let id = uuid::Uuid::new_v4().to_string();
-                let created_at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64;
-                
+                let created_at = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs() as i64;
+
                 let mut data = HashMap::new();
                 data.insert("id".to_string(), Value::String(id.clone()));
                 data.insert("name".to_string(), Value::String(name.to_string()));
                 data.insert("version".to_string(), Value::String(version.to_string()));
                 data.insert("spec".to_string(), Value::String(spec.to_string()));
-                data.insert("created_at".to_string(), Value::Number(serde_json::Number::from(created_at)));
-                
+                data.insert(
+                    "created_at".to_string(),
+                    Value::Number(serde_json::Number::from(created_at)),
+                );
+
                 db.insert("_meta_api_configs", data).await?;
-                
+
                 // Extract schemas from spec and initialize them in the DB
-                let schemas = crate::schema_generator::SchemaGenerator::extract_schemas_from_openapi(spec)?;
+                let schemas =
+                    crate::schema_generator::SchemaGenerator::extract_schemas_from_openapi(spec)?;
                 db.initialize_schema(schemas).await?;
-                
+
                 return Ok(hyper::Response::builder()
                     .status(hyper::StatusCode::CREATED)
                     .header("Content-Type", "application/json")
-                    .body(http_body_util::Full::new(hyper::body::Bytes::from(serde_json::json!({"id": id}).to_string())))?);
+                    .body(http_body_util::Full::new(hyper::body::Bytes::from(
+                        serde_json::json!({"id": id}).to_string(),
+                    )))?);
             }
             _ => {}
         }
     } else if path == "/_meta/auth" {
         match method {
             hyper::Method::GET => {
-                let records = db.select("_meta_auth_configs", None, None, None, None).await?;
+                let records = db
+                    .select("_meta_auth_configs", None, None, None, None)
+                    .await?;
                 let json = serde_json::to_string(&records)?;
                 return Ok(hyper::Response::builder()
                     .status(hyper::StatusCode::OK)
@@ -234,21 +255,28 @@ pub async fn handle_control_plane_request(
                 let auth_config: Authenticator = serde_json::from_slice(&body_bytes)?;
                 // Store as string
                 let config_str = serde_json::to_string(&auth_config)?;
-                
+
                 let id = uuid::Uuid::new_v4().to_string();
-                let updated_at = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as i64;
-                
+                let updated_at = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs() as i64;
+
                 let mut data = HashMap::new();
                 data.insert("id".to_string(), Value::String(id.clone()));
                 data.insert("config".to_string(), Value::String(config_str));
-                data.insert("updated_at".to_string(), Value::Number(serde_json::Number::from(updated_at)));
-                
+                data.insert(
+                    "updated_at".to_string(),
+                    Value::Number(serde_json::Number::from(updated_at)),
+                );
+
                 db.insert("_meta_auth_configs", data).await?;
-                
+
                 return Ok(hyper::Response::builder()
                     .status(hyper::StatusCode::CREATED)
                     .header("Content-Type", "application/json")
-                    .body(http_body_util::Full::new(hyper::body::Bytes::from(serde_json::json!({"id": id}).to_string())))?);
+                    .body(http_body_util::Full::new(hyper::body::Bytes::from(
+                        serde_json::json!({"id": id}).to_string(),
+                    )))?);
             }
             _ => {}
         }
@@ -256,6 +284,7 @@ pub async fn handle_control_plane_request(
 
     Ok(hyper::Response::builder()
         .status(hyper::StatusCode::NOT_FOUND)
-        .body(http_body_util::Full::new(hyper::body::Bytes::from("Not Found")))?
-    )
+        .body(http_body_util::Full::new(hyper::body::Bytes::from(
+            "Not Found",
+        )))?)
 }

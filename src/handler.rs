@@ -91,20 +91,21 @@ async fn handle_request_inner(
     }
 
     // Control Plane handling
-    if let Some(db) = &state.control_plane_db {
-        if ctx.path.starts_with("/_meta/") {
-            let mut req_builder = Request::builder()
-                .method(ctx.method.clone())
-                .uri(ctx.uri.clone());
-            if let Some(headers) = req_builder.headers_mut() {
-                *headers = ctx.headers.clone();
-            }
-            
-            return crate::control_plane::handle_control_plane_request(
-                req_builder.body(body_stream)?,
-                db,
-            ).await;
+    if let Some(db) = &state.control_plane_db
+        && ctx.path.starts_with("/_meta/")
+    {
+        let mut req_builder = Request::builder()
+            .method(ctx.method.clone())
+            .uri(ctx.uri.clone());
+        if let Some(headers) = req_builder.headers_mut() {
+            *headers = ctx.headers.clone();
         }
+
+        return crate::control_plane::handle_control_plane_request(
+            req_builder.body(body_stream)?,
+            db,
+        )
+        .await;
     }
 
     // Try CRUD handler first if available

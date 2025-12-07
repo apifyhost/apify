@@ -39,7 +39,11 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .enable_all()
         .build()?;
 
-    let (control_plane_db, db_openapi_configs, db_auth_config): (Option<apify::database::DatabaseManager>, Vec<apify::app_state::OpenApiStateConfig>, Option<Vec<apify::config::Authenticator>>) = rt_init.block_on(async {
+    let (control_plane_db, db_openapi_configs, db_auth_config): (
+        Option<apify::database::DatabaseManager>,
+        Vec<apify::app_state::OpenApiStateConfig>,
+        Option<Vec<apify::config::Authenticator>>,
+    ) = rt_init.block_on(async {
         let db = apify::database::DatabaseManager::new(db_config)
             .await
             .map_err(|e| e.to_string())?;
@@ -58,26 +62,26 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 Ok(configs) => {
                     tracing::info!(count = configs.len(), "Loaded API configs from Metadata DB");
                     configs
-                },
+                }
                 Err(e) => {
                     tracing::warn!("Failed to load API configs from DB: {}", e);
                     Vec::new()
                 }
             };
-            
+
             let auth_configs = match apify::control_plane::load_auth_configs(&db).await {
                 Ok(configs) => {
                     if let Some(c) = &configs {
                         tracing::info!(count = c.len(), "Loaded Auth configs from Metadata DB");
                     }
                     configs
-                },
+                }
                 Err(e) => {
                     tracing::warn!("Failed to load Auth configs from DB: {}", e);
                     None
                 }
             };
-            
+
             Ok::<_, String>((None, api_configs, auth_configs))
         }
     })?;

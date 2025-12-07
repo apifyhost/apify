@@ -115,15 +115,13 @@ impl RequestValidator {
                             {
                                 // Create a self-contained schema by adding components from the root spec
                                 let mut schema_with_components = schema.clone();
-                                if let Some(components) = spec.get("components") {
-                                    if let Some(obj) = schema_with_components.as_object_mut() {
-                                        obj.insert("components".to_string(), components.clone());
-                                    }
+                                if let Some(components) = spec.get("components")
+                                    && let Some(obj) = schema_with_components.as_object_mut()
+                                {
+                                    obj.insert("components".to_string(), components.clone());
                                 }
 
-                                match JSONSchema::options()
-                                    .compile(&schema_with_components)
-                                {
+                                match JSONSchema::options().compile(&schema_with_components) {
                                     Ok(compiled) => {
                                         route_val.body_schema = Some(compiled);
                                     }
@@ -267,7 +265,10 @@ impl Module for RequestValidator {
 
                     eprintln!("Validation Error: {}", error_msg);
                     // Debug: print the schema being used (if possible, JSONSchema doesn't implement Debug nicely usually, but let's try printing the key)
-                    eprintln!("Debug: Validation failed for route: {} {}", ctx.method, route.path_pattern);
+                    eprintln!(
+                        "Debug: Validation failed for route: {} {}",
+                        ctx.method, route.path_pattern
+                    );
 
                     return ModuleOutcome::Respond(error_response(
                         StatusCode::BAD_REQUEST,
