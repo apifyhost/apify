@@ -1,6 +1,6 @@
 //! Database facade delegating to backend implementations in modules/.
 
-use crate::observability::metrics::DbMetrics;
+use crate::modules::metrics::DbMetrics;
 use crate::schema_generator::TableSchema;
 use serde_json::Value;
 use std::collections::HashMap;

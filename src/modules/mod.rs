@@ -9,6 +9,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 pub mod key_auth;
+pub mod metrics;
 pub mod oauth;
 pub mod openapi_docs;
 pub mod postgres;
@@ -16,6 +17,7 @@ pub mod request_logger;
 pub mod request_validator;
 pub mod response_headers;
 pub mod sqlite;
+pub mod tracing;
 
 /// Result of executing a module hook
 pub enum ModuleOutcome {

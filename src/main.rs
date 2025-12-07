@@ -2,7 +2,10 @@
 
 use apify::{
     config::{ApiRef, Config, OpenAPIConfig},
-    observability::{init_metrics, init_tracing, shutdown_tracing},
+    modules::{
+        metrics::init_metrics,
+        tracing::{init_tracing, shutdown_tracing},
+    },
     server::{start_docs_server, start_listener},
 };
 use clap::Parser;
@@ -296,7 +299,10 @@ fn start_metrics_server(
             Request, Response, StatusCode, body::Bytes, server::conn::http1, service::service_fn,
         },
         hyper_util::rt::TokioIo,
-        observability::{export_metrics, init_logging, init_tracing_with_otel},
+        modules::{
+            metrics::export_metrics,
+            tracing::{init_logging, init_tracing_with_otel},
+        },
         tokio::{self, net::TcpListener},
     };
 
