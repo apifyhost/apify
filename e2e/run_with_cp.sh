@@ -128,7 +128,7 @@ rm $CONFIG
 # rm $DB_FILE # Optional: keep for debugging
 
 echo "=== APIFY LOGS ==="
-cat apify.log
+# cat apify.log
 echo "=================="
 
 exit $TEST_EXIT_CODE
