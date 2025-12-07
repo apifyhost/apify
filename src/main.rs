@@ -28,15 +28,13 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Load main configuration from specified file path
     let config = Config::from_file(&cli.config)?;
 
-    // Get observability configuration
+    // Get global modules configuration
     let otlp_endpoint = config
-        .observability
+        .modules
         .as_ref()
-        .and_then(|o| o.otlp_endpoint.as_deref());
-    let log_level = config
-        .observability
-        .as_ref()
-        .and_then(|o| o.log_level.as_deref());
+        .and_then(|m| m.tracing.as_ref())
+        .and_then(|t| t.otlp_endpoint.as_deref());
+    let log_level = config.log_level.as_deref();
 
     // If OpenTelemetry is configured, we need to defer ALL tracing initialization
     // to the metrics server thread (which has Tokio runtime)
@@ -79,14 +77,16 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Start metrics server if enabled
     let metrics_enabled = config
-        .observability
+        .modules
         .as_ref()
-        .and_then(|o| o.metrics_enabled)
+        .and_then(|m| m.metrics.as_ref())
+        .and_then(|metrics| metrics.enabled)
         .unwrap_or(true); // Default enabled
     let metrics_port = config
-        .observability
+        .modules
         .as_ref()
-        .and_then(|o| o.metrics_port)
+        .and_then(|m| m.metrics.as_ref())
+        .and_then(|metrics| metrics.port)
         .unwrap_or(9090);
 
     if metrics_enabled {

@@ -141,9 +141,12 @@ datasource:
     database: %s
     max_pool_size: 1
 
-observability:
-  log_level: "info"
-  metrics_enabled: false
+log_level: "info"
+
+modules:
+  tracing:
+  metrics:
+    enabled: false
 `, serverPort, apiFile, dbFile)
 		err = os.WriteFile(configFile, []byte(configContent), 0644)
 		Expect(err).NotTo(HaveOccurred())

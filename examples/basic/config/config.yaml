@@ -32,20 +32,22 @@ datasource:
 # If set, docs will be served on this port instead of the main API port
 # docs_port: 3001
 
-# Observability configuration (optional)
-observability:
-  # Log level: trace, debug, info, warn, error
-  # Can be overridden with RUST_LOG environment variable
-  log_level: "info"
+# Log level: trace, debug, info, warn, error
+# Can be overridden with RUST_LOG environment variable
+log_level: "info"
 
-  # OpenTelemetry OTLP endpoint for distributed tracing
-  # Set to null to disable tracing
-  otlp_endpoint: null
+# Global modules configuration
+modules:
+  tracing:
+    # OpenTelemetry OTLP endpoint for distributed tracing
+    # Set to null to disable tracing
+    otlp_endpoint: null
 
-  # Enable Prometheus metrics endpoint
-  # Default: true
-  metrics_enabled: true
+  metrics:
+    # Enable Prometheus metrics endpoint
+    # Default: true
+    enabled: true
 
-  # Port for Prometheus metrics HTTP endpoint
-  # Default: 9090
-  metrics_port: 9090
+    # Port for Prometheus metrics HTTP endpoint
+    # Default: 9090
+    port: 9090

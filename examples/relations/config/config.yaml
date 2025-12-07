@@ -12,7 +12,10 @@ datasource:
     database: /app/data/orders.db
     max_pool_size: 5
 
-observability:
-  log_level: "info"
-  metrics_enabled: true
-  metrics_port: 9090
+log_level: "info"
+
+modules:
+  tracing:
+  metrics:
+    enabled: true
+    port: 9090

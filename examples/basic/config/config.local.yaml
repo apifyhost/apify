@@ -18,10 +18,13 @@ datasource:
     database: ":memory:"
     max_pool_size: 5
 
-observability:
-  log_level: "info"
-  otlp_endpoint: null
-  metrics_enabled: true
-  metrics_port: 9090
+log_level: "info"
+
+modules:
+  tracing:
+    otlp_endpoint: null
+  metrics:
+    enabled: true
+    port: 9090
 
 docs_port: 3001

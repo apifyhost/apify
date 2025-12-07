@@ -42,8 +42,11 @@ datasource:
     ssl_mode: disable
     max_pool_size: 10
 
-observability:
-  log_level: "info"
-  otlp_endpoint: http://jaeger:4317
-  metrics_enabled: true
-  metrics_port: 9090
+log_level: "info"
+
+modules:
+  tracing:
+    otlp_endpoint: http://jaeger:4317
+  metrics:
+    enabled: true
+    port: 9090

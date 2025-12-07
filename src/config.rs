@@ -11,18 +11,30 @@ pub struct Config {
     pub listeners: Vec<ListenerConfig>,
     pub consumers: Option<Vec<ConsumerConfig>>, // Global consumers
     pub datasource: Option<std::collections::HashMap<String, DatabaseSettings>>, // Global datasources
-    pub observability: Option<ObservabilityConfig>, // Observability settings
+    pub modules: Option<GlobalModulesConfig>,       // Global modules (tracing, metrics, etc.)
     pub oauth_providers: Option<Vec<OAuthProviderConfig>>, // OAuth/OIDC providers
     pub docs_port: Option<u16>,                     // Port for OpenAPI docs (Swagger UI)
+    pub log_level: Option<String>,                  // Global log level (trace, debug, info, warn, error)
 }
 
-/// Observability configuration
+/// Global modules configuration
 #[derive(Debug, Deserialize, Clone)]
-pub struct ObservabilityConfig {
-    pub log_level: Option<String>,     // trace, debug, info, warn, error
-    pub otlp_endpoint: Option<String>, // OpenTelemetry collector endpoint (e.g., http://localhost:4317)
-    pub metrics_enabled: Option<bool>, // Enable Prometheus metrics endpoint
-    pub metrics_port: Option<u16>,     // Port for metrics endpoint (default: 9090)
+pub struct GlobalModulesConfig {
+    pub tracing: Option<TracingConfig>,
+    pub metrics: Option<MetricsConfig>,
+}
+
+/// Tracing module configuration
+#[derive(Debug, Deserialize, Clone)]
+pub struct TracingConfig {
+    pub otlp_endpoint: Option<String>, // OpenTelemetry collector endpoint
+}
+
+/// Metrics module configuration
+#[derive(Debug, Deserialize, Clone)]
+pub struct MetricsConfig {
+    pub enabled: Option<bool>, // Enable Prometheus metrics endpoint
+    pub port: Option<u16>,     // Port for metrics endpoint (default: 9090)
 }
 
 /// Database configuration structure - supports multiple named datasources

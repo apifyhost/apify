@@ -29,9 +29,12 @@ datasource:
     database: /tmp/apify-relations-crud-test/data/test.db
     max_pool_size: 5
 
-observability:
-  log_level: "info"
-  metrics_enabled: false
+log_level: "info"
+
+modules:
+  tracing:
+  metrics:
+    enabled: false
 EOF
 
 # Copy OpenAPI specs
