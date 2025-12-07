@@ -123,7 +123,11 @@ listeners:
         .send()
         .await?;
     // With request_validator enabled by default, this should return 413 Payload Too Large
-    assert_eq!(resp.status(), 413, "Large body should be rejected by default validator");
+    assert_eq!(
+        resp.status(),
+        413,
+        "Large body should be rejected by default validator"
+    );
 
     let _ = child.kill().await;
     Ok(())
