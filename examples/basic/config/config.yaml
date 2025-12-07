@@ -28,9 +28,6 @@ datasource:
     ssl_mode: disable
     max_pool_size: 10
 
-# Port for OpenAPI docs (Swagger UI)
-# If set, docs will be served on this port instead of the main API port
-# docs_port: 3001
 
 # Log level: trace, debug, info, warn, error
 # Can be overridden with RUST_LOG environment variable
@@ -55,3 +52,9 @@ modules:
     # Port for Prometheus metrics HTTP endpoint
     # Default: 9090
     port: 9090
+
+  openapi_docs:
+    # Enable OpenAPI docs server
+    enabled: false
+    # Port for OpenAPI docs (Swagger UI)
+    port: 3001

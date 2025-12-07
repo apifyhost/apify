@@ -27,5 +27,6 @@ modules:
   metrics:
     enabled: true
     port: 9090
-
-docs_port: 3001
+  openapi_docs:
+    enabled: true
+    port: 3001

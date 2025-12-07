@@ -195,7 +195,17 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
 
         // Start docs server if configured
-        if let Some(docs_port) = config.docs_port {
+        let docs_config = config
+            .modules
+            .as_ref()
+            .and_then(|m| m.openapi_docs.as_ref());
+        if let Some(docs_port) = docs_config.and_then(|c| {
+            if c.enabled.unwrap_or(false) {
+                c.port
+            } else {
+                None
+            }
+        }) {
             // We need to construct a minimal AppState for the docs server
             // For now, we can reuse the logic from start_listener but simplified,
             // or better yet, we need access to the AppState created inside start_listener.

@@ -13,7 +13,6 @@ pub struct Config {
     pub datasource: Option<std::collections::HashMap<String, DatabaseSettings>>, // Global datasources
     pub modules: Option<GlobalModulesConfig>, // Global modules (tracing, metrics, etc.)
     pub oauth_providers: Option<Vec<OAuthProviderConfig>>, // OAuth/OIDC providers
-    pub docs_port: Option<u16>,               // Port for OpenAPI docs (Swagger UI)
     pub log_level: Option<String>,            // Global log level (trace, debug, info, warn, error)
 }
 
@@ -22,6 +21,7 @@ pub struct Config {
 pub struct GlobalModulesConfig {
     pub tracing: Option<TracingConfig>,
     pub metrics: Option<MetricsConfig>,
+    pub openapi_docs: Option<OpenApiDocsConfig>,
 }
 
 /// Tracing module configuration
@@ -36,6 +36,13 @@ pub struct TracingConfig {
 pub struct MetricsConfig {
     pub enabled: Option<bool>, // Enable Prometheus metrics endpoint
     pub port: Option<u16>,     // Port for metrics endpoint (default: 9090)
+}
+
+/// OpenAPI Docs module configuration
+#[derive(Debug, Deserialize, Clone)]
+pub struct OpenApiDocsConfig {
+    pub enabled: Option<bool>, // Enable OpenAPI docs server
+    pub port: Option<u16>,     // Port for OpenAPI docs (Swagger UI)
 }
 
 /// Database configuration structure - supports multiple named datasources
