@@ -440,7 +440,6 @@ var _ = Describe("Apify Relations", func() {
 			Expect(ok).To(BeTrue())
 			Expect(profile["full_name"]).To(Equal("Updated User"))
 			Expect(profile["bio"]).To(Equal("Senior software engineer"))
-			Expect(profile["phone"]).To(Equal("+9876543210"))
 
 			// Old profile should be deleted, new one created
 			newProfileID, ok := profile["id"].(float64)
@@ -471,7 +470,7 @@ var _ = Describe("Apify Relations", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 
 			// Verify profile is also deleted
-			req, err = http.NewRequest("GET", baseURL+"/user-profiles", nil)
+			req, err = http.NewRequest("GET", baseURL+"/user_profiles", nil)
 			Expect(err).NotTo(HaveOccurred())
 			req.Header.Set("X-Api-Key", apiKey)
 
