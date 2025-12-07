@@ -20,11 +20,8 @@ use tokio::sync::mpsc;
 #[derive(Serialize)]
 struct AccessLogEntry {
     timestamp: String,
-    method: String,
-    path: String,
-    status: u16,
     duration_ms: u64,
-    ip: String,
+    client_ip: String,
     user_agent: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
@@ -34,6 +31,10 @@ struct AccessLogEntry {
 
 #[derive(Serialize)]
 struct RequestLogInfo {
+    method: String,
+    path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    size: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     headers: Option<HashMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -46,6 +47,9 @@ struct RequestLogInfo {
 
 #[derive(Serialize)]
 struct ResponseLogInfo {
+    status: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    size: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     headers: Option<HashMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -219,13 +223,13 @@ impl Module for RequestLogger {
             None
         };
 
+        let req_size = ctx.raw_body.as_ref().map(|b| b.len());
+        let res_size = ctx.result_json.as_ref().map(|v| v.to_string().len());
+
         let entry = AccessLogEntry {
             timestamp: Local::now().to_rfc3339(),
-            method: ctx.method.to_string(),
-            path: ctx.path.to_string(),
-            status,
             duration_ms: duration,
-            ip: ctx
+            client_ip: ctx
                 .client_ip
                 .map(|ip| ip.to_string())
                 .unwrap_or_else(|| "0.0.0.0".to_string()),
@@ -236,12 +240,17 @@ impl Module for RequestLogger {
                 .map(|s| s.to_string()),
             error: None, // TODO: Capture error if any
             request: RequestLogInfo {
+                method: ctx.method.to_string(),
+                path: ctx.path.to_string(),
+                size: req_size,
                 headers: req_headers,
                 query,
                 body: req_body,
                 cookies: req_cookies,
             },
             response: ResponseLogInfo {
+                status,
+                size: res_size,
                 headers: res_headers,
                 body: res_body,
                 cookies: res_cookies,
