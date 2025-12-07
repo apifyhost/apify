@@ -2,7 +2,10 @@
 
 use apify::{
     config::{ApiRef, Config, OpenAPIConfig},
-    observability::{init_metrics, init_tracing, shutdown_tracing},
+    modules::{
+        metrics::init_metrics,
+        tracing::{init_tracing, shutdown_tracing},
+    },
     server::{start_docs_server, start_listener},
 };
 use clap::Parser;
@@ -25,24 +28,20 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Load main configuration from specified file path
     let config = Config::from_file(&cli.config)?;
 
-    // Get observability configuration
-    let otlp_endpoint = config
-        .observability
-        .as_ref()
-        .and_then(|o| o.otlp_endpoint.as_deref());
-    let log_level = config
-        .observability
-        .as_ref()
-        .and_then(|o| o.log_level.as_deref());
+    // Get global modules configuration
+    let tracing_config = config.modules.as_ref().and_then(|m| m.tracing.as_ref());
+    let tracing_enabled = tracing_config.and_then(|t| t.enabled).unwrap_or(true);
+    let otlp_endpoint = tracing_config.and_then(|t| t.otlp_endpoint.as_deref());
+    let log_level = config.log_level.as_deref();
 
-    // If OpenTelemetry is configured, we need to defer ALL tracing initialization
+    // If OpenTelemetry is configured AND enabled, we need to defer ALL tracing initialization
     // to the metrics server thread (which has Tokio runtime)
     // Otherwise, initialize basic logging here
-    if otlp_endpoint.is_none() {
-        init_tracing("apify", None, log_level)?;
-    } else {
+    if tracing_enabled && otlp_endpoint.is_some() {
         // Print to stderr since tracing isn't initialized yet
         eprintln!("Deferring tracing initialization to Tokio runtime (OpenTelemetry enabled)");
+    } else {
+        init_tracing("apify", None, log_level)?;
     }
 
     tracing::info!(
@@ -76,18 +75,24 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Start metrics server if enabled
     let metrics_enabled = config
-        .observability
+        .modules
         .as_ref()
-        .and_then(|o| o.metrics_enabled)
+        .and_then(|m| m.metrics.as_ref())
+        .and_then(|metrics| metrics.enabled)
         .unwrap_or(true); // Default enabled
     let metrics_port = config
-        .observability
+        .modules
         .as_ref()
-        .and_then(|o| o.metrics_port)
+        .and_then(|m| m.metrics.as_ref())
+        .and_then(|metrics| metrics.port)
         .unwrap_or(9090);
 
     if metrics_enabled {
-        let otlp_endpoint_for_thread = otlp_endpoint.map(|s| s.to_string());
+        let otlp_endpoint_for_thread = if tracing_enabled {
+            otlp_endpoint.map(|s| s.to_string())
+        } else {
+            None
+        };
         let log_level_for_thread = log_level.map(|s| s.to_string());
         let metrics_handle = thread::spawn(
             move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -97,7 +102,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         );
         handles.push(metrics_handle);
 
-        if otlp_endpoint.is_some() {
+        if tracing_enabled && otlp_endpoint.is_some() {
             eprintln!(
                 "Metrics endpoint will start on port {} with OpenTelemetry tracing",
                 metrics_port
@@ -190,7 +195,17 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
 
         // Start docs server if configured
-        if let Some(docs_port) = config.docs_port {
+        let docs_config = config
+            .modules
+            .as_ref()
+            .and_then(|m| m.openapi_docs.as_ref());
+        if let Some(docs_port) = docs_config.and_then(|c| {
+            if c.enabled.unwrap_or(false) {
+                c.port
+            } else {
+                None
+            }
+        }) {
             // We need to construct a minimal AppState for the docs server
             // For now, we can reuse the logic from start_listener but simplified,
             // or better yet, we need access to the AppState created inside start_listener.
@@ -296,7 +311,10 @@ fn start_metrics_server(
             Request, Response, StatusCode, body::Bytes, server::conn::http1, service::service_fn,
         },
         hyper_util::rt::TokioIo,
-        observability::{export_metrics, init_logging, init_tracing_with_otel},
+        modules::{
+            metrics::export_metrics,
+            tracing::{init_logging, init_tracing_with_otel},
+        },
         tokio::{self, net::TcpListener},
     };
 

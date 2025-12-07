@@ -31,9 +31,13 @@ datasource:
     database: /tmp/apify-relations-test/data/orders.db
     max_pool_size: 5
 
-observability:
-  log_level: "info"
-  metrics_enabled: false
+log_level: "info"
+
+modules:
+  tracing:
+    enabled: true
+  metrics:
+    enabled: false
 EOF
 
 echo "Starting Apify server..."

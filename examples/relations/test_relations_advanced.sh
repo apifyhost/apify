@@ -26,9 +26,13 @@ datasource:
     database: /tmp/apify-relations-advanced-test/data/users.db
     max_pool_size: 5
 
-observability:
-  log_level: "info"
-  metrics_enabled: false
+log_level: "info"
+
+modules:
+  tracing:
+    enabled: true
+  metrics:
+    enabled: false
 EOF
 
 # Copy users OpenAPI spec

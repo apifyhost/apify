@@ -30,7 +30,11 @@ datasource:
     ssl_mode: disable
     max_pool_size: 10
 
-observability:
-  log_level: "info"
-  metrics_enabled: true
-  metrics_port: 9090
+log_level: "info"
+
+modules:
+  tracing:
+    enabled: true
+  metrics:
+    enabled: true
+    port: 9090

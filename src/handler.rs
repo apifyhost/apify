@@ -5,7 +5,7 @@ use super::crud_handler::CRUDError;
 use super::hyper::{Request, Response, StatusCode};
 use super::{Arc, http_body_util::Full, hyper::body::Bytes};
 use crate::modules::ModuleOutcome;
-use crate::observability::RequestMetrics;
+use crate::modules::metrics::RequestMetrics;
 use crate::phases::{Phase, RequestContext};
 use serde_json::Value;
 use std::collections::HashMap;
