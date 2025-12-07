@@ -6,11 +6,18 @@ listeners:
       - path: ./openapi/items.yaml
         datasource: postgres1
 
-consumers:
-  - name: default
-    keys:
-      - dev-key-123
-      - my-api-key-001
+auth:
+  - name: default-api-keys
+    type: api-key
+    enabled: true
+    config:
+      source: header
+      key_name: X-Api-Key
+      consumers:
+        - name: default
+          keys:
+            - dev-key-123
+            - my-api-key-001
 
 datasource:
   sqlite1:

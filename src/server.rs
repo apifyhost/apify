@@ -50,8 +50,7 @@ pub fn start_listener(
     thread_id: usize,
     datasources: Option<std::collections::HashMap<String, super::config::DatabaseSettings>>,
     openapi_configs: Vec<super::app_state::OpenApiStateConfig>,
-    consumers: Vec<super::config::ConsumerConfig>,
-    oauth_providers: Option<Vec<super::config::OAuthProviderConfig>>,
+    auth_config: Option<Vec<super::config::Authenticator>>,
     access_log_config: Option<super::config::AccessLogConfig>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Critical: Create single-threaded runtime using new_current_thread
@@ -74,8 +73,7 @@ pub fn start_listener(
             datasources,
             openapi_configs,
             listener_modules: listener_config.modules,
-            consumers,
-            oauth_providers,
+            auth_config,
             public_url: None,
             access_log_config,
         })

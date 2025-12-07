@@ -12,19 +12,28 @@ listeners:
       - path: ./openapi/users.yaml
         datasource: postgres1
 
-consumers:
-  - name: default
-    keys:
-      - dev-key-123
-      - e2e-test-key-001
+auth:
+  - name: default-api-keys
+    type: api-key
+    enabled: true
+    config:
+      source: header
+      key_name: X-Api-Key
+      consumers:
+        - name: default
+          keys:
+            - dev-key-123
+            - e2e-test-key-001
 
-oauth_providers:
   - name: keycloak
-    issuer: "${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:apify}"
-    client_id: "${KEYCLOAK_CLIENT_ID:apify-test-client}"
-    client_secret: "${KEYCLOAK_CLIENT_SECRET:apify-test-secret}"
-    audience: "apify-api"
-    introspection: true
+    type: oidc
+    enabled: true
+    config:
+      issuer: "${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:apify}"
+      client_id: "${KEYCLOAK_CLIENT_ID:apify-test-client}"
+      client_secret: "${KEYCLOAK_CLIENT_SECRET:apify-test-secret}"
+      audience: "apify-api"
+      introspection: true
 
 datasource:
   sqlite1:

@@ -6,18 +6,27 @@ listeners:
       - path: ./openapi/items_oauth.yaml
         datasource: postgres1
 
-consumers:
-  - name: default
-    keys:
-      - demo-key-123
+auth:
+  - name: default-api-keys
+    type: api-key
+    enabled: true
+    config:
+      source: header
+      key_name: X-Api-Key
+      consumers:
+        - name: default
+          keys:
+            - demo-key-123
 
-oauth_providers:
   - name: keycloak
-    issuer: "${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:apify}"
-    client_id: "${KEYCLOAK_CLIENT_ID:apify-client}"
-    client_secret: "${KEYCLOAK_CLIENT_SECRET:your-client-secret}"
-    audience: "apify-api"
-    introspection: true
+    type: oidc
+    enabled: true
+    config:
+      issuer: "${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:apify}"
+      client_id: "${KEYCLOAK_CLIENT_ID:apify-client}"
+      client_secret: "${KEYCLOAK_CLIENT_SECRET:your-client-secret}"
+      audience: "apify-api"
+      introspection: true
 
 datasource:
   postgres1:

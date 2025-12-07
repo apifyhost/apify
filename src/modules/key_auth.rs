@@ -30,21 +30,31 @@ impl Module for KeyAuthModule {
 
     fn run(&self, phase: Phase, ctx: &mut RequestContext, state: &Arc<AppState>) -> ModuleOutcome {
         debug_assert_eq!(phase, Phase::Access);
-        let header_val = ctx.headers.get("X-Api-Key").and_then(|v| v.to_str().ok());
-        if header_val.is_none() {
-            return ModuleOutcome::Respond(error_response(
-                StatusCode::UNAUTHORIZED,
-                "missing api key",
-            ));
+
+        if let Some(authenticators) = &state.auth_config {
+            for authenticator in authenticators {
+                if let crate::config::Authenticator::ApiKey(cfg) = authenticator {
+                    if !cfg.enabled.unwrap_or(true) {
+                        continue;
+                    }
+
+                    let key_name = cfg.config.key_name.as_deref().unwrap_or("X-Api-Key");
+                    // TODO: Support Query source
+                    if let Some(key) = ctx.headers.get(key_name).and_then(|v| v.to_str().ok()) {
+                        if let Some(consumer) = state.lookup_consumer_by_key(key) {
+                            ctx.extensions.insert(ConsumerIdentity {
+                                name: consumer.name.clone(),
+                            });
+                            return ModuleOutcome::Continue;
+                        }
+                    }
+                }
+            }
         }
-        let key = header_val.unwrap();
-        if let Some(consumer) = state.lookup_consumer_by_key(key) {
-            ctx.extensions.insert(ConsumerIdentity {
-                name: consumer.name.clone(),
-            });
-            ModuleOutcome::Continue
-        } else {
-            ModuleOutcome::Respond(error_response(StatusCode::UNAUTHORIZED, "invalid api key"))
-        }
+
+        ModuleOutcome::Respond(error_response(
+            StatusCode::UNAUTHORIZED,
+            "missing or invalid api key",
+        ))
     }
 }

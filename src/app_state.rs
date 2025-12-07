@@ -2,8 +2,8 @@
 
 use super::api_generator::APIGenerator;
 use super::config::{
-    ConsumerConfig, DatabaseSettings, MatchRule, ModulesConfig, OAuthProviderConfig, OpenAPIConfig,
-    RouteConfig,
+    Authenticator, ConsumerConfig, DatabaseSettings, MatchRule, ModulesConfig, OidcConfig,
+    OpenAPIConfig, RouteConfig,
 };
 use super::crud_handler::CRUDHandler;
 use super::database::DatabaseManager;
@@ -27,8 +27,7 @@ pub struct AppStateConfig {
     pub datasources: Option<HashMap<String, DatabaseSettings>>,
     pub openapi_configs: Vec<OpenApiStateConfig>,
     pub listener_modules: Option<ModulesConfig>,
-    pub consumers: Vec<ConsumerConfig>,
-    pub oauth_providers: Option<Vec<OAuthProviderConfig>>,
+    pub auth_config: Option<Vec<Authenticator>>,
     pub public_url: Option<String>,
     pub access_log_config: Option<crate::config::AccessLogConfig>,
 }
@@ -44,7 +43,8 @@ pub struct AppState {
     pub operation_modules: HashMap<String, crate::modules::ModuleRegistry>, // "METHOD path_pattern" -> modules
     consumers: HashMap<String, ConsumerConfig>,                             // name -> config
     key_to_consumer: HashMap<String, String>, // api_key -> consumer name
-    pub oauth_providers: HashMap<String, OAuthProviderConfig>, // name -> provider config
+    pub oidc_providers: HashMap<String, OidcConfig>, // name -> provider config
+    pub auth_config: Option<Vec<Authenticator>>, // Full auth configuration
 }
 
 impl AppState {
@@ -64,7 +64,8 @@ impl AppState {
             operation_modules: HashMap::new(),
             consumers: HashMap::new(),
             key_to_consumer: HashMap::new(),
-            oauth_providers: HashMap::new(),
+            oidc_providers: HashMap::new(),
+            auth_config: None,
         }
     }
 
@@ -370,32 +371,44 @@ impl AppState {
             }
         }
 
-        // Build consumers maps
+        // Build consumers maps and OIDC providers from AuthConfig
         let mut consumers_map = HashMap::new();
         let mut key_map = HashMap::new();
-        for c in config.consumers {
-            for k in &c.keys {
-                key_map.insert(k.clone(), c.name.clone());
+        let mut oidc_map = HashMap::new();
+
+        // Move auth_config out to avoid partial move issues
+        let auth_config = config.auth_config;
+
+        if let Some(ref authenticators) = auth_config {
+            for authenticator in authenticators {
+                match authenticator {
+                    Authenticator::ApiKey(api_key_auth) => {
+                        if api_key_auth.enabled.unwrap_or(true) {
+                            tracing::info!(name = %api_key_auth.name, "Loading API Key authenticator");
+                            for c in &api_key_auth.config.consumers {
+                                for k in &c.keys {
+                                    key_map.insert(k.clone(), c.name.clone());
+                                }
+                                consumers_map.insert(c.name.clone(), c.clone());
+                            }
+                        }
+                    }
+                    Authenticator::Oidc(oidc_auth) => {
+                        if oidc_auth.enabled.unwrap_or(true) {
+                            tracing::info!(
+                                name = %oidc_auth.name,
+                                issuer = %oidc_auth.config.issuer,
+                                "Loading OIDC authenticator"
+                            );
+                            oidc_map.insert(oidc_auth.name.clone(), oidc_auth.config.clone());
+                        }
+                    }
+                }
             }
-            consumers_map.insert(c.name.clone(), c);
         }
 
-        // Build oauth providers map
-        let mut oauth_map = HashMap::new();
-        if let Some(list) = config.oauth_providers {
-            tracing::info!(provider_count = list.len(), "Loading OAuth providers");
-            for p in list {
-                tracing::debug!(
-                    name = %p.name,
-                    issuer = %p.issuer,
-                    client_id = ?p.client_id,
-                    introspection = ?p.introspection,
-                    "Registered OAuth provider"
-                );
-                oauth_map.insert(p.name.clone(), p);
-            }
-        } else {
-            tracing::warn!("No OAuth providers configured");
+        if oidc_map.is_empty() {
+            tracing::debug!("No OIDC providers configured");
         }
 
         Ok(Self {
@@ -407,7 +420,8 @@ impl AppState {
             operation_modules,
             consumers: consumers_map,
             key_to_consumer: key_map,
-            oauth_providers: oauth_map,
+            oidc_providers: oidc_map,
+            auth_config,
         })
     }
 }

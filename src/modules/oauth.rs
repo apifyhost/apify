@@ -92,12 +92,11 @@ impl Module for OAuthModule {
         }
 
         // Select provider config (first available for now)
-        let provider_cfg = match state.oauth_providers.values().next() {
+        let provider_cfg = match state.oidc_providers.values().next() {
             Some(p) => {
                 tracing::debug!(
-                    provider = %p.name,
                     issuer = %p.issuer,
-                    "Using OAuth provider"
+                    "Using OIDC provider"
                 );
                 p
             }
