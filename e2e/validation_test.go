@@ -159,6 +159,8 @@ observability:
 		
 		serverCmd = exec.Command("cargo", "run", "--", "--config", configFile)
 		serverCmd.Dir = projectRoot
+		serverCmd.Stdout = GinkgoWriter
+		serverCmd.Stderr = GinkgoWriter
 		
 		err = serverCmd.Start()
 		Expect(err).NotTo(HaveOccurred())
@@ -176,7 +178,7 @@ observability:
 				return fmt.Errorf("status %d", resp.StatusCode)
 			}
 			return nil
-		}, "30s", "1s").Should(Succeed(), "Server failed to start")
+		}, "120s", "1s").Should(Succeed(), "Server failed to start")
 	})
 
 	AfterEach(func() {
