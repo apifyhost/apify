@@ -1,52 +1,83 @@
 //! Request logger module (Log phase)
-//! Logs request and response details
+//! Logs request and response details to file, stdout, or other destinations.
 
 use crate::app_state::AppState;
+use crate::config::AccessLogConfig;
 use crate::modules::{Module, ModuleOutcome};
 use crate::phases::{Phase, RequestContext};
+use serde::Serialize;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::path::Path;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::thread;
+use tokio::sync::mpsc;
 
-/// Request logger configuration
-pub struct RequestLoggerConfig {
-    /// Log request headers
-    pub log_headers: bool,
-    /// Log request body
-    pub log_body: bool,
-    /// Log response data
-    pub log_response: bool,
-}
-
-impl Default for RequestLoggerConfig {
-    fn default() -> Self {
-        Self {
-            log_headers: true,
-            log_body: false, // Don't log body by default for security
-            log_response: true,
-        }
-    }
+/// Access log entry structure
+#[derive(Serialize)]
+struct AccessLogEntry {
+    timestamp: String,
+    method: String,
+    path: String,
+    status: u16,
+    duration_ms: u64,
+    ip: String,
+    user_agent: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
 }
 
 /// Request logger module
 pub struct RequestLogger {
-    config: RequestLoggerConfig,
+    sender: mpsc::UnboundedSender<String>,
 }
 
 impl RequestLogger {
-    pub fn new(config: RequestLoggerConfig) -> Self {
-        Self { config }
-    }
+    pub fn new(config: Option<AccessLogConfig>) -> Self {
+        let (sender, mut receiver) = mpsc::unbounded_channel();
 
-    pub fn with_defaults() -> Self {
-        Self::new(RequestLoggerConfig::default())
-    }
+        let config = config.unwrap_or(AccessLogConfig {
+            enabled: Some(true),
+            path: Some("logs/access.log".to_string()),
+            format: Some("json".to_string()),
+        });
 
-    pub fn verbose() -> Self {
-        Self::new(RequestLoggerConfig {
-            log_headers: true,
-            log_body: true,
-            log_response: true,
-        })
+        if config.enabled.unwrap_or(true) {
+            let path_str = config
+                .path
+                .clone()
+                .unwrap_or_else(|| "logs/access.log".to_string());
+            
+            // Ensure directory exists
+            if let Some(parent) = Path::new(&path_str).parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+
+            // Spawn a dedicated thread for logging to avoid blocking async runtime with file I/O
+            thread::spawn(move || {
+                let file = OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&path_str);
+
+                let mut output: Box<dyn Write + Send> = match file {
+                    Ok(f) => Box::new(f),
+                    Err(e) => {
+                        eprintln!("Failed to open access log file {}: {}", path_str, e);
+                        // Fallback to stdout if file fails
+                        Box::new(std::io::stdout())
+                    }
+                };
+
+                while let Some(log_line) = receiver.blocking_recv() {
+                    if let Err(e) = writeln!(output, "{}", log_line) {
+                        eprintln!("Failed to write access log: {}", e);
+                    }
+                }
+            });
+        }
+
+        Self { sender }
     }
 }
 
@@ -62,54 +93,26 @@ impl Module for RequestLogger {
     fn run(&self, phase: Phase, ctx: &mut RequestContext, _state: &Arc<AppState>) -> ModuleOutcome {
         debug_assert_eq!(phase, Phase::Log);
 
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis();
+        let duration = ctx.start_time.elapsed().as_millis() as u64;
+        let status = ctx.response_status.unwrap_or(500);
+        
+        let entry = AccessLogEntry {
+            timestamp: chrono::Local::now().to_rfc3339(),
+            method: ctx.method.to_string(),
+            path: ctx.path.to_string(),
+            status,
+            duration_ms: duration,
+            ip: ctx.client_ip.map(|ip| ip.to_string()).unwrap_or_else(|| "0.0.0.0".to_string()),
+            user_agent: ctx
+                .headers
+                .get("user-agent")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string()),
+            error: None, // TODO: Capture error if any
+        };
 
-        // Log basic request info
-        println!(
-            "[{}] {} {} - matched_route: {:?}",
-            timestamp,
-            ctx.method,
-            ctx.path,
-            ctx.matched_route.as_ref().map(|r| &r.path_pattern)
-        );
-
-        // Log headers if configured
-        if self.config.log_headers && !ctx.headers.is_empty() {
-            println!("  Headers:");
-            for (name, value) in ctx.headers.iter() {
-                if let Ok(val_str) = value.to_str() {
-                    println!("    {}: {}", name, val_str);
-                }
-            }
-        }
-
-        // Log query params if present
-        if !ctx.query_params.is_empty() {
-            println!("  Query params: {:?}", ctx.query_params);
-        }
-
-        // Log path params if present
-        if !ctx.path_params.is_empty() {
-            println!("  Path params: {:?}", ctx.path_params);
-        }
-
-        // Log body if configured
-        if self.config.log_body {
-            if let Some(ref json_body) = ctx.json_body {
-                println!("  Body: {}", json_body);
-            } else if let Some(ref raw_body) = ctx.raw_body {
-                println!("  Body size: {} bytes", raw_body.len());
-            }
-        }
-
-        // Log response if configured
-        if self.config.log_response
-            && let Some(ref result) = ctx.result_json
-        {
-            println!("  Response: {}", result);
+        if let Ok(json) = serde_json::to_string(&entry) {
+            let _ = self.sender.send(json);
         }
 
         ModuleOutcome::Continue

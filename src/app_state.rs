@@ -56,6 +56,7 @@ impl AppState {
         consumers: Vec<ConsumerConfig>,
         oauth_providers: Option<Vec<OAuthProviderConfig>>,
         public_url: Option<String>,
+        access_log_config: Option<crate::config::AccessLogConfig>,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let routes = routes.unwrap_or_default();
         let mut route_responses = HashMap::new();
@@ -217,6 +218,11 @@ impl AppState {
 
         // Build listener-level fallback module registry
         let mut modules_registry = crate::modules::ModuleRegistry::new();
+        
+        // Add Access Log module (globally enabled by default)
+        let request_logger = crate::modules::request_logger::RequestLogger::new(access_log_config);
+        modules_registry = modules_registry.with(Arc::new(request_logger));
+
         if let Some(cfg) = listener_modules {
             modules_registry = apply_modules_cfg(modules_registry, cfg);
         }

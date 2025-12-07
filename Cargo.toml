@@ -49,6 +49,7 @@ tracing-opentelemetry = "0.32"
 prometheus = { version = "0.14", features = ["process"] }
 lazy_static = "1.4"
 jsonschema = "0.17"
+chrono = { version = "0.4.42", features = ["serde"] }
 
 [dev-dependencies]
 assert_cmd = "2"

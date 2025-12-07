@@ -172,6 +172,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let openapi_configs_clone = openapi_configs.clone();
             let consumers_clone = all_consumers.clone();
             let oauth_clone = config.oauth_providers.clone();
+            let access_log_config = config.modules.as_ref().and_then(|m| m.access_log.clone());
+            let access_log_config_clone = access_log_config.clone();
+
             let handle = thread::spawn(
                 move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     tracing::info!(
@@ -187,6 +190,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         openapi_configs_clone,
                         consumers_clone,
                         oauth_clone,
+                        access_log_config_clone,
                     )?;
                     Ok(())
                 },
@@ -239,6 +243,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let openapi_configs_clone = openapi_configs.clone();
             let consumers_clone = all_consumers.clone();
             let oauth_clone = config.oauth_providers.clone();
+            let access_log_config = config.modules.as_ref().and_then(|m| m.access_log.clone());
+            let access_log_config_clone = access_log_config.clone();
 
             // Only start docs server once (e.g. for the first listener, or globally?)
             // The user asked for "separate port", implying one global docs port.
@@ -265,6 +271,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 consumers_clone,
                                 oauth_clone,
                                 Some(format!("http://localhost:{}", listener_config_clone.port)),
+                                access_log_config_clone,
                             )
                             .await
                         })?;

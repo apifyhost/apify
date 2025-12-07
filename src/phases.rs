@@ -21,9 +21,14 @@ pub enum Phase {
     Log,
 }
 
+use std::time::Instant;
+
 /// Mutable request-scoped context passed between phases
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RequestContext {
+    pub start_time: Instant,
+    pub client_ip: Option<std::net::IpAddr>,
+    pub response_status: Option<u16>,
     pub method: Method,
     pub uri: Uri,
     pub path: String,
@@ -38,9 +43,12 @@ pub struct RequestContext {
 }
 
 impl RequestContext {
-    pub fn new(method: Method, uri: Uri, headers: HeaderMap) -> Self {
+    pub fn new(method: Method, uri: Uri, headers: HeaderMap, client_ip: Option<std::net::IpAddr>) -> Self {
         let path = uri.path().to_string();
         Self {
+            start_time: Instant::now(),
+            client_ip,
+            response_status: None,
             method,
             uri,
             path,

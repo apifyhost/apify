@@ -41,9 +41,10 @@ async fn handle_request_inner(
     state: Arc<AppState>,
 ) -> Result<Response<Full<Bytes>>, Box<dyn Error + Send + Sync>> {
     let method = parts.method.clone();
+    let client_ip = parts.extensions.get::<std::net::SocketAddr>().map(|addr| addr.ip());
 
     // Phase: HeaderParse (and build initial context)
-    let mut ctx = RequestContext::new(method.clone(), parts.uri.clone(), parts.headers.clone());
+    let mut ctx = RequestContext::new(method.clone(), parts.uri.clone(), parts.headers.clone(), client_ip);
     ctx.extensions = parts.extensions; // carry over existing request extensions
     ctx.query_params = extract_query_params(parts.uri.query());
 

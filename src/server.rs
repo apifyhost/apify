@@ -56,6 +56,7 @@ pub fn start_listener(
     )>,
     consumers: Vec<super::config::ConsumerConfig>,
     oauth_providers: Option<Vec<super::config::OAuthProviderConfig>>,
+    access_log_config: Option<super::config::AccessLogConfig>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Critical: Create single-threaded runtime using new_current_thread
     let rt = tokio::runtime::Builder::new_current_thread() // <-- Restored critical line
@@ -80,6 +81,7 @@ pub fn start_listener(
             consumers,
             oauth_providers,
             None,
+            access_log_config,
         )
         .await
         {
@@ -97,7 +99,7 @@ pub fn start_listener(
         // Continuously accept and handle connections
         loop {
             match listener.accept().await {
-                Ok((stream, _)) => {
+                Ok((stream, remote_addr)) => {
                     if let Err(e) = stream.set_nodelay(true) {
                         eprintln!("Thread {} set_nodelay error: {}", thread_id, e);
                         continue;
@@ -106,8 +108,10 @@ pub fn start_listener(
                     let state_clone = Arc::clone(&state);
                     // Handle connection asynchronously
                     tokio::task::spawn(async move {
-                        let service =
-                            service_fn(move |req| handle_request(req, Arc::clone(&state_clone)));
+                        let service = service_fn(move |mut req| {
+                            req.extensions_mut().insert(remote_addr);
+                            handle_request(req, Arc::clone(&state_clone))
+                        });
                         if let Err(err) = http1::Builder::new()
                             .keep_alive(true)
                             .serve_connection(io, service)
