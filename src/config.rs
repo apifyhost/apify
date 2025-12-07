@@ -27,6 +27,7 @@ pub struct GlobalModulesConfig {
 /// Tracing module configuration
 #[derive(Debug, Deserialize, Clone)]
 pub struct TracingConfig {
+    pub enabled: Option<bool>,         // Enable tracing (OpenTelemetry)
     pub otlp_endpoint: Option<String>, // OpenTelemetry collector endpoint
 }
 

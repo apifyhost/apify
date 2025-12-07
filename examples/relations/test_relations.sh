@@ -35,6 +35,7 @@ log_level: "info"
 
 modules:
   tracing:
+    enabled: true
   metrics:
     enabled: false
 EOF

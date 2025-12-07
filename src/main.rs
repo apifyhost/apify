@@ -29,21 +29,19 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let config = Config::from_file(&cli.config)?;
 
     // Get global modules configuration
-    let otlp_endpoint = config
-        .modules
-        .as_ref()
-        .and_then(|m| m.tracing.as_ref())
-        .and_then(|t| t.otlp_endpoint.as_deref());
+    let tracing_config = config.modules.as_ref().and_then(|m| m.tracing.as_ref());
+    let tracing_enabled = tracing_config.and_then(|t| t.enabled).unwrap_or(true);
+    let otlp_endpoint = tracing_config.and_then(|t| t.otlp_endpoint.as_deref());
     let log_level = config.log_level.as_deref();
 
-    // If OpenTelemetry is configured, we need to defer ALL tracing initialization
+    // If OpenTelemetry is configured AND enabled, we need to defer ALL tracing initialization
     // to the metrics server thread (which has Tokio runtime)
     // Otherwise, initialize basic logging here
-    if otlp_endpoint.is_none() {
-        init_tracing("apify", None, log_level)?;
-    } else {
+    if tracing_enabled && otlp_endpoint.is_some() {
         // Print to stderr since tracing isn't initialized yet
         eprintln!("Deferring tracing initialization to Tokio runtime (OpenTelemetry enabled)");
+    } else {
+        init_tracing("apify", None, log_level)?;
     }
 
     tracing::info!(
@@ -90,7 +88,11 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .unwrap_or(9090);
 
     if metrics_enabled {
-        let otlp_endpoint_for_thread = otlp_endpoint.map(|s| s.to_string());
+        let otlp_endpoint_for_thread = if tracing_enabled {
+            otlp_endpoint.map(|s| s.to_string())
+        } else {
+            None
+        };
         let log_level_for_thread = log_level.map(|s| s.to_string());
         let metrics_handle = thread::spawn(
             move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -100,7 +102,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         );
         handles.push(metrics_handle);
 
-        if otlp_endpoint.is_some() {
+        if tracing_enabled && otlp_endpoint.is_some() {
             eprintln!(
                 "Metrics endpoint will start on port {} with OpenTelemetry tracing",
                 metrics_port

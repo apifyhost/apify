@@ -22,6 +22,7 @@ log_level: "info"
 
 modules:
   tracing:
+    enabled: true
     otlp_endpoint: null
   metrics:
     enabled: true

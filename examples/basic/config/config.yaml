@@ -39,6 +39,10 @@ log_level: "info"
 # Global modules configuration
 modules:
   tracing:
+    # Enable distributed tracing
+    # Default: true
+    enabled: true
+
     # OpenTelemetry OTLP endpoint for distributed tracing
     # Set to null to disable tracing
     otlp_endpoint: null

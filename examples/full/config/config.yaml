@@ -46,6 +46,7 @@ log_level: "info"
 
 modules:
   tracing:
+    enabled: true
     otlp_endpoint: http://jaeger:4317
   metrics:
     enabled: true

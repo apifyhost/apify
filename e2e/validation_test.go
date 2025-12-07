@@ -145,6 +145,7 @@ log_level: "info"
 
 modules:
   tracing:
+    enabled: true
   metrics:
     enabled: false
 `, serverPort, apiFile, dbFile)
