@@ -2,7 +2,7 @@
 
 use super::app_state::AppState;
 use super::config::ListenerConfig;
-use super::handler::{handle_docs_request, handle_request};
+use super::handler::handle_request;
 use super::hyper::server::conn::http1;
 use super::hyper::service::service_fn;
 use super::tokio::net::TcpListener;
@@ -155,7 +155,10 @@ pub fn start_docs_server(
                     let state_clone = Arc::clone(&state);
                     tokio::task::spawn(async move {
                         let service = service_fn(move |req| {
-                            handle_docs_request(req, Arc::clone(&state_clone))
+                            crate::modules::openapi_docs::handle_docs_request(
+                                req,
+                                Arc::clone(&state_clone),
+                            )
                         });
                         if let Err(err) = http1::Builder::new().serve_connection(io, service).await
                         {

@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 pub mod key_auth;
 pub mod oauth;
+pub mod openapi_docs;
 pub mod postgres;
 pub mod request_logger;
 pub mod request_validator;
