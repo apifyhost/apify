@@ -12,11 +12,20 @@ use super::schema_generator::SchemaGenerator;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Configuration for a single OpenAPI spec within AppState
+#[derive(Clone)]
+pub struct OpenApiStateConfig {
+    pub config: OpenAPIConfig,
+    pub modules: Option<ModulesConfig>,
+    pub datasource: Option<String>,
+    pub access_log: Option<crate::config::AccessLogConfig>,
+}
+
 /// Configuration for creating AppState
 pub struct AppStateConfig {
     pub routes: Option<Vec<RouteConfig>>,
     pub datasources: Option<HashMap<String, DatabaseSettings>>,
-    pub openapi_configs: Vec<(OpenAPIConfig, Option<ModulesConfig>, Option<String>)>,
+    pub openapi_configs: Vec<OpenApiStateConfig>,
     pub listener_modules: Option<ModulesConfig>,
     pub consumers: Vec<ConsumerConfig>,
     pub oauth_providers: Option<Vec<OAuthProviderConfig>>,
@@ -83,7 +92,7 @@ impl AppState {
                 let datasource_name = config
                     .openapi_configs
                     .first()
-                    .and_then(|(_, _, ds_name)| ds_name.clone())
+                    .and_then(|c| c.datasource.clone())
                     .or_else(|| ds_map.keys().next().cloned())
                     .ok_or("No datasource specified and none available")?;
 
@@ -141,11 +150,11 @@ impl AppState {
                     config_count = config.openapi_configs.len(),
                     "Extracting schemas from OpenAPI configs"
                 );
-                for (i, (openapi_config, _, _)) in config.openapi_configs.iter().enumerate() {
+                for (i, api_config) in config.openapi_configs.iter().enumerate() {
                     tracing::info!(index = i, "Extracting from OpenAPI config");
 
                     match SchemaGenerator::extract_schemas_from_openapi(
-                        &openapi_config.openapi.spec,
+                        &api_config.config.openapi.spec,
                     ) {
                         Ok(schemas) => {
                             tracing::info!(
@@ -188,8 +197,8 @@ impl AppState {
                 let mut merged_spec = serde_json::Map::new();
                 let mut merged_paths = serde_json::Map::new();
 
-                for (openapi_config, _, _) in &config.openapi_configs {
-                    if let Some(spec_obj) = openapi_config.openapi.spec.as_object() {
+                for api_config in &config.openapi_configs {
+                    if let Some(spec_obj) = api_config.config.openapi.spec.as_object() {
                         for (key, value) in spec_obj {
                             if key == "paths" {
                                 if let Some(paths_obj) = value.as_object() {
@@ -236,19 +245,26 @@ impl AppState {
 
         // Build per-route module registries from per-API modules
         let mut route_modules: HashMap<String, crate::modules::ModuleRegistry> = HashMap::new();
-        for (openapi_config, per_api_modules, _) in &config.openapi_configs {
+        for api_config in &config.openapi_configs {
             let mut reg = crate::modules::ModuleRegistry::new();
 
+            // Apply per-API access log if configured
+            if let Some(log_cfg) = &api_config.access_log {
+                let logger =
+                    crate::modules::request_logger::RequestLogger::new(Some(log_cfg.clone()));
+                reg = reg.with(Arc::new(logger));
+            }
+
             // Apply configured modules
-            if let Some(cfg) = per_api_modules.clone() {
-                reg = apply_modules_cfg(reg, cfg);
+            if let Some(cfg) = &api_config.modules {
+                reg = apply_modules_cfg(reg, cfg.clone());
             }
 
             // Always enable request validation
             {
                 tracing::info!("Enabling request validation for API");
                 let validator_config = crate::modules::request_validator::RequestValidatorConfig {
-                    openapi_spec: Some(openapi_config.openapi.spec.clone()),
+                    openapi_spec: Some(api_config.config.openapi.spec.clone()),
                     ..Default::default()
                 };
                 let validator =
@@ -256,7 +272,7 @@ impl AppState {
                 reg = reg.with(Arc::new(validator));
             }
 
-            if let Some(paths_obj) = openapi_config
+            if let Some(paths_obj) = api_config.config
                 .openapi
                 .spec
                 .get("paths")

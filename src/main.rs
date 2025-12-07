@@ -1,6 +1,7 @@
 //! Application entry point, responsible for parsing CLI args, loading config, and starting services
 
 use apify::{
+    app_state::OpenApiStateConfig,
     config::{ApiRef, Config, OpenAPIConfig},
     modules::{
         metrics::init_metrics,
@@ -129,7 +130,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
                             Ok(openapi_config) => {
                                 tracing::info!(path = %p, "OpenAPI config loaded");
-                                openapi_configs.push((openapi_config, None, None));
+                                openapi_configs.push(OpenApiStateConfig {
+                                    config: openapi_config,
+                                    modules: None,
+                                    datasource: None,
+                                    access_log: None,
+                                });
                             }
                             Err(e) => {
                                 tracing::error!(path = %p, error = %e, "Failed to load OpenAPI config")
@@ -140,6 +146,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         path,
                         modules,
                         datasource,
+                        access_log,
                     } => {
                         let api_path = config_dir.join(path);
                         match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
@@ -155,7 +162,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                     tracing::info!(path = %path, "OpenAPI config loaded");
                                     None
                                 };
-                                openapi_configs.push((openapi_config, modules.clone(), ds_info));
+                                openapi_configs.push(OpenApiStateConfig {
+                                    config: openapi_config,
+                                    modules: modules.clone(),
+                                    datasource: ds_info,
+                                    access_log: access_log.clone(),
+                                });
                             }
                             Err(e) => {
                                 tracing::error!(path = %path, error = %e, "Failed to load OpenAPI config")

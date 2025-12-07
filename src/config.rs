@@ -145,6 +145,7 @@ pub enum ApiRef {
         path: String,
         modules: Option<ModulesConfig>,
         datasource: Option<String>, // Specify which datasource to use for this API
+        access_log: Option<AccessLogConfig>, // Per-API access log configuration
     },
 }
 

@@ -50,7 +50,26 @@ pub async fn handle_request(
     ctx.response_headers = response.headers().clone();
 
     // Phase: Log (after response is ready)
+    // 1. Global modules
     let _ = state.modules.run_phase(Phase::Log, &mut ctx, &state);
+
+    // 2. Route/Operation modules
+    let matched_route = ctx.matched_route.clone();
+    if let Some(pattern) = matched_route {
+        // Route modules
+        if let Some(reg) = state.route_modules.get(&pattern.path_pattern) {
+            let _ = reg.run_phase(Phase::Log, &mut ctx, &state);
+        }
+        // Operation modules
+        let key = format!(
+            "{} {}",
+            method.as_str().to_uppercase(),
+            pattern.path_pattern
+        );
+        if let Some(reg) = state.operation_modules.get(&key) {
+            let _ = reg.run_phase(Phase::Log, &mut ctx, &state);
+        }
+    }
 
     Ok(response)
 }

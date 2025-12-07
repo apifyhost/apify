@@ -49,11 +49,7 @@ pub fn start_listener(
     listener_config: ListenerConfig,
     thread_id: usize,
     datasources: Option<std::collections::HashMap<String, super::config::DatabaseSettings>>,
-    openapi_configs: Vec<(
-        super::config::OpenAPIConfig,
-        Option<super::config::ModulesConfig>,
-        Option<String>, // datasource name for this API
-    )>,
+    openapi_configs: Vec<super::app_state::OpenApiStateConfig>,
     consumers: Vec<super::config::ConsumerConfig>,
     oauth_providers: Option<Vec<super::config::OAuthProviderConfig>>,
     access_log_config: Option<super::config::AccessLogConfig>,
