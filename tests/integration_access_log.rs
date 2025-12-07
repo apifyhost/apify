@@ -40,7 +40,11 @@ async fn wait_for_log_content(
         }
         tokio::time::sleep(Duration::from_millis(200)).await;
     }
-    Err(format!("Log file {:?} did not contain '{}' in time", path, substring).into())
+    Err(format!(
+        "Log file {:?} did not contain '{}' in time",
+        path, substring
+    )
+    .into())
 }
 
 #[tokio::test]
@@ -122,11 +126,9 @@ modules:
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     // 4. Make Request
-    let client = Client::builder()
-        .no_proxy()
-        .build()?;
+    let client = Client::builder().no_proxy().build()?;
     let url = format!("http://127.0.0.1:{}/echo?foo=bar", port);
-    
+
     let resp = client
         .post(&url)
         .header("User-Agent", "TestAgent/1.0")
@@ -142,12 +144,16 @@ modules:
 
     // We expect 500 because "echo" table doesn't exist in sqlite memory
     // But we accept 503 if it happens during startup race, though we tried to wait.
-    assert!(status.as_u16() == 500 || status.as_u16() == 503, "Unexpected status code: {}", status);
+    assert!(
+        status.as_u16() == 500 || status.as_u16() == 503,
+        "Unexpected status code: {}",
+        status
+    );
 
     // 5. Verify Global Log
     wait_for_log_content(&global_log_path, "/echo", Duration::from_secs(5)).await?;
     let global_content = fs::read_to_string(&global_log_path)?;
-    
+
     assert!(global_content.contains(r#""path":"/echo""#));
     assert!(global_content.contains(r#""method":"POST""#));
     // Status might be 500 or 503
@@ -156,17 +162,17 @@ modules:
     // 6. Verify API Log (Detailed)
     wait_for_log_content(&api_log_path, "TestAgent", Duration::from_secs(5)).await?;
     let api_content = fs::read_to_string(&api_log_path)?;
-    
+
     // Check Headers
     assert!(api_content.contains(r#""user-agent":"TestAgent/1.0""#));
     assert!(api_content.contains(r#""x-test-header":"test-value""#));
-    
+
     // Check Query
     assert!(api_content.contains(r#""foo":"bar""#));
-    
+
     // Check Body
     assert!(api_content.contains(r#""msg":"hello""#));
-    
+
     // Check Cookies
     assert!(api_content.contains(r#""session":"123""#));
 

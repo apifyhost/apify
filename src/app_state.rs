@@ -272,7 +272,8 @@ impl AppState {
                 reg = reg.with(Arc::new(validator));
             }
 
-            if let Some(paths_obj) = api_config.config
+            if let Some(paths_obj) = api_config
+                .config
                 .openapi
                 .spec
                 .get("paths")
