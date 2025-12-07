@@ -1,4 +1,4 @@
-//! Integration tests for various modules (body_validator, request_logger, etc.)
+//! Integration tests for various modules (request_validator, request_logger, etc.)
 
 use reqwest::Client;
 use serial_test::serial;
@@ -31,7 +31,7 @@ async fn wait_for_ready(
 
 #[tokio::test]
 #[serial]
-async fn test_body_validator_size_limit() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_request_validator_size_limit() -> Result<(), Box<dyn std::error::Error>> {
     let temp = TempDir::new()?;
     let cfg_dir = temp.path();
 
@@ -109,8 +109,8 @@ listeners:
         .await?;
     assert_eq!(resp.status(), 200, "Small body should be accepted");
 
-    // Test 2: Very large body should be rejected (if body_validator is active)
-    // Note: This test assumes body_validator with 1MB limit is configured
+    // Test 2: Very large body should be rejected (if request_validator is active)
+    // Note: This test assumes request_validator with 1MB limit is configured
     // Since we can't configure modules via YAML yet, we test the default behavior
     let large_string = "x".repeat(2 * 1024 * 1024); // 2MB
     let large_body = serde_json::json!({
@@ -122,9 +122,12 @@ listeners:
         .json(&large_body)
         .send()
         .await?;
-    // Without body_validator configured, this will still succeed
-    // In a real deployment with body_validator, it would return 413
-    println!("Large body response status: {}", resp.status());
+    // With request_validator enabled by default, this should return 413 Payload Too Large
+    assert_eq!(
+        resp.status(),
+        413,
+        "Large body should be rejected by default validator"
+    );
 
     let _ = child.kill().await;
     Ok(())
@@ -209,7 +212,7 @@ listeners:
         .body(r#"{"name": "test2"}"#)
         .send()
         .await?;
-    // Current implementation is lenient, but with body_validator it would reject
+    // Current implementation is lenient, but with request_validator it would reject
     println!("Missing Content-Type response: {}", resp.status());
 
     let _ = child.kill().await;

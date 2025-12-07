@@ -224,19 +224,34 @@ impl AppState {
         // Build per-route module registries from per-API modules
         let mut route_modules: HashMap<String, crate::modules::ModuleRegistry> = HashMap::new();
         for (openapi_config, per_api_modules, _) in &openapi_configs {
+            let mut reg = crate::modules::ModuleRegistry::new();
+
+            // Apply configured modules
             if let Some(cfg) = per_api_modules.clone() {
-                let mut reg = crate::modules::ModuleRegistry::new();
                 reg = apply_modules_cfg(reg, cfg);
-                if let Some(paths_obj) = openapi_config
-                    .openapi
-                    .spec
-                    .get("paths")
-                    .and_then(|v| v.as_object())
-                {
-                    for (path_key, _value) in paths_obj.iter() {
-                        // Assign same registry for all paths in this API
-                        route_modules.insert(path_key.clone(), reg.clone());
-                    }
+            }
+
+            // Always enable request validation
+            {
+                tracing::info!("Enabling request validation for API");
+                let validator_config = crate::modules::request_validator::RequestValidatorConfig {
+                    openapi_spec: Some(openapi_config.openapi.spec.clone()),
+                    ..Default::default()
+                };
+                let validator =
+                    crate::modules::request_validator::RequestValidator::new(validator_config);
+                reg = reg.with(Arc::new(validator));
+            }
+
+            if let Some(paths_obj) = openapi_config
+                .openapi
+                .spec
+                .get("paths")
+                .and_then(|v| v.as_object())
+            {
+                for (path_key, _value) in paths_obj.iter() {
+                    // Assign same registry for all paths in this API
+                    route_modules.insert(path_key.clone(), reg.clone());
                 }
             }
         }
