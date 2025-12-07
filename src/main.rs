@@ -1,6 +1,7 @@
 //! Application entry point, responsible for parsing CLI args, loading config, and starting services
 
 use apify::{
+    app_state::OpenApiStateConfig,
     config::{ApiRef, Config, OpenAPIConfig},
     modules::{
         metrics::init_metrics,
@@ -129,7 +130,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
                             Ok(openapi_config) => {
                                 tracing::info!(path = %p, "OpenAPI config loaded");
-                                openapi_configs.push((openapi_config, None, None));
+                                openapi_configs.push(OpenApiStateConfig {
+                                    config: openapi_config,
+                                    modules: None,
+                                    datasource: None,
+                                    access_log: None,
+                                });
                             }
                             Err(e) => {
                                 tracing::error!(path = %p, error = %e, "Failed to load OpenAPI config")
@@ -140,6 +146,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         path,
                         modules,
                         datasource,
+                        access_log,
                     } => {
                         let api_path = config_dir.join(path);
                         match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
@@ -155,7 +162,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                     tracing::info!(path = %path, "OpenAPI config loaded");
                                     None
                                 };
-                                openapi_configs.push((openapi_config, modules.clone(), ds_info));
+                                openapi_configs.push(OpenApiStateConfig {
+                                    config: openapi_config,
+                                    modules: modules.clone(),
+                                    datasource: ds_info,
+                                    access_log: access_log.clone(),
+                                });
                             }
                             Err(e) => {
                                 tracing::error!(path = %path, error = %e, "Failed to load OpenAPI config")
@@ -172,6 +184,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let openapi_configs_clone = openapi_configs.clone();
             let consumers_clone = all_consumers.clone();
             let oauth_clone = config.oauth_providers.clone();
+            let access_log_config = config.modules.as_ref().and_then(|m| m.access_log.clone());
+            let access_log_config_clone = access_log_config.clone();
+
             let handle = thread::spawn(
                 move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     tracing::info!(
@@ -187,6 +202,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         openapi_configs_clone,
                         consumers_clone,
                         oauth_clone,
+                        access_log_config_clone,
                     )?;
                     Ok(())
                 },
@@ -239,6 +255,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let openapi_configs_clone = openapi_configs.clone();
             let consumers_clone = all_consumers.clone();
             let oauth_clone = config.oauth_providers.clone();
+            let access_log_config = config.modules.as_ref().and_then(|m| m.access_log.clone());
+            let access_log_config_clone = access_log_config.clone();
 
             // Only start docs server once (e.g. for the first listener, or globally?)
             // The user asked for "separate port", implying one global docs port.
@@ -258,13 +276,19 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
                         let state = rt.block_on(async {
                             apify::app_state::AppState::new_with_crud(
-                                listener_config_clone.routes,
-                                datasources_clone,
-                                openapi_configs_clone,
-                                listener_config_clone.modules,
-                                consumers_clone,
-                                oauth_clone,
-                                Some(format!("http://localhost:{}", listener_config_clone.port)),
+                                apify::app_state::AppStateConfig {
+                                    routes: listener_config_clone.routes,
+                                    datasources: datasources_clone,
+                                    openapi_configs: openapi_configs_clone,
+                                    listener_modules: listener_config_clone.modules,
+                                    consumers: consumers_clone,
+                                    oauth_providers: oauth_clone,
+                                    public_url: Some(format!(
+                                        "http://localhost:{}",
+                                        listener_config_clone.port
+                                    )),
+                                    access_log_config: access_log_config_clone,
+                                },
                             )
                             .await
                         })?;

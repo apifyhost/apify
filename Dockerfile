@@ -54,7 +54,8 @@ WORKDIR /app
 COPY --from=builder /app/target/release/apify /usr/local/bin/apify
 
 # Copy default config directory structure
-RUN mkdir -p /app/config /app/data && \
+RUN mkdir -p /app/config /app/data /app/logs && \
+    ln -sf /dev/stdout /app/logs/access.log && \
     chown -R apify:apify /app
 
 # Switch to non-root user

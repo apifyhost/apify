@@ -22,6 +22,19 @@ pub struct GlobalModulesConfig {
     pub tracing: Option<TracingConfig>,
     pub metrics: Option<MetricsConfig>,
     pub openapi_docs: Option<OpenApiDocsConfig>,
+    pub access_log: Option<AccessLogConfig>,
+}
+
+/// Access Log module configuration
+#[derive(Debug, Deserialize, Clone)]
+pub struct AccessLogConfig {
+    pub enabled: Option<bool>,
+    pub path: Option<String>, // Path to log file (default: "logs/access.log")
+    pub format: Option<String>, // "json" or "text" (default: "json")
+    pub headers: Option<Vec<String>>, // List of headers to log (case-insensitive)
+    pub query: Option<bool>,  // Log query parameters
+    pub body: Option<bool>,   // Log request body (if available as JSON)
+    pub cookies: Option<bool>, // Log cookies
 }
 
 /// Tracing module configuration
@@ -132,6 +145,7 @@ pub enum ApiRef {
         path: String,
         modules: Option<ModulesConfig>,
         datasource: Option<String>, // Specify which datasource to use for this API
+        access_log: Option<AccessLogConfig>, // Per-API access log configuration
     },
 }
 

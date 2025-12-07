@@ -12,6 +12,27 @@ use super::schema_generator::SchemaGenerator;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Configuration for a single OpenAPI spec within AppState
+#[derive(Clone)]
+pub struct OpenApiStateConfig {
+    pub config: OpenAPIConfig,
+    pub modules: Option<ModulesConfig>,
+    pub datasource: Option<String>,
+    pub access_log: Option<crate::config::AccessLogConfig>,
+}
+
+/// Configuration for creating AppState
+pub struct AppStateConfig {
+    pub routes: Option<Vec<RouteConfig>>,
+    pub datasources: Option<HashMap<String, DatabaseSettings>>,
+    pub openapi_configs: Vec<OpenApiStateConfig>,
+    pub listener_modules: Option<ModulesConfig>,
+    pub consumers: Vec<ConsumerConfig>,
+    pub oauth_providers: Option<Vec<OAuthProviderConfig>>,
+    pub public_url: Option<String>,
+    pub access_log_config: Option<crate::config::AccessLogConfig>,
+}
+
 /// Shared application state (route configurations and CRUD handlers)
 #[derive(Clone)]
 pub struct AppState {
@@ -49,15 +70,9 @@ impl AppState {
 
     /// Create new application state with CRUD support
     pub async fn new_with_crud(
-        routes: Option<Vec<RouteConfig>>,
-        datasources: Option<HashMap<String, DatabaseSettings>>,
-        openapi_configs: Vec<(OpenAPIConfig, Option<ModulesConfig>, Option<String>)>,
-        listener_modules: Option<ModulesConfig>,
-        consumers: Vec<ConsumerConfig>,
-        oauth_providers: Option<Vec<OAuthProviderConfig>>,
-        public_url: Option<String>,
+        config: AppStateConfig,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let routes = routes.unwrap_or_default();
+        let routes = config.routes.unwrap_or_default();
         let mut route_responses = HashMap::new();
         // Generate fixed responses for each route (hello + route name)
         for route in &routes {
@@ -65,18 +80,19 @@ impl AppState {
         }
 
         // Build CRUD handler if OpenAPI configs exist and datasources are configured
-        let crud_handler = if let Some(ds_map) = datasources.as_ref() {
-            if !openapi_configs.is_empty() {
+        let crud_handler = if let Some(ds_map) = config.datasources.as_ref() {
+            if !config.openapi_configs.is_empty() {
                 tracing::debug!(
                     available_datasources = ?ds_map.keys().collect::<Vec<_>>(),
-                    openapi_count = openapi_configs.len(),
+                    openapi_count = config.openapi_configs.len(),
                     "Building CRUD handler"
                 );
 
                 // Determine which datasource to use (from first API config or first available)
-                let datasource_name = openapi_configs
+                let datasource_name = config
+                    .openapi_configs
                     .first()
-                    .and_then(|(_, _, ds_name)| ds_name.clone())
+                    .and_then(|c| c.datasource.clone())
                     .or_else(|| ds_map.keys().next().cloned())
                     .ok_or("No datasource specified and none available")?;
 
@@ -131,14 +147,14 @@ impl AppState {
                 // Extract table schemas from all OpenAPI specs
                 let mut all_schemas = Vec::new();
                 tracing::info!(
-                    config_count = openapi_configs.len(),
+                    config_count = config.openapi_configs.len(),
                     "Extracting schemas from OpenAPI configs"
                 );
-                for (i, (openapi_config, _, _)) in openapi_configs.iter().enumerate() {
+                for (i, api_config) in config.openapi_configs.iter().enumerate() {
                     tracing::info!(index = i, "Extracting from OpenAPI config");
 
                     match SchemaGenerator::extract_schemas_from_openapi(
-                        &openapi_config.openapi.spec,
+                        &api_config.config.openapi.spec,
                     ) {
                         Ok(schemas) => {
                             tracing::info!(
@@ -181,8 +197,8 @@ impl AppState {
                 let mut merged_spec = serde_json::Map::new();
                 let mut merged_paths = serde_json::Map::new();
 
-                for (openapi_config, _, _) in &openapi_configs {
-                    if let Some(spec_obj) = openapi_config.openapi.spec.as_object() {
+                for api_config in &config.openapi_configs {
+                    if let Some(spec_obj) = api_config.config.openapi.spec.as_object() {
                         for (key, value) in spec_obj {
                             if key == "paths" {
                                 if let Some(paths_obj) = value.as_object() {
@@ -198,7 +214,7 @@ impl AppState {
                 }
 
                 // Inject servers if public_url is provided
-                if let Some(url) = public_url {
+                if let Some(url) = config.public_url {
                     merged_spec.insert("servers".to_string(), serde_json::json!([{ "url": url }]));
                 }
 
@@ -217,25 +233,38 @@ impl AppState {
 
         // Build listener-level fallback module registry
         let mut modules_registry = crate::modules::ModuleRegistry::new();
-        if let Some(cfg) = listener_modules {
+
+        // Add Access Log module (globally enabled by default)
+        let request_logger =
+            crate::modules::request_logger::RequestLogger::new(config.access_log_config);
+        modules_registry = modules_registry.with(Arc::new(request_logger));
+
+        if let Some(cfg) = config.listener_modules {
             modules_registry = apply_modules_cfg(modules_registry, cfg);
         }
 
         // Build per-route module registries from per-API modules
         let mut route_modules: HashMap<String, crate::modules::ModuleRegistry> = HashMap::new();
-        for (openapi_config, per_api_modules, _) in &openapi_configs {
+        for api_config in &config.openapi_configs {
             let mut reg = crate::modules::ModuleRegistry::new();
 
+            // Apply per-API access log if configured
+            if let Some(log_cfg) = &api_config.access_log {
+                let logger =
+                    crate::modules::request_logger::RequestLogger::new(Some(log_cfg.clone()));
+                reg = reg.with(Arc::new(logger));
+            }
+
             // Apply configured modules
-            if let Some(cfg) = per_api_modules.clone() {
-                reg = apply_modules_cfg(reg, cfg);
+            if let Some(cfg) = &api_config.modules {
+                reg = apply_modules_cfg(reg, cfg.clone());
             }
 
             // Always enable request validation
             {
                 tracing::info!("Enabling request validation for API");
                 let validator_config = crate::modules::request_validator::RequestValidatorConfig {
-                    openapi_spec: Some(openapi_config.openapi.spec.clone()),
+                    openapi_spec: Some(api_config.config.openapi.spec.clone()),
                     ..Default::default()
                 };
                 let validator =
@@ -243,7 +272,8 @@ impl AppState {
                 reg = reg.with(Arc::new(validator));
             }
 
-            if let Some(paths_obj) = openapi_config
+            if let Some(paths_obj) = api_config
+                .config
                 .openapi
                 .spec
                 .get("paths")
@@ -343,7 +373,7 @@ impl AppState {
         // Build consumers maps
         let mut consumers_map = HashMap::new();
         let mut key_map = HashMap::new();
-        for c in consumers {
+        for c in config.consumers {
             for k in &c.keys {
                 key_map.insert(k.clone(), c.name.clone());
             }
@@ -352,7 +382,7 @@ impl AppState {
 
         // Build oauth providers map
         let mut oauth_map = HashMap::new();
-        if let Some(list) = oauth_providers {
+        if let Some(list) = config.oauth_providers {
             tracing::info!(provider_count = list.len(), "Loading OAuth providers");
             for p in list {
                 tracing::debug!(
