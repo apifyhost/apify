@@ -11,10 +11,10 @@ pub struct Config {
     pub listeners: Vec<ListenerConfig>,
     pub consumers: Option<Vec<ConsumerConfig>>, // Global consumers
     pub datasource: Option<std::collections::HashMap<String, DatabaseSettings>>, // Global datasources
-    pub modules: Option<GlobalModulesConfig>,       // Global modules (tracing, metrics, etc.)
+    pub modules: Option<GlobalModulesConfig>, // Global modules (tracing, metrics, etc.)
     pub oauth_providers: Option<Vec<OAuthProviderConfig>>, // OAuth/OIDC providers
-    pub docs_port: Option<u16>,                     // Port for OpenAPI docs (Swagger UI)
-    pub log_level: Option<String>,                  // Global log level (trace, debug, info, warn, error)
+    pub docs_port: Option<u16>,               // Port for OpenAPI docs (Swagger UI)
+    pub log_level: Option<String>,            // Global log level (trace, debug, info, warn, error)
 }
 
 /// Global modules configuration
