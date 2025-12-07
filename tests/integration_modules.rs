@@ -122,9 +122,8 @@ listeners:
         .json(&large_body)
         .send()
         .await?;
-    // Without request_validator configured, this will still succeed
-    // In a real deployment with request_validator, it would return 413
-    println!("Large body response status: {}", resp.status());
+    // With request_validator enabled by default, this should return 413 Payload Too Large
+    assert_eq!(resp.status(), 413, "Large body should be rejected by default validator");
 
     let _ = child.kill().await;
     Ok(())

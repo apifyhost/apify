@@ -231,15 +231,8 @@ impl AppState {
                 reg = apply_modules_cfg(reg, cfg);
             }
 
-            // Check if validation is enabled
-            let validate_request = openapi_config
-                .openapi
-                .validation
-                .as_ref()
-                .and_then(|v| v.enabled)
-                .unwrap_or(false);
-
-            if validate_request {
+            // Always enable request validation
+            {
                 tracing::info!("Enabling request validation for API");
                 let validator_config = crate::modules::request_validator::RequestValidatorConfig {
                     openapi_spec: Some(openapi_config.openapi.spec.clone()),

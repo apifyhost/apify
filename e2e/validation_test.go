@@ -38,8 +38,6 @@ var _ = Describe("OpenAPI Validation", func() {
 		// Write API definition
 		apiContent := `
 openapi:
-  validation:
-    enabled: true
   spec:
     openapi: "3.0.0"
     info:

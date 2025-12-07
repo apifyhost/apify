@@ -93,7 +93,6 @@ pub struct PathMatch {
 #[derive(Debug, Deserialize, Clone)]
 pub struct ValidationConfig {
     pub strict_mode: Option<bool>,
-    pub enabled: Option<bool>,
     pub validate_response_body: Option<bool>,
 }
 
