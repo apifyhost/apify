@@ -211,7 +211,21 @@ pub async fn load_api_configs(
         let spec: Value = serde_json::from_str(&api_record.spec)?;
 
         let modules = if let Some(m_str) = api_record.modules_config {
-            Some(serde_json::from_str::<ModulesConfig>(&m_str)?)
+            if m_str.trim().is_empty() {
+                None
+            } else {
+                Some(serde_json::from_str::<ModulesConfig>(&m_str)?)
+            }
+        } else {
+            None
+        };
+
+        let datasource_name = if let Some(ds) = api_record.datasource_name {
+            if ds.trim().is_empty() {
+                None
+            } else {
+                Some(ds)
+            }
         } else {
             None
         };
@@ -224,7 +238,7 @@ pub async fn load_api_configs(
                 },
             },
             modules,
-            datasource: api_record.datasource_name,
+            datasource: datasource_name,
             access_log: None,
         });
     }
