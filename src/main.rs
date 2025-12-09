@@ -39,10 +39,11 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .enable_all()
         .build()?;
 
-    let (control_plane_db, db_openapi_configs, db_auth_config): (
+    let (control_plane_db, db_openapi_configs, db_auth_config, db_datasources): (
         Option<apify::database::DatabaseManager>,
         Vec<apify::app_state::OpenApiStateConfig>,
         Option<Vec<apify::config::Authenticator>>,
+        Option<std::collections::HashMap<String, apify::config::DatabaseSettings>>,
     ) = rt_init.block_on(async {
         let db = apify::database::DatabaseManager::new(db_config)
             .await
@@ -54,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             db.initialize_schema(apify::control_plane::get_metadata_schemas())
                 .await
                 .map_err(|e| e.to_string())?;
-            Ok::<_, String>((Some(db), Vec::new(), None))
+            Ok::<_, String>((Some(db), Vec::new(), None, None))
         } else {
             tracing::info!("Starting in Data Plane mode");
             // Load configs from DB
@@ -82,7 +83,20 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 }
             };
 
-            Ok::<_, String>((None, api_configs, auth_configs))
+            let datasources = match apify::control_plane::load_datasources(&db).await {
+                Ok(ds) => {
+                    if let Some(d) = &ds {
+                        tracing::info!(count = d.len(), "Loaded Datasources from Metadata DB");
+                    }
+                    ds
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to load Datasources from DB: {}", e);
+                    None
+                }
+            };
+
+            Ok::<_, String>((None, api_configs, auth_configs, datasources))
         }
     })?;
 
@@ -107,8 +121,19 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         "Configuration loaded successfully"
     );
 
-    // Use datasources from config if available
-    let datasources = config.datasource.clone();
+    // Use datasources from config if available, merge with DB datasources
+    let mut datasources_map = config.datasource.clone().unwrap_or_default();
+    if let Some(db_ds) = db_datasources {
+        for (name, ds) in db_ds {
+            datasources_map.insert(name, ds);
+        }
+    }
+    let datasources = if datasources_map.is_empty() {
+        None
+    } else {
+        Some(datasources_map)
+    };
+
     if let Some(ref ds) = datasources {
         tracing::info!(datasource_count = ds.len(), "Datasources configured");
     }
