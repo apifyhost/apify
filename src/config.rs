@@ -8,11 +8,27 @@ use std::net::SocketAddr;
 /// Top-level configuration structure
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
-    pub listeners: Vec<ListenerConfig>,
+    pub listeners: Option<Vec<ListenerConfig>>,
+    #[serde(alias = "control-plane")]
+    pub control_plane: Option<ControlPlaneConfig>,
     pub auth: Option<Vec<Authenticator>>, // Unified authentication configuration
     pub datasource: Option<std::collections::HashMap<String, DatabaseSettings>>, // Global datasources
     pub modules: Option<GlobalModulesConfig>, // Global modules (tracing, metrics, etc.)
     pub log_level: Option<String>,            // Global log level (trace, debug, info, warn, error)
+}
+
+/// Control Plane configuration
+#[derive(Debug, Deserialize, Clone)]
+pub struct ControlPlaneConfig {
+    pub listen: ControlPlaneListenConfig,
+    pub database: DatabaseSettings,
+}
+
+/// Control Plane listen configuration
+#[derive(Debug, Deserialize, Clone)]
+pub struct ControlPlaneListenConfig {
+    pub ip: String,
+    pub port: u16,
 }
 
 /// Authenticator Enum (Polymorphic)
@@ -68,7 +84,7 @@ pub struct OidcConfig {
 }
 
 /// Global modules configuration
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct GlobalModulesConfig {
     pub tracing: Option<TracingConfig>,
     pub metrics: Option<MetricsConfig>,
@@ -77,7 +93,7 @@ pub struct GlobalModulesConfig {
 }
 
 /// Access Log module configuration
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AccessLogConfig {
     pub enabled: Option<bool>,
     pub path: Option<String>, // Path to log file (default: "logs/access.log")
@@ -89,34 +105,34 @@ pub struct AccessLogConfig {
 }
 
 /// Tracing module configuration
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TracingConfig {
     pub enabled: Option<bool>,         // Enable tracing (OpenTelemetry)
     pub otlp_endpoint: Option<String>, // OpenTelemetry collector endpoint
 }
 
 /// Metrics module configuration
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MetricsConfig {
     pub enabled: Option<bool>, // Enable Prometheus metrics endpoint
     pub port: Option<u16>,     // Port for metrics endpoint (default: 9090)
 }
 
 /// OpenAPI Docs module configuration
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct OpenApiDocsConfig {
     pub enabled: Option<bool>, // Enable OpenAPI docs server
     pub port: Option<u16>,     // Port for OpenAPI docs (Swagger UI)
 }
 
 /// Database configuration structure - supports multiple named datasources
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DatabaseConfig {
     pub datasource: std::collections::HashMap<String, DatabaseSettings>,
 }
 
 /// Database settings for a single datasource
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DatabaseSettings {
     pub driver: String,
     pub host: Option<String>,
@@ -129,20 +145,20 @@ pub struct DatabaseSettings {
 }
 
 /// OpenAPI configuration structure
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct OpenAPIConfig {
     pub openapi: OpenAPISettings,
 }
 
 /// OpenAPI settings
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct OpenAPISettings {
     pub spec: Value,
     pub validation: Option<ValidationConfig>,
 }
 
 /// Listener configuration (port, IP, routes, etc.)
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ListenerConfig {
     pub port: u16,
     pub ip: String,
@@ -154,41 +170,41 @@ pub struct ListenerConfig {
 }
 
 /// Route configuration (name and matching rules)
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct RouteConfig {
     pub name: String,
     pub matches: Vec<MatchRule>,
 }
 
 /// Route matching rules (path, method, etc.)
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MatchRule {
     pub path: PathMatch,
     pub method: Option<String>,
 }
 
 /// Path matching rules (prefix matching)
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct PathMatch {
     pub path_prefix: String,
 }
 
 /// Validation configuration for OpenAPI
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ValidationConfig {
     pub strict_mode: Option<bool>,
     pub validate_response_body: Option<bool>,
 }
 
 /// Phase modules configuration (kept outside OpenAPI to preserve spec compliance)
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct ModulesConfig {
     pub access: Option<Vec<String>>,  // e.g., ["auth_header", "jwt"]
     pub rewrite: Option<Vec<String>>, // e.g., ["prefix_strip:/api"] (future)
 }
 
 /// API reference in listener: path string or object with path + per-API modules + datasource
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(untagged)]
 pub enum ApiRef {
     Path(String),

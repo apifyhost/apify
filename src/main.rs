@@ -34,20 +34,54 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let config = Config::from_file(&cli.config)?;
 
     // Initialize Metadata DB connection and load configs
-    let db_config = apify::database::DatabaseRuntimeConfig::sqlite_default();
     let rt_init = apify::tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
 
     type RuntimeInitData = (
         Option<apify::database::DatabaseManager>,
-        Vec<apify::app_state::OpenApiStateConfig>,
+        std::collections::HashMap<String, apify::app_state::OpenApiStateConfig>,
         Option<Vec<apify::config::Authenticator>>,
         Option<std::collections::HashMap<String, apify::config::DatabaseSettings>>,
+        Option<Vec<apify::config::ListenerConfig>>,
     );
 
-    let (control_plane_db, db_openapi_configs, db_auth_config, db_datasources): RuntimeInitData =
+    let (control_plane_db, db_openapi_configs, db_auth_config, db_datasources, db_listeners): RuntimeInitData =
         rt_init.block_on(async {
+            let db_config = if let Some(cp_config) = &config.control_plane {
+                let s = &cp_config.database;
+                let url = if s.driver == "sqlite" {
+                    format!("sqlite:{}", s.database)
+                } else {
+                    let mut url = "postgres://".to_string();
+                    if let Some(user) = &s.user {
+                        url.push_str(user);
+                        if let Some(pass) = &s.password {
+                            url.push(':');
+                            url.push_str(pass);
+                        }
+                        url.push('@');
+                    }
+                    if let Some(host) = &s.host {
+                        url.push_str(host);
+                    }
+                    if let Some(port) = s.port {
+                        url.push(':');
+                        url.push_str(&port.to_string());
+                    }
+                    url.push('/');
+                    url.push_str(&s.database);
+                    url
+                };
+                apify::database::DatabaseRuntimeConfig {
+                    driver: s.driver.clone(),
+                    url,
+                    max_size: s.max_pool_size.unwrap_or(5) as u32,
+                }
+            } else {
+                apify::database::DatabaseRuntimeConfig::sqlite_default()
+            };
+
             let db = apify::database::DatabaseManager::new(db_config)
                 .await
                 .map_err(|e| e.to_string())?;
@@ -58,7 +92,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 db.initialize_schema(apify::control_plane::get_metadata_schemas())
                     .await
                     .map_err(|e| e.to_string())?;
-                Ok::<_, String>((Some(db), Vec::new(), None, None))
+                Ok::<_, String>((Some(db), std::collections::HashMap::new(), None, None, None))
             } else {
                 tracing::info!("Starting in Data Plane mode");
                 // Load configs from DB
@@ -72,7 +106,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                     Err(e) => {
                         tracing::warn!("Failed to load API configs from DB: {}", e);
-                        Vec::new()
+                        std::collections::HashMap::new()
                     }
                 };
 
@@ -102,13 +136,43 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                 };
 
-                Ok::<_, String>((None, api_configs, auth_configs, datasources))
+                let listeners = match apify::control_plane::load_listeners(&db).await {
+                    Ok(l) => {
+                        if let Some(list) = &l {
+                            tracing::info!(count = list.len(), "Loaded Listeners from Metadata DB");
+                        }
+                        l
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to load Listeners from DB: {}", e);
+                        None
+                    }
+                };
+
+                Ok::<_, String>((None, api_configs, auth_configs, datasources, listeners))
             }
         })?;
 
     // Get global modules configuration
     let tracing_config = config.modules.as_ref().and_then(|m| m.tracing.as_ref());
     let tracing_enabled = tracing_config.and_then(|t| t.enabled).unwrap_or(true);
+
+    if cli.control_plane {
+        if let Some(cp_config) = config.control_plane {
+            if let Some(db) = control_plane_db {
+                // Initialize tracing for control plane (simple logging)
+                init_tracing("apify-cp", None, config.log_level.as_deref())?;
+                tracing::info!("Starting Control Plane Server");
+                rt_init.block_on(apify::control_plane::start_control_plane_server(
+                    cp_config, db,
+                ))?;
+                return Ok(());
+            }
+        } else {
+            return Err("Control plane configuration missing".into());
+        }
+    }
+
     let otlp_endpoint = tracing_config.and_then(|t| t.otlp_endpoint.as_deref());
     let log_level = config.log_level.as_deref();
 
@@ -208,7 +272,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     }
 
-    for (listener_idx, listener_config) in config.listeners.into_iter().enumerate() {
+    let listeners = config.listeners.or(db_listeners);
+    for (listener_idx, listener_config) in listeners.into_iter().flatten().enumerate() {
         let auth_config_clone = auth_config.clone();
 
         // Load OpenAPI configurations for this listener with datasource info
@@ -217,19 +282,25 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             for api_ref in api_refs {
                 match api_ref {
                     ApiRef::Path(p) => {
-                        let api_path = config_dir.join(p);
-                        match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
-                            Ok(openapi_config) => {
-                                tracing::info!(path = %p, "OpenAPI config loaded");
-                                openapi_configs.push(OpenApiStateConfig {
-                                    config: openapi_config,
-                                    modules: None,
-                                    datasource: None,
-                                    access_log: None,
-                                });
-                            }
-                            Err(e) => {
-                                tracing::error!(path = %p, error = %e, "Failed to load OpenAPI config")
+                        // Check if in DB first
+                        if let Some(db_config) = db_openapi_configs.get(p) {
+                            tracing::info!(path = %p, "OpenAPI config loaded from DB");
+                            openapi_configs.push(db_config.clone());
+                        } else {
+                            let api_path = config_dir.join(p);
+                            match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
+                                Ok(openapi_config) => {
+                                    tracing::info!(path = %p, "OpenAPI config loaded");
+                                    openapi_configs.push(OpenApiStateConfig {
+                                        config: openapi_config,
+                                        modules: None,
+                                        datasource: None,
+                                        access_log: None,
+                                    });
+                                }
+                                Err(e) => {
+                                    tracing::error!(path = %p, error = %e, "Failed to load OpenAPI config")
+                                }
                             }
                         }
                     }
@@ -239,38 +310,51 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         datasource,
                         access_log,
                     } => {
-                        let api_path = config_dir.join(path);
-                        match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
-                            Ok(openapi_config) => {
-                                let ds_info = if let Some(ds_name) = datasource {
-                                    tracing::info!(
-                                        path = %path,
-                                        datasource = %ds_name,
-                                        "OpenAPI config loaded with datasource"
-                                    );
-                                    Some(ds_name.clone())
-                                } else {
-                                    tracing::info!(path = %path, "OpenAPI config loaded");
-                                    None
-                                };
-                                openapi_configs.push(OpenApiStateConfig {
-                                    config: openapi_config,
-                                    modules: modules.clone(),
-                                    datasource: ds_info,
-                                    access_log: access_log.clone(),
-                                });
+                        // Check if in DB first
+                        if let Some(db_config) = db_openapi_configs.get(path) {
+                            tracing::info!(path = %path, "OpenAPI config loaded from DB");
+                            let mut config = db_config.clone();
+                            if datasource.is_some() {
+                                config.datasource = datasource.clone();
                             }
-                            Err(e) => {
-                                tracing::error!(path = %path, error = %e, "Failed to load OpenAPI config")
+                            if modules.is_some() {
+                                config.modules = modules.clone();
+                            }
+                            if access_log.is_some() {
+                                config.access_log = access_log.clone();
+                            }
+                            openapi_configs.push(config);
+                        } else {
+                            let api_path = config_dir.join(path);
+                            match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
+                                Ok(openapi_config) => {
+                                    let ds_info = if let Some(ds_name) = datasource {
+                                        tracing::info!(
+                                            path = %path,
+                                            datasource = %ds_name,
+                                            "OpenAPI config loaded with datasource"
+                                        );
+                                        Some(ds_name.clone())
+                                    } else {
+                                        tracing::info!(path = %path, "OpenAPI config loaded");
+                                        None
+                                    };
+                                    openapi_configs.push(OpenApiStateConfig {
+                                        config: openapi_config,
+                                        modules: modules.clone(),
+                                        datasource: ds_info,
+                                        access_log: access_log.clone(),
+                                    });
+                                }
+                                Err(e) => {
+                                    tracing::error!(path = %path, error = %e, "Failed to load OpenAPI config")
+                                }
                             }
                         }
                     }
                 }
             }
         }
-
-        // Append configs loaded from DB
-        openapi_configs.extend(db_openapi_configs.clone());
 
         for thread_id in 0..num_threads {
             let listener_config_clone = listener_config.clone();

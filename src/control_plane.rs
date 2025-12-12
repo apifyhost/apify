@@ -5,6 +5,12 @@ use crate::schema_generator::{ColumnDefinition, TableSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::net::SocketAddr;
+use tokio::net::TcpListener;
+use hyper::server::conn::http1;
+use hyper::service::service_fn;
+use std::sync::Arc;
+use hyper_util::rt::TokioIo;
 
 pub fn get_metadata_schemas() -> Vec<TableSchema> {
     vec![
@@ -109,6 +115,16 @@ pub fn get_metadata_schemas() -> Vec<TableSchema> {
                     auto_field: false,
                 },
                 ColumnDefinition {
+                    name: "type".to_string(),
+                    column_type: "TEXT".to_string(),
+                    nullable: false,
+                    primary_key: false,
+                    unique: false,
+                    auto_increment: false,
+                    default_value: None,
+                    auto_field: false,
+                },
+                ColumnDefinition {
                     name: "config".to_string(),
                     column_type: "TEXT".to_string(), // JSON string (DatabaseSettings)
                     nullable: false,
@@ -169,6 +185,53 @@ pub fn get_metadata_schemas() -> Vec<TableSchema> {
             indexes: vec![],
             relations: vec![],
         },
+        TableSchema {
+            table_name: "_meta_listeners".to_string(),
+            columns: vec![
+                ColumnDefinition {
+                    name: "id".to_string(),
+                    column_type: "TEXT".to_string(),
+                    nullable: false,
+                    primary_key: true,
+                    unique: true,
+                    auto_increment: false,
+                    default_value: None,
+                    auto_field: false,
+                },
+                ColumnDefinition {
+                    name: "port".to_string(),
+                    column_type: "INTEGER".to_string(),
+                    nullable: false,
+                    primary_key: false,
+                    unique: false,
+                    auto_increment: false,
+                    default_value: None,
+                    auto_field: false,
+                },
+                ColumnDefinition {
+                    name: "config".to_string(),
+                    column_type: "TEXT".to_string(), // JSON string (ListenerConfig)
+                    nullable: false,
+                    primary_key: false,
+                    unique: false,
+                    auto_increment: false,
+                    default_value: None,
+                    auto_field: false,
+                },
+                ColumnDefinition {
+                    name: "updated_at".to_string(),
+                    column_type: "INTEGER".to_string(),
+                    nullable: false,
+                    primary_key: false,
+                    unique: false,
+                    auto_increment: false,
+                    default_value: None,
+                    auto_field: false,
+                },
+            ],
+            indexes: vec![],
+            relations: vec![],
+        },
     ]
 }
 
@@ -200,12 +263,12 @@ pub struct AuthConfigRecord {
 
 pub async fn load_api_configs(
     db: &DatabaseManager,
-) -> Result<Vec<OpenApiStateConfig>, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<HashMap<String, OpenApiStateConfig>, Box<dyn std::error::Error + Send + Sync>> {
     let records = db
         .select("_meta_api_configs", None, None, None, None)
         .await?;
 
-    let mut configs = Vec::new();
+    let mut configs = HashMap::new();
     for record in records {
         let api_record: ApiConfigRecord = serde_json::from_value(record)?;
         let spec: Value = serde_json::from_str(&api_record.spec)?;
@@ -224,17 +287,20 @@ pub async fn load_api_configs(
             .datasource_name
             .filter(|ds| !ds.trim().is_empty());
 
-        configs.push(OpenApiStateConfig {
-            config: OpenAPIConfig {
-                openapi: crate::config::OpenAPISettings {
-                    spec,
-                    validation: None,
+        configs.insert(
+            api_record.name,
+            OpenApiStateConfig {
+                config: OpenAPIConfig {
+                    openapi: crate::config::OpenAPISettings {
+                        spec,
+                        validation: None,
+                    },
                 },
+                modules,
+                datasource: datasource_name,
+                access_log: None,
             },
-            modules,
-            datasource: datasource_name,
-            access_log: None,
-        });
+        );
     }
     Ok(configs)
 }
@@ -258,6 +324,30 @@ pub async fn load_datasources(
     } else {
         Ok(Some(datasources))
     }
+}
+
+pub async fn load_listeners(
+    db: &DatabaseManager,
+) -> Result<Option<Vec<crate::config::ListenerConfig>>, Box<dyn std::error::Error + Send + Sync>> {
+    let records = db
+        .select("_meta_listeners", None, None, None, None)
+        .await?;
+
+    if records.is_empty() {
+        return Ok(None);
+    }
+
+    let mut listeners = Vec::new();
+    for record in records {
+        if let Some(config_val) = record.get("config") {
+            if let Some(config_str) = config_val.as_str() {
+                let listener: crate::config::ListenerConfig = serde_json::from_str(config_str)?;
+                listeners.push(listener);
+            }
+        }
+    }
+
+    Ok(Some(listeners))
 }
 
 pub async fn load_auth_configs(
@@ -451,6 +541,160 @@ pub async fn handle_control_plane_request(
             }
             _ => {}
         }
+    } else if path == "/_meta/import" && method == hyper::Method::POST {
+        let body_bytes = http_body_util::BodyExt::collect(body).await?.to_bytes();
+        let config: crate::config::Config = serde_yaml::from_slice(&body_bytes)?;
+
+        // Import Datasources
+        if let Some(datasources) = config.datasource {
+            for (name, ds_config) in datasources {
+                let id = uuid::Uuid::new_v4().to_string();
+                let config_str = serde_json::to_string(&ds_config)?;
+                let updated_at = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs() as i64;
+
+                let mut data = HashMap::new();
+                data.insert("id".to_string(), Value::String(id));
+                data.insert("name".to_string(), Value::String(name));
+                data.insert("type".to_string(), Value::String(ds_config.driver.clone()));
+                data.insert("config".to_string(), Value::String(config_str));
+                data.insert(
+                    "updated_at".to_string(),
+                    Value::Number(serde_json::Number::from(updated_at)),
+                );
+
+                if let Err(e) = db.insert("_meta_datasources", data).await {
+                    tracing::warn!("Failed to import datasource: {}", e);
+                }
+            }
+        }
+
+        // Import Auth
+        if let Some(auths) = config.auth {
+            for auth in auths {
+                let id = uuid::Uuid::new_v4().to_string();
+                let config_str = serde_json::to_string(&auth)?;
+                let updated_at = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs() as i64;
+
+                let mut data = HashMap::new();
+                data.insert("id".to_string(), Value::String(id));
+                data.insert("config".to_string(), Value::String(config_str));
+                data.insert(
+                    "updated_at".to_string(),
+                    Value::Number(serde_json::Number::from(updated_at)),
+                );
+
+                if let Err(e) = db.insert("_meta_auth_configs", data).await {
+                    tracing::warn!("Failed to import auth config: {}", e);
+                }
+            }
+        }
+
+        // Import Listeners
+        if let Some(listeners) = &config.listeners {
+            for listener in listeners {
+                let id = uuid::Uuid::new_v4().to_string();
+                let config_str = serde_json::to_string(listener)?;
+                let updated_at = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs() as i64;
+
+                let mut data = HashMap::new();
+                data.insert("id".to_string(), Value::String(id));
+                data.insert(
+                    "port".to_string(),
+                    Value::Number(serde_json::Number::from(listener.port)),
+                );
+                data.insert("config".to_string(), Value::String(config_str));
+                data.insert(
+                    "updated_at".to_string(),
+                    Value::Number(serde_json::Number::from(updated_at)),
+                );
+
+                if let Err(e) = db.insert("_meta_listeners", data).await {
+                    tracing::warn!("Failed to import listener: {}", e);
+                }
+            }
+        }
+
+        // Import APIs
+        if let Some(listeners) = config.listeners {
+            for listener in listeners {
+                if let Some(apis) = listener.apis {
+                    for api_ref in apis {
+                        let (path, modules, datasource, _access_log) = match api_ref {
+                            crate::config::ApiRef::Path(p) => (p, None, None, None),
+                            crate::config::ApiRef::WithConfig {
+                                path,
+                                modules,
+                                datasource,
+                                access_log,
+                            } => (path, modules, datasource, access_log),
+                        };
+
+                        match std::fs::read_to_string(&path) {
+                            Ok(spec_content) => {
+                                let spec_value = if let Ok(api_config) =
+                                    serde_yaml::from_str::<crate::config::OpenAPIConfig>(&spec_content)
+                                {
+                                    api_config.openapi.spec
+                                } else if let Ok(val) = serde_yaml::from_str::<Value>(&spec_content) {
+                                    val
+                                } else {
+                                    tracing::warn!("Failed to parse API spec: {}", path);
+                                    continue;
+                                };
+
+                                let name = path.clone();
+                                let version = "1.0.0".to_string();
+                                let id = uuid::Uuid::new_v4().to_string();
+                                let updated_at = std::time::SystemTime::now()
+                                    .duration_since(std::time::UNIX_EPOCH)?
+                                    .as_secs() as i64;
+
+                                let mut data = HashMap::new();
+                                data.insert("id".to_string(), Value::String(id));
+                                data.insert("name".to_string(), Value::String(name));
+                                data.insert("version".to_string(), Value::String(version));
+                                data.insert(
+                                    "spec".to_string(),
+                                    Value::String(serde_json::to_string(&spec_value)?),
+                                );
+                                if let Some(ds) = datasource {
+                                    data.insert("datasource_name".to_string(), Value::String(ds));
+                                }
+                                if let Some(m) = modules {
+                                    data.insert(
+                                        "modules_config".to_string(),
+                                        Value::String(serde_json::to_string(&m)?),
+                                    );
+                                }
+                                data.insert(
+                                    "created_at".to_string(),
+                                    Value::Number(serde_json::Number::from(updated_at)),
+                                );
+
+                                if let Err(e) = db.insert("_meta_api_configs", data).await {
+                                    tracing::warn!("Failed to import API config: {}", e);
+                                }
+                            }
+                            Err(e) => {
+                                tracing::warn!("Failed to read API spec file {}: {}", path, e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return Ok(hyper::Response::builder()
+            .status(hyper::StatusCode::OK)
+            .body(http_body_util::Full::new(hyper::body::Bytes::from(
+                "Imported",
+            )))?);
     }
 
     Ok(hyper::Response::builder()
@@ -458,4 +702,47 @@ pub async fn handle_control_plane_request(
         .body(http_body_util::Full::new(hyper::body::Bytes::from(
             "Not Found",
         )))?)
+}
+
+pub async fn start_control_plane_server(
+    config: crate::config::ControlPlaneConfig,
+    db: DatabaseManager,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let addr: SocketAddr = format!("{}:{}", config.listen.ip, config.listen.port).parse()?;
+    let listener = TcpListener::bind(addr).await?;
+    tracing::info!("Control Plane listening on {}", addr);
+
+    let db = Arc::new(db);
+
+    loop {
+        let (stream, _) = listener.accept().await?;
+        let io = TokioIo::new(stream);
+        let db_clone = db.clone();
+
+        tokio::task::spawn(async move {
+            if let Err(err) = http1::Builder::new()
+                .serve_connection(io, service_fn(move |req| {
+                    let db = db_clone.clone();
+                    async move {
+                        match handle_control_plane_request(req, &db).await {
+                            Ok(res) => Ok::<_, hyper::Error>(res),
+                            Err(e) => {
+                                tracing::error!("Internal server error: {}", e);
+                                let res = hyper::Response::builder()
+                                    .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
+                                    .body(http_body_util::Full::new(hyper::body::Bytes::from(
+                                        format!("Internal Server Error: {}", e),
+                                    )))
+                                    .unwrap();
+                                Ok(res)
+                            }
+                        }
+                    }
+                }))
+                .await
+            {
+                tracing::error!("Error serving connection: {:?}", err);
+            }
+        });
+    }
 }
