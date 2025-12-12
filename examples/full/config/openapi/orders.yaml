@@ -32,7 +32,7 @@ openapi:
             primary_key: false
             unique: false
             auto_increment: false
-          - name: "total_amount"
+          - name: "total"
             column_type: "REAL"
             nullable: true
             primary_key: false
@@ -166,7 +166,7 @@ openapi:
                   properties:
                     customer_name:
                       type: string
-                    total_amount:
+                    total:
                       type: number
                     status:
                       type: string
@@ -214,7 +214,7 @@ openapi:
                         type: integer
                       customer_name:
                         type: string
-                      total_amount:
+                      total:
                         type: number
                       status:
                         type: string
@@ -250,7 +250,7 @@ openapi:
                   properties:
                     customer_name:
                       type: string
-                    total_amount:
+                    total:
                       type: number
                     status:
                       type: string
