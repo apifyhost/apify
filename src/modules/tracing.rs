@@ -4,8 +4,11 @@ use opentelemetry::KeyValue;
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{Resource, trace::SdkTracerProvider};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::SubscriberInitExt};
+
+static TRACING_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 /// Initialize basic logging subsystem (without OpenTelemetry)
 ///
@@ -15,6 +18,11 @@ use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::Subs
 ///
 /// Call this first in main() before any async operations.
 pub fn init_logging(log_level: Option<&str>) {
+    // Check if already initialized to avoid panic/errors
+    if TRACING_INITIALIZED.load(Ordering::SeqCst) {
+        return;
+    }
+
     // Build filter from environment or default
     let filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new(log_level.unwrap_or("info")));
@@ -31,7 +39,9 @@ pub fn init_logging(log_level: Option<&str>) {
         .with_filter(filter);
 
     // Initialize with just logging layer
-    let _ = tracing_subscriber::registry().with(fmt_layer).try_init();
+    if tracing_subscriber::registry().with(fmt_layer).try_init().is_ok() {
+        TRACING_INITIALIZED.store(true, Ordering::SeqCst);
+    }
 }
 
 /// Initialize tracing with OpenTelemetry support (must be called from within Tokio runtime)
@@ -49,6 +59,11 @@ pub async fn init_tracing_with_otel(
     otlp_endpoint: &str,
     log_level: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Check if already initialized
+    if TRACING_INITIALIZED.load(Ordering::SeqCst) {
+        return Ok(());
+    }
+
     // Build filter from environment or default
     let filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new(log_level.unwrap_or("info")));
@@ -91,10 +106,14 @@ pub async fn init_tracing_with_otel(
     let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
 
     // Initialize the subscriber with both layers
-    let _ = tracing_subscriber::registry()
+    if tracing_subscriber::registry()
         .with(fmt_layer)
         .with(otel_layer)
-        .try_init();
+        .try_init()
+        .is_ok()
+    {
+        TRACING_INITIALIZED.store(true, Ordering::SeqCst);
+    }
 
     tracing::info!(
         service = service_name,
