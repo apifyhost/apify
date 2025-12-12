@@ -220,15 +220,9 @@ pub async fn load_api_configs(
             None
         };
 
-        let datasource_name = if let Some(ds) = api_record.datasource_name {
-            if ds.trim().is_empty() {
-                None
-            } else {
-                Some(ds)
-            }
-        } else {
-            None
-        };
+        let datasource_name = api_record
+            .datasource_name
+            .filter(|ds| !ds.trim().is_empty());
 
         configs.push(OpenApiStateConfig {
             config: OpenAPIConfig {

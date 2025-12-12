@@ -39,66 +39,72 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .enable_all()
         .build()?;
 
-    let (control_plane_db, db_openapi_configs, db_auth_config, db_datasources): (
+    type RuntimeInitData = (
         Option<apify::database::DatabaseManager>,
         Vec<apify::app_state::OpenApiStateConfig>,
         Option<Vec<apify::config::Authenticator>>,
         Option<std::collections::HashMap<String, apify::config::DatabaseSettings>>,
-    ) = rt_init.block_on(async {
-        let db = apify::database::DatabaseManager::new(db_config)
-            .await
-            .map_err(|e| e.to_string())?;
+    );
 
-        if cli.control_plane {
-            tracing::info!("Starting in Control Plane mode");
-            // Initialize metadata schema
-            db.initialize_schema(apify::control_plane::get_metadata_schemas())
+    let (control_plane_db, db_openapi_configs, db_auth_config, db_datasources): RuntimeInitData =
+        rt_init.block_on(async {
+            let db = apify::database::DatabaseManager::new(db_config)
                 .await
                 .map_err(|e| e.to_string())?;
-            Ok::<_, String>((Some(db), Vec::new(), None, None))
-        } else {
-            tracing::info!("Starting in Data Plane mode");
-            // Load configs from DB
-            let api_configs = match apify::control_plane::load_api_configs(&db).await {
-                Ok(configs) => {
-                    tracing::info!(count = configs.len(), "Loaded API configs from Metadata DB");
-                    configs
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to load API configs from DB: {}", e);
-                    Vec::new()
-                }
-            };
 
-            let auth_configs = match apify::control_plane::load_auth_configs(&db).await {
-                Ok(configs) => {
-                    if let Some(c) = &configs {
-                        tracing::info!(count = c.len(), "Loaded Auth configs from Metadata DB");
+            if cli.control_plane {
+                tracing::info!("Starting in Control Plane mode");
+                // Initialize metadata schema
+                db.initialize_schema(apify::control_plane::get_metadata_schemas())
+                    .await
+                    .map_err(|e| e.to_string())?;
+                Ok::<_, String>((Some(db), Vec::new(), None, None))
+            } else {
+                tracing::info!("Starting in Data Plane mode");
+                // Load configs from DB
+                let api_configs = match apify::control_plane::load_api_configs(&db).await {
+                    Ok(configs) => {
+                        tracing::info!(
+                            count = configs.len(),
+                            "Loaded API configs from Metadata DB"
+                        );
+                        configs
                     }
-                    configs
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to load Auth configs from DB: {}", e);
-                    None
-                }
-            };
-
-            let datasources = match apify::control_plane::load_datasources(&db).await {
-                Ok(ds) => {
-                    if let Some(d) = &ds {
-                        tracing::info!(count = d.len(), "Loaded Datasources from Metadata DB");
+                    Err(e) => {
+                        tracing::warn!("Failed to load API configs from DB: {}", e);
+                        Vec::new()
                     }
-                    ds
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to load Datasources from DB: {}", e);
-                    None
-                }
-            };
+                };
 
-            Ok::<_, String>((None, api_configs, auth_configs, datasources))
-        }
-    })?;
+                let auth_configs = match apify::control_plane::load_auth_configs(&db).await {
+                    Ok(configs) => {
+                        if let Some(c) = &configs {
+                            tracing::info!(count = c.len(), "Loaded Auth configs from Metadata DB");
+                        }
+                        configs
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to load Auth configs from DB: {}", e);
+                        None
+                    }
+                };
+
+                let datasources = match apify::control_plane::load_datasources(&db).await {
+                    Ok(ds) => {
+                        if let Some(d) = &ds {
+                            tracing::info!(count = d.len(), "Loaded Datasources from Metadata DB");
+                        }
+                        ds
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to load Datasources from DB: {}", e);
+                        None
+                    }
+                };
+
+                Ok::<_, String>((None, api_configs, auth_configs, datasources))
+            }
+        })?;
 
     // Get global modules configuration
     let tracing_config = config.modules.as_ref().and_then(|m| m.tracing.as_ref());
