@@ -37,8 +37,8 @@ impl PostgresBackend {
 
         if !lock_acquired {
             // Another thread is creating the schema, wait for the lock to be released
-            sqlx::query_scalar::<_, bool>("SELECT pg_advisory_lock(123456789)")
-                .fetch_one(&self.pool)
+            sqlx::query("SELECT pg_advisory_lock(123456789)")
+                .execute(&self.pool)
                 .await
                 .map_err(DatabaseError::QueryError)?;
             // Lock acquired after waiting, but schema should be ready now, so just unlock and return
