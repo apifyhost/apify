@@ -245,7 +245,7 @@ var _ = Describe("Apify Relations", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 
 			// Verify items are also deleted (list should not contain items with this order_id)
-			req, err = http.NewRequest("GET", baseURL+"/order_items", nil)
+			req, err = http.NewRequest("GET", baseURL+"/order-items", nil)
 			Expect(err).NotTo(HaveOccurred())
 			req.Header.Set("X-Api-Key", apiKey)
 
@@ -336,7 +336,7 @@ var _ = Describe("Apify Relations", func() {
 		})
 
 		It("should GET profile with auto-loaded user (belongsTo)", func() {
-			req, err := http.NewRequest("GET", fmt.Sprintf("%s/user_profiles/%d", baseURL, profileID), nil)
+			req, err := http.NewRequest("GET", fmt.Sprintf("%s/user-profiles/%d", baseURL, profileID), nil)
 			Expect(err).NotTo(HaveOccurred())
 			req.Header.Set("X-Api-Key", apiKey)
 
@@ -470,7 +470,7 @@ var _ = Describe("Apify Relations", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 
 			// Verify profile is also deleted
-			req, err = http.NewRequest("GET", baseURL+"/user_profiles", nil)
+			req, err = http.NewRequest("GET", baseURL+"/user-profiles", nil)
 			Expect(err).NotTo(HaveOccurred())
 			req.Header.Set("X-Api-Key", apiKey)
 
