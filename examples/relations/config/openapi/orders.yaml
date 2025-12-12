@@ -9,7 +9,7 @@ openapi:
     components:
       schemas:
         Order:
-          x-table-name: orders_new
+          x-table-name: orders
           type: object
           required:
             - customer_name
@@ -52,7 +52,7 @@ openapi:
               readOnly: true
 
         OrderItem:
-          x-table-name: order_items_new
+          x-table-name: order_items
           type: object
           required:
             - product_name
@@ -94,7 +94,7 @@ openapi:
     paths:
       /orders:
         get:
-          x-table-name: orders_new
+          x-table-name: orders
           summary: List all orders
           operationId: listOrders
           responses:
@@ -108,7 +108,7 @@ openapi:
                       $ref: '#/components/schemas/Order'
 
         post:
-          x-table-name: orders_new
+          x-table-name: orders
           summary: Create a new order with items
           operationId: createOrder
           requestBody:
@@ -140,7 +140,7 @@ openapi:
 
       /orders/{id}:
         get:
-          x-table-name: orders_new
+          x-table-name: orders
           summary: Get order by ID
           operationId: getOrder
           parameters:
@@ -158,7 +158,7 @@ openapi:
                     $ref: '#/components/schemas/Order'
 
         put:
-          x-table-name: orders_new
+          x-table-name: orders
           summary: Update an order
           operationId: updateOrder
           parameters:
@@ -182,7 +182,7 @@ openapi:
                     $ref: '#/components/schemas/Order'
 
         delete:
-          x-table-name: orders_new
+          x-table-name: orders
           summary: Delete an order
           operationId: deleteOrder
           parameters:
@@ -197,7 +197,7 @@ openapi:
 
       /order_items:
         get:
-          x-table-name: order_items_new
+          x-table-name: order_items
           summary: List all order items
           operationId: listOrderItems
           responses:
@@ -211,7 +211,7 @@ openapi:
                       $ref: '#/components/schemas/OrderItem'
 
     x-table-schemas:
-      - table_name: "orders_new"
+      - table_name: "orders"
         columns:
           - name: "id"
             column_type: "INTEGER"
@@ -270,9 +270,9 @@ openapi:
         relations:
           - field_name: "items"
             relation_type: "hasMany"
-            target_table: "order_items_new"
+            target_table: "order_items"
             foreign_key: "order_id"
-      - table_name: "order_items_new"
+      - table_name: "order_items"
         columns:
           - name: "id"
             column_type: "INTEGER"
