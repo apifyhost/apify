@@ -89,6 +89,12 @@ openapi:
             primary_key: false
             unique: true
             auto_increment: false
+          - name: "full_name"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            unique: false
+            auto_increment: false
           - name: "bio"
             column_type: "TEXT"
             nullable: true
@@ -177,6 +183,8 @@ openapi:
                         target: UserProfile
                         foreignKey: user_id
                       properties:
+                        full_name:
+                          type: string
                         bio:
                           type: string
                         avatar_url:
