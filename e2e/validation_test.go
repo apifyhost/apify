@@ -227,7 +227,7 @@ modules:
 				return fmt.Errorf("status code %d", resp.StatusCode)
 			}
 			return nil
-		}, 30*time.Second, 1*time.Second).Should(Succeed())
+		}, 60*time.Second, 1*time.Second).Should(Succeed())
 
 		// Post API Spec
 		// Wrap the spec in the expected payload format

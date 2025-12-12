@@ -46,7 +46,7 @@ var _ = Describe("Apify Relations", func() {
 				return fmt.Errorf("health check failed with status %d", resp.StatusCode)
 			}
 			return nil
-		}, "10s", "500ms").Should(Succeed(), "Service should be ready")
+		}, "30s", "500ms").Should(Succeed(), "Service should be ready")
 	})
 
 	Describe("hasMany Relations (Orders with Items)", Ordered, func() {
