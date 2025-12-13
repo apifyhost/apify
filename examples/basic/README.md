@@ -44,8 +44,8 @@ curl -X POST http://localhost:3000/items \
 
 ## Configuration
 
-- **API Keys**: Defined in `config/config.yaml` under `consumers`
-- **Database**: PostgreSQL connection settings in `datasource` section
+- **Main Config**: `config/config.yaml`
+- **Resources**: `config/resource.yaml` (listeners, auth, datasources)
 - **OpenAPI Spec**: `config/openapi/items.yaml`
 
 ## Stop and Clean

@@ -306,3 +306,9 @@ docker-compose down -v
 - [docs/RELATIONS.md](../../docs/RELATIONS.md) - Complete relations documentation
 - [examples/oauth](../oauth/) - Authentication and audit trail
 - [examples/full](../full/) - Complete E2E example
+
+## Configuration
+
+- **Main Config**: `config/config.yaml`
+- **Resources**: `config/resource.yaml` (listeners, auth, datasources)
+- **OpenAPI Spec**: `config/openapi/orders.yaml`

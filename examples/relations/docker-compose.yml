@@ -1,8 +1,6 @@
 services:
   apify:
-    build:
-      context: ../..
-      dockerfile: Dockerfile
+    image: apifyhost/apify:latest
     ports:
       - "3000:3000"
       - "9090:9090"
@@ -11,3 +9,4 @@ services:
       - ./data:/app/data
     environment:
       - RUST_LOG=info
+      - APIFY_THREADS=2
