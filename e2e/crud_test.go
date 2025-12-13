@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -15,42 +14,33 @@ import (
 
 var _ = Describe("Apify CRUD Operations", func() {
 	var (
+		env     *TestEnv
 		baseURL string
 		apiKey  string
 		client  *http.Client
 	)
 
-	BeforeEach(func() {
-		baseURL = os.Getenv("BASE_URL")
-		if baseURL == "" {
-			baseURL = "http://localhost:3000"
-		}
-
-		apiKey = os.Getenv("API_KEY")
-		if apiKey == "" {
-			apiKey = "e2e-test-key-001"
-		}
-
+	startEnv := func() {
+		env = StartTestEnv(map[string]string{
+			"items": "examples/basic/config/openapi/items.yaml",
+		})
+		baseURL = env.BaseURL
+		apiKey = env.APIKey
 		client = &http.Client{
 			Timeout: 10 * time.Second,
 		}
+	}
 
-		// Verify service is ready (should already be started by the workflow)
-		Eventually(func() error {
-			resp, err := client.Get(baseURL + "/healthz")
-			if err != nil {
-				return fmt.Errorf("failed to connect: %w", err)
-			}
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusOK {
-				return fmt.Errorf("health check failed with status %d", resp.StatusCode)
-			}
-			return nil
-		}, "10s", "500ms").Should(Succeed(), "Service should be ready")
-	})
+	stopEnv := func() {
+		if env != nil {
+			env.Stop()
+		}
+	}
 
 	Describe("Health Check", func() {
+		BeforeEach(startEnv)
+		AfterEach(stopEnv)
+
 		It("should return 200 OK for health endpoint", func() {
 			resp, err := client.Get(baseURL + "/healthz")
 			Expect(err).NotTo(HaveOccurred())
@@ -61,6 +51,9 @@ var _ = Describe("Apify CRUD Operations", func() {
 	})
 
 	Describe("Authentication", func() {
+		BeforeEach(startEnv)
+		AfterEach(stopEnv)
+
 		Context("when API key is not provided", func() {
 			It("should return 401 Unauthorized", func() {
 				req, err := http.NewRequest("GET", baseURL+"/items", nil)
@@ -104,6 +97,9 @@ var _ = Describe("Apify CRUD Operations", func() {
 	})
 
 	Describe("CRUD Operations", Ordered, func() {
+		BeforeAll(startEnv)
+		AfterAll(stopEnv)
+
 		var itemID int64
 
 		It("should list empty items initially", func() {
@@ -309,6 +305,9 @@ var _ = Describe("Apify CRUD Operations", func() {
 	})
 
 	Describe("Large Payload Handling", func() {
+		BeforeEach(startEnv)
+		AfterEach(stopEnv)
+
 		It("should handle large description fields", func() {
 			// Create a large description (1000 'x' characters)
 			largeDescription := make([]byte, 1000)
@@ -338,6 +337,9 @@ var _ = Describe("Apify CRUD Operations", func() {
 	})
 
 	Describe("Content-Type Validation", func() {
+		BeforeEach(startEnv)
+		AfterEach(stopEnv)
+
 		It("should accept requests with proper Content-Type", func() {
 			payload := map[string]interface{}{
 				"name": "Content Type Test",

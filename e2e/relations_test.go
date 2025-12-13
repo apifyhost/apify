@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -14,42 +13,34 @@ import (
 
 var _ = Describe("Apify Relations", func() {
 	var (
+		env     *TestEnv
 		baseURL string
 		apiKey  string
 		client  *http.Client
 	)
 
-	BeforeEach(func() {
-		baseURL = os.Getenv("BASE_URL")
-		if baseURL == "" {
-			baseURL = "http://localhost:3000"
-		}
-
-		apiKey = os.Getenv("API_KEY")
-		if apiKey == "" {
-			apiKey = "e2e-test-key-001"
-		}
-
+	startEnv := func() {
+		env = StartTestEnv(map[string]string{
+			"orders": "examples/relations/config/openapi/orders.yaml",
+			"users":  "examples/relations/config/openapi/users.yaml",
+		})
+		baseURL = env.BaseURL
+		apiKey = env.APIKey
 		client = &http.Client{
 			Timeout: 10 * time.Second,
 		}
+	}
 
-		// Verify service is ready
-		Eventually(func() error {
-			resp, err := client.Get(baseURL + "/healthz")
-			if err != nil {
-				return fmt.Errorf("failed to connect: %w", err)
-			}
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusOK {
-				return fmt.Errorf("health check failed with status %d", resp.StatusCode)
-			}
-			return nil
-		}, "30s", "500ms").Should(Succeed(), "Service should be ready")
-	})
+	stopEnv := func() {
+		if env != nil {
+			env.Stop()
+		}
+	}
 
 	Describe("hasMany Relations (Orders with Items)", Ordered, func() {
+		BeforeAll(startEnv)
+		AfterAll(stopEnv)
+
 		var orderID int64
 
 		It("should create an order with nested items", func() {
@@ -267,6 +258,9 @@ var _ = Describe("Apify Relations", func() {
 	})
 
 	Describe("hasOne and belongsTo Relations (Users with Profiles)", Ordered, func() {
+		BeforeAll(startEnv)
+		AfterAll(stopEnv)
+
 		var userID int64
 		var profileID int64
 
