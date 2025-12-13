@@ -148,7 +148,7 @@ modules:
 	Expect(err).NotTo(HaveOccurred())
 
 	// Start Control Plane
-	env.CPCmd = exec.Command("cargo", "run", "--", "--config", env.ConfigFile, "--control-plane")
+	env.CPCmd = exec.Command("cargo", "run", "--bin", "apify-cp", "--", "--config", env.ConfigFile)
 	env.CPCmd.Dir = projectRoot
 	env.CPCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+env.DBFile)
 	env.CPCmd.Stdout = GinkgoWriter
@@ -179,7 +179,7 @@ modules:
 	}
 
 	// Start Data Plane
-	env.ServerCmd = exec.Command("cargo", "run", "--", "--config", env.ConfigFile)
+	env.ServerCmd = exec.Command("cargo", "run", "--bin", "apify", "--", "--config", env.ConfigFile)
 	env.ServerCmd.Dir = projectRoot
 	env.ServerCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+env.DBFile)
 	env.ServerCmd.Stdout = GinkgoWriter

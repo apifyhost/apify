@@ -215,7 +215,7 @@ modules:
 		wd, _ := os.Getwd()
 		projectRoot := filepath.Dir(wd)
 		
-		cpCmd = exec.Command("cargo", "run", "--", "--config", configFile, "--control-plane")
+		cpCmd = exec.Command("cargo", "run", "--bin", "apify-cp", "--", "--config", configFile)
 		cpCmd.Dir = projectRoot
 		cpCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+dbFile)
 		cpCmd.Stdout = GinkgoWriter
@@ -265,7 +265,7 @@ modules:
 		}
 
 		// Start Server (Data Plane)
-		serverCmd = exec.Command("cargo", "run", "--", "--config", configFile)
+		serverCmd = exec.Command("cargo", "run", "--bin", "apify", "--", "--config", configFile)
 		serverCmd.Dir = projectRoot
 		serverCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+dbFile)
 		serverCmd.Stdout = GinkgoWriter

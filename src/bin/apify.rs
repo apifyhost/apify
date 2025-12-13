@@ -3,11 +3,9 @@
 use apify::{
     app_state::OpenApiStateConfig,
     config::{ApiRef, Config, OpenAPIConfig},
-    modules::{
-        metrics::init_metrics,
-        tracing::{init_tracing, shutdown_tracing},
-    },
+    modules::{metrics::init_metrics, tracing::shutdown_tracing},
     server::{start_docs_server, start_listener},
+    startup::{RuntimeInitData, build_runtime, init_database, setup_logging},
 };
 use clap::Parser;
 use std::path::Path;
@@ -20,10 +18,6 @@ struct Cli {
     /// Path to the configuration file (YAML format)
     #[arg(short, long, default_value = "config.yaml")]
     config: String,
-
-    /// Enable Control Plane mode
-    #[arg(long)]
-    control_plane: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -33,153 +27,73 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Load main configuration from specified file path
     let config = Config::from_file(&cli.config)?;
 
-    // Get global modules configuration
-    let tracing_config = config.modules.as_ref().and_then(|m| m.tracing.as_ref());
-    let tracing_enabled = tracing_config.and_then(|t| t.enabled).unwrap_or(true);
-    let otlp_endpoint = tracing_config.and_then(|t| t.otlp_endpoint.as_deref());
-    let log_level = config.log_level.as_deref();
-
-    if cli.control_plane {
-        init_tracing("apify-cp", None, log_level)?;
-    } else if tracing_enabled && otlp_endpoint.is_some() {
-        eprintln!("Deferring tracing initialization to Tokio runtime (OpenTelemetry enabled)");
-    } else {
-        init_tracing("apify", None, log_level)?;
-    }
+    // Setup logging
+    let (tracing_enabled, otlp_endpoint, log_level) = setup_logging(&config)?;
 
     // Initialize Metadata DB connection and load configs
-    let rt_init = apify::tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()?;
-
-    type RuntimeInitData = (
-        Option<apify::database::DatabaseManager>,
-        std::collections::HashMap<String, apify::app_state::OpenApiStateConfig>,
-        Option<Vec<apify::config::Authenticator>>,
-        Option<std::collections::HashMap<String, apify::config::DatabaseSettings>>,
-        Option<Vec<apify::config::ListenerConfig>>,
-    );
+    let rt_init = build_runtime()?;
 
     let (control_plane_db, db_openapi_configs, db_auth_config, db_datasources, db_listeners): RuntimeInitData =
         rt_init.block_on(async {
-            let db_config = if let Some(cp_config) = &config.control_plane {
-                let s = &cp_config.database;
-                let url = if s.driver == "sqlite" {
-                    format!("sqlite:{}", s.database)
-                } else {
-                    let mut url = "postgres://".to_string();
-                    if let Some(user) = &s.user {
-                        url.push_str(user);
-                        if let Some(pass) = &s.password {
-                            url.push(':');
-                            url.push_str(pass);
-                        }
-                        url.push('@');
-                    }
-                    if let Some(host) = &s.host {
-                        url.push_str(host);
-                    }
-                    if let Some(port) = s.port {
-                        url.push(':');
-                        url.push_str(&port.to_string());
-                    }
-                    url.push('/');
-                    url.push_str(&s.database);
-                    url
-                };
-                apify::database::DatabaseRuntimeConfig {
-                    driver: s.driver.clone(),
-                    url,
-                    max_size: s.max_pool_size.unwrap_or(5) as u32,
+            let db = init_database(&config).await.map_err(|e| e.to_string())?;
+
+            tracing::info!("Starting in Data Plane mode");
+            // Load configs from DB
+            let api_configs = match apify::control_plane::load_api_configs(&db).await {
+                Ok(configs) => {
+                    tracing::info!(
+                        count = configs.len(),
+                        "Loaded API configs from Metadata DB"
+                    );
+                    configs
                 }
-            } else {
-                apify::database::DatabaseRuntimeConfig::sqlite_default()
+                Err(e) => {
+                    tracing::warn!("Failed to load API configs from DB: {}", e);
+                    std::collections::HashMap::new()
+                }
             };
 
-            let db = apify::database::DatabaseManager::new(db_config)
-                .await
-                .map_err(|e| e.to_string())?;
+            let auth_configs = match apify::control_plane::load_auth_configs(&db).await {
+                Ok(configs) => {
+                    if let Some(c) = &configs {
+                        tracing::info!(count = c.len(), "Loaded Auth configs from Metadata DB");
+                    }
+                    configs
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to load Auth configs from DB: {}", e);
+                    None
+                }
+            };
 
-            if cli.control_plane {
-                tracing::info!("Starting in Control Plane mode");
-                // Initialize metadata schema
-                db.initialize_schema(apify::control_plane::get_metadata_schemas())
-                    .await
-                    .map_err(|e| e.to_string())?;
-                Ok::<_, String>((Some(db), std::collections::HashMap::new(), None, None, None))
-            } else {
-                tracing::info!("Starting in Data Plane mode");
-                // Load configs from DB
-                let api_configs = match apify::control_plane::load_api_configs(&db).await {
-                    Ok(configs) => {
-                        tracing::info!(
-                            count = configs.len(),
-                            "Loaded API configs from Metadata DB"
-                        );
-                        configs
+            let datasources = match apify::control_plane::load_datasources(&db).await {
+                Ok(ds) => {
+                    if let Some(d) = &ds {
+                        tracing::info!(count = d.len(), "Loaded Datasources from Metadata DB");
                     }
-                    Err(e) => {
-                        tracing::warn!("Failed to load API configs from DB: {}", e);
-                        std::collections::HashMap::new()
-                    }
-                };
+                    ds
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to load Datasources from DB: {}", e);
+                    None
+                }
+            };
 
-                let auth_configs = match apify::control_plane::load_auth_configs(&db).await {
-                    Ok(configs) => {
-                        if let Some(c) = &configs {
-                            tracing::info!(count = c.len(), "Loaded Auth configs from Metadata DB");
-                        }
-                        configs
+            let listeners = match apify::control_plane::load_listeners(&db).await {
+                Ok(l) => {
+                    if let Some(list) = &l {
+                        tracing::info!(count = list.len(), "Loaded Listeners from Metadata DB");
                     }
-                    Err(e) => {
-                        tracing::warn!("Failed to load Auth configs from DB: {}", e);
-                        None
-                    }
-                };
+                    l
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to load Listeners from DB: {}", e);
+                    None
+                }
+            };
 
-                let datasources = match apify::control_plane::load_datasources(&db).await {
-                    Ok(ds) => {
-                        if let Some(d) = &ds {
-                            tracing::info!(count = d.len(), "Loaded Datasources from Metadata DB");
-                        }
-                        ds
-                    }
-                    Err(e) => {
-                        tracing::warn!("Failed to load Datasources from DB: {}", e);
-                        None
-                    }
-                };
-
-                let listeners = match apify::control_plane::load_listeners(&db).await {
-                    Ok(l) => {
-                        if let Some(list) = &l {
-                            tracing::info!(count = list.len(), "Loaded Listeners from Metadata DB");
-                        }
-                        l
-                    }
-                    Err(e) => {
-                        tracing::warn!("Failed to load Listeners from DB: {}", e);
-                        None
-                    }
-                };
-
-                Ok::<_, String>((None, api_configs, auth_configs, datasources, listeners))
-            }
+            Ok::<_, String>((None, api_configs, auth_configs, datasources, listeners))
         })?;
-
-    if cli.control_plane {
-        if let Some(cp_config) = config.control_plane {
-            if let Some(db) = control_plane_db {
-                tracing::info!("Starting Control Plane Server");
-                rt_init.block_on(apify::control_plane::start_control_plane_server(
-                    cp_config, db,
-                ))?;
-                return Ok(());
-            }
-        } else {
-            return Err("Control plane configuration missing".into());
-        }
-    }
 
     tracing::info!(
         config_file = %cli.config,
@@ -244,7 +158,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     if metrics_enabled {
         let otlp_endpoint_for_thread = if tracing_enabled {
-            otlp_endpoint.map(|s| s.to_string())
+            otlp_endpoint.clone()
         } else {
             None
         };
@@ -394,83 +308,48 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             } else {
                 None
             }
-        }) {
-            // We need to construct a minimal AppState for the docs server
-            // For now, we can reuse the logic from start_listener but simplified,
-            // or better yet, we need access to the AppState created inside start_listener.
-            // However, AppState is created per-thread inside start_listener.
-            // To support a separate docs server that needs access to the generated OpenAPI spec (which is in AppState -> CRUDHandler),
-            // we should probably create the AppState ONCE here in main (or at least the CRUDHandler part) and pass it down.
-            // But AppState creation is async and involves DB connection.
-
-            // Alternative: The docs server needs to know the OpenAPI spec.
-            // The spec is loaded from files in main().
-            // We can reconstruct the AppState or just the relevant parts for the docs server.
-            // Actually, the docs server only needs the OpenAPI spec JSON.
-            // We can pass the loaded openapi_configs to the docs server and let it build a minimal state or just serve the JSON.
-
-            // Let's modify start_docs_server to take openapi_configs directly or build a minimal state.
-            // But wait, start_docs_server takes Arc<AppState>.
-            // And AppState::new_with_crud is what builds the merged spec.
-
-            // To avoid refactoring everything, let's spawn the docs server thread
-            // and inside it, create a dedicated AppState just for serving docs.
-            // This means double DB connection initialization if we are not careful,
-            // but for docs we might not need DB connection if we only serve the JSON?
-            // AppState::new_with_crud DOES initialize DB.
-
-            // Optimization: Refactor AppState creation to separate Spec generation from DB init?
-            // For now, let's just create a separate AppState for the docs server.
-            // It might be slightly inefficient (extra DB pool) but it's robust.
-
+        }) && listener_idx == 0
+        {
             let listener_config_clone = listener_config.clone();
             let datasources_clone = datasources.clone();
             let openapi_configs_clone = openapi_configs.clone();
-            let auth_config_clone = auth_config_clone.clone();
+            let auth_config_clone = auth_config.clone();
             let access_log_config = config.modules.as_ref().and_then(|m| m.access_log.clone());
             let access_log_config_clone = access_log_config.clone();
 
-            // Only start docs server once (e.g. for the first listener, or globally?)
-            // The user asked for "separate port", implying one global docs port.
-            // But config structure has listeners.
-            // If we have multiple listeners, do we have one docs port for all?
-            // The config.docs_port is global.
-            // So we should start it only once.
-            if listener_idx == 0 {
-                let handle = thread::spawn(
-                    move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-                        tracing::info!(port = docs_port, "Starting docs server");
+            let handle = thread::spawn(
+                move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+                    tracing::info!(port = docs_port, "Starting docs server");
 
-                        // Create a runtime for AppState creation
-                        let rt = tokio::runtime::Builder::new_current_thread()
-                            .enable_all()
-                            .build()?;
+                    // Create a runtime for AppState creation
+                    let rt = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()?;
 
-                        let state = rt.block_on(async {
-                            apify::app_state::AppState::new_with_crud(
-                                apify::app_state::AppStateConfig {
-                                    routes: listener_config_clone.routes,
-                                    datasources: datasources_clone,
-                                    openapi_configs: openapi_configs_clone,
-                                    listener_modules: listener_config_clone.modules,
-                                    auth_config: auth_config_clone,
-                                    public_url: Some(format!(
-                                        "http://localhost:{}",
-                                        listener_config_clone.port
-                                    )),
-                                    access_log_config: access_log_config_clone,
-                                    control_plane_db: None,
-                                },
-                            )
-                            .await
-                        })?;
+                    let state = rt.block_on(async {
+                        apify::app_state::AppState::new_with_crud(
+                            apify::app_state::AppStateConfig {
+                                routes: listener_config_clone.routes,
+                                datasources: datasources_clone,
+                                openapi_configs: openapi_configs_clone,
+                                listener_modules: listener_config_clone.modules,
+                                auth_config: auth_config_clone,
+                                public_url: Some(format!(
+                                    "http://localhost:{}",
+                                    listener_config_clone.port
+                                )),
+                                access_log_config: access_log_config_clone,
+                                control_plane_db: None,
+                            },
+                        )
+                        .await
+                    })?;
 
-                        start_docs_server(docs_port, std::sync::Arc::new(state))?;
-                        Ok(())
-                    },
-                );
-                handles.push(handle);
-            }
+                    start_docs_server(docs_port, std::sync::Arc::new(state))?;
+                    Ok(())
+                },
+            );
+            handles.push(handle);
         }
     }
 

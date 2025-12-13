@@ -9,6 +9,7 @@ pub mod modules;
 pub mod phases;
 pub mod schema_generator;
 pub mod server;
+pub mod startup;
 
 pub use http_body_util;
 pub use hyper;

@@ -15,8 +15,9 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 
 # Create dummy source files to cache dependencies
-RUN mkdir -p src && \
-    echo "fn main() {}" > src/main.rs && \
+RUN mkdir -p src/bin && \
+    echo "fn main() {}" > src/bin/apify.rs && \
+    echo "fn main() {}" > src/bin/apify-cp.rs && \
     echo "pub fn dummy() {}" > src/lib.rs
 
 # Build dependencies (this layer will be cached)
@@ -52,6 +53,7 @@ WORKDIR /app
 
 # Copy binary from builder
 COPY --from=builder /app/target/release/apify /usr/local/bin/apify
+COPY --from=builder /app/target/release/apify-cp /usr/local/bin/apify-cp
 
 # Copy default config directory structure
 RUN mkdir -p /app/config /app/data /app/logs && \
