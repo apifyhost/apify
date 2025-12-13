@@ -34,25 +34,35 @@ static DISCOVERY: OnceCell<OIDCDiscovery> = OnceCell::new();
 static JWKS: OnceCell<serde_json::Value> = OnceCell::new();
 
 fn fetch_discovery(issuer: &str) -> Option<OIDCDiscovery> {
-    // In Docker environments, replace localhost with keycloak service name for actual HTTP requests
-    // This allows tokens to have issuer=localhost while containers access keycloak service
-    let actual_url = issuer.replace("localhost", "keycloak");
+    let issuer = issuer.to_string();
+    std::thread::spawn(move || {
+        // In Docker environments, replace localhost with keycloak service name for actual HTTP requests
+        // This allows tokens to have issuer=localhost while containers access keycloak service
+        let actual_url = issuer.replace("localhost", "keycloak");
 
-    let url = format!(
-        "{}/.well-known/openid-configuration",
-        actual_url.trim_end_matches('/')
-    );
-    reqwest::blocking::get(&url)
-        .ok()?
-        .json::<OIDCDiscovery>()
-        .ok()
+        let url = format!(
+            "{}/.well-known/openid-configuration",
+            actual_url.trim_end_matches('/')
+        );
+        reqwest::blocking::get(&url)
+            .ok()?
+            .json::<OIDCDiscovery>()
+            .ok()
+    })
+    .join()
+    .unwrap_or(None)
 }
 
 fn fetch_jwks(jwks_uri: &str) -> Option<serde_json::Value> {
-    reqwest::blocking::get(jwks_uri)
-        .ok()?
-        .json::<serde_json::Value>()
-        .ok()
+    let jwks_uri = jwks_uri.to_string();
+    std::thread::spawn(move || {
+        reqwest::blocking::get(jwks_uri)
+            .ok()?
+            .json::<serde_json::Value>()
+            .ok()
+    })
+    .join()
+    .unwrap_or(None)
 }
 
 impl Module for OAuthModule {
@@ -158,16 +168,29 @@ impl Module for OAuthModule {
                 introspect_url = %actual_introspect_url,
                 "Attempting token introspection"
             );
-            let form = [("token", token)];
-            let client = reqwest::blocking::Client::new();
-            let resp = client
-                .post(&actual_introspect_url)
-                .basic_auth(cid, Some(csec))
-                .form(&form)
-                .send();
-            if let Ok(r) = resp
-                && let Ok(json) = r.json::<serde_json::Value>()
-            {
+            
+            let form = [("token", token.to_string())];
+            let url = actual_introspect_url.clone();
+            let client_id = cid.clone();
+            let client_secret = csec.clone();
+
+            let introspection_result = std::thread::spawn(move || {
+                let client = reqwest::blocking::Client::new();
+                let resp = client
+                    .post(&url)
+                    .basic_auth(client_id, Some(client_secret))
+                    .form(&form)
+                    .send();
+                
+                match resp {
+                    Ok(r) => r.json::<serde_json::Value>().ok(),
+                    Err(_) => None,
+                }
+            })
+            .join()
+            .unwrap_or(None);
+
+            if let Some(json) = introspection_result {
                 tracing::debug!(
                     response = %json,
                     "Token introspection full response"
