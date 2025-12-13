@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -13,32 +12,22 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Observability Features", Ordered, func() {
+var _ = Describe("Observability Features", func() {
 	var (
+		env         *TestEnv
 		baseURL     string
 		metricsURL  string
 		apiKey      string
 		client      *http.Client
-		metricsPort string
 	)
 
-	BeforeAll(func() {
-		baseURL = os.Getenv("BASE_URL")
-		if baseURL == "" {
-			baseURL = "http://localhost:3000"
-		}
-
-		// Metrics port - SQLite uses 9090, Postgres uses 9091
-		metricsPort = os.Getenv("METRICS_PORT")
-		if metricsPort == "" {
-			metricsPort = "9090"
-		}
-		metricsURL = fmt.Sprintf("http://localhost:%s/metrics", metricsPort)
-
-		apiKey = os.Getenv("API_KEY")
-		if apiKey == "" {
-			apiKey = "e2e-test-key-001"
-		}
+	BeforeEach(func() {
+		env = StartTestEnv(map[string]string{
+			"items": "examples/basic/config/openapi/items.yaml",
+		})
+		baseURL = env.BaseURL
+		metricsURL = fmt.Sprintf("http://127.0.0.1:%s/metrics", env.MetricsPort)
+		apiKey = env.APIKey
 
 		client = &http.Client{
 			Timeout: 10 * time.Second,
@@ -56,6 +45,12 @@ var _ = Describe("Observability Features", Ordered, func() {
 			}
 			return nil
 		}, "10s", "500ms").Should(Succeed())
+	})
+
+	AfterEach(func() {
+		if env != nil {
+			env.Stop()
+		}
 	})
 
 	Describe("Prometheus Metrics Endpoint", func() {

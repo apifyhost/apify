@@ -1,20 +1,18 @@
 package e2e_test
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"gopkg.in/yaml.v3"
 )
 
 func TestE2E(t *testing.T) {
@@ -30,11 +28,15 @@ type TestEnv struct {
 	APIKey     string
 	ConfigFile string
 	DBFile     string
+	MetricsPort string
 }
 
 func StartTestEnv(specFiles map[string]string) *TestEnv {
 	var err error
 	env := &TestEnv{}
+
+	wd, _ := os.Getwd()
+	projectRoot := filepath.Dir(wd)
 
 	// Get a free port
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -43,6 +45,12 @@ func StartTestEnv(specFiles map[string]string) *TestEnv {
 	l.Close()
 	env.BaseURL = "http://127.0.0.1:" + serverPort
 	env.APIKey = "e2e-test-key-001"
+
+	// Get a free port for metrics
+	l, err = net.Listen("tcp", "127.0.0.1:0")
+	Expect(err).NotTo(HaveOccurred())
+	env.MetricsPort = fmt.Sprintf("%d", l.Addr().(*net.TCPAddr).Port)
+	l.Close()
 
 	// Create temporary directory
 	env.TmpDir, err = os.MkdirTemp("", "apify-e2e-test")
@@ -56,16 +64,42 @@ func StartTestEnv(specFiles map[string]string) *TestEnv {
 	Expect(err).NotTo(HaveOccurred())
 	f.Close()
 
-	// Prepare API names for config
+	// Generate config.yaml
 	apisYaml := ""
 	if len(specFiles) > 0 {
-		apisYaml = "    apis:\n"
-		for name := range specFiles {
-			apisYaml += fmt.Sprintf("      - %s\n", name)
+		apisYaml = "\n    apis:"
+		for name, path := range specFiles {
+			// Read the actual content from the source path
+			// Assuming path is relative to project root
+			fullPath := filepath.Join(projectRoot, path)
+			content, err := os.ReadFile(fullPath)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Write spec to file
+			specPath := filepath.Join(env.TmpDir, name+".yaml")
+			err = os.WriteFile(specPath, content, 0644)
+			Expect(err).NotTo(HaveOccurred())
+
+			apisYaml += fmt.Sprintf(`
+      - path: %s
+`, specPath)
 		}
 	}
 
-	// Write Config
+	keycloakURL := os.Getenv("KEYCLOAK_URL")
+	oidcConfig := ""
+	if keycloakURL != "" {
+		oidcConfig = fmt.Sprintf(`
+  - name: keycloak
+    type: oidc
+    enabled: true
+    config:
+      issuer: %s/realms/apify
+      client_id: apify-test-client
+      client_secret: apify-test-secret
+`, keycloakURL)
+	}
+
 	configContent := fmt.Sprintf(`
 control-plane:
   listen:
@@ -92,6 +126,7 @@ auth:
         - name: default
           keys:
             - %s
+%s
 
 datasource:
   default:
@@ -105,16 +140,14 @@ modules:
   tracing:
     enabled: true
   metrics:
-    enabled: false
-`, serverPort, env.DBFile, serverPort, apisYaml, env.APIKey, env.DBFile)
+    enabled: true
+    port: %s
+`, serverPort, env.DBFile, serverPort, apisYaml, env.APIKey, oidcConfig, env.DBFile, env.MetricsPort)
 
 	err = os.WriteFile(env.ConfigFile, []byte(configContent), 0644)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Start Control Plane
-	wd, _ := os.Getwd()
-	projectRoot := filepath.Dir(wd)
-
 	env.CPCmd = exec.Command("cargo", "run", "--", "--config", env.ConfigFile, "--control-plane")
 	env.CPCmd.Dir = projectRoot
 	env.CPCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+env.DBFile)
@@ -138,38 +171,6 @@ modules:
 		}
 		return nil
 	}, 300*time.Second, 1*time.Second).Should(Succeed())
-
-	// Import Specs
-	for name, path := range specFiles {
-		// Read YAML
-		yamlContent, err := os.ReadFile(filepath.Join(projectRoot, path))
-		Expect(err).NotTo(HaveOccurred())
-
-		// Parse YAML to interface{}
-		var fullConfig map[string]interface{}
-		err = yaml.Unmarshal(yamlContent, &fullConfig)
-		Expect(err).NotTo(HaveOccurred())
-
-		// Extract "openapi" -> "spec"
-		openapi, ok := fullConfig["openapi"].(map[string]interface{})
-		Expect(ok).To(BeTrue(), "Missing 'openapi' key in spec file")
-		specObj, ok := openapi["spec"]
-		Expect(ok).To(BeTrue(), "Missing 'spec' key in openapi object")
-
-		// Construct payload
-		payload := map[string]interface{}{
-			"name":    name,
-			"version": "1.0.0",
-			"spec":    specObj,
-		}
-		payloadBytes, err := json.Marshal(payload)
-		Expect(err).NotTo(HaveOccurred())
-
-		resp, err := client.Post(env.BaseURL+"/_meta/apis", "application/json", bytes.NewBuffer(payloadBytes))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(201))
-		resp.Body.Close()
-	}
 
 	// Stop Control Plane
 	if env.CPCmd.Process != nil {
@@ -216,3 +217,15 @@ func (e *TestEnv) Stop() {
 		os.RemoveAll(e.TmpDir)
 	}
 }
+
+func indent(s string, n int) string {
+	lines := strings.Split(s, "\n")
+	pad := strings.Repeat(" ", n)
+	for i, line := range lines {
+		if line != "" {
+			lines[i] = pad + line
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+

@@ -23,6 +23,7 @@ type TokenResponse struct {
 
 var _ = Describe("OAuth/OIDC Integration", func() {
 	var (
+		env           *TestEnv
 		baseURL       string
 		keycloakURL   string
 		client        *http.Client
@@ -35,15 +36,15 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 	)
 
 	BeforeEach(func() {
-		baseURL = os.Getenv("BASE_URL")
-		if baseURL == "" {
-			baseURL = "http://localhost:3000"
-		}
-
 		keycloakURL = os.Getenv("KEYCLOAK_URL")
 		if keycloakURL == "" {
-			keycloakURL = "http://localhost:8080"
+			Skip("KEYCLOAK_URL not set, skipping OAuth tests")
 		}
+
+		env = StartTestEnv(map[string]string{
+			"items_oauth": "examples/oauth/config/openapi/items_oauth.yaml",
+		})
+		baseURL = env.BaseURL
 
 		client = &http.Client{
 			Timeout: 15 * time.Second,
@@ -75,6 +76,12 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 
 		accessToken = tokenResp.AccessToken
 		GinkgoWriter.Printf("Obtained access token: %s...\n", accessToken[:20])
+	})
+
+	AfterEach(func() {
+		if env != nil {
+			env.Stop()
+		}
 	})
 
 	Describe("Bearer Token Authentication", func() {
