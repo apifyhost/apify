@@ -33,12 +33,20 @@ impl OAuthModule {
 static DISCOVERY: OnceCell<OIDCDiscovery> = OnceCell::new();
 static JWKS: OnceCell<serde_json::Value> = OnceCell::new();
 
+fn resolve_url(url: &str) -> String {
+    if std::env::var("APIFY_OAUTH_REPLACE_LOCALHOST").is_ok() {
+        url.replace("localhost", "keycloak")
+    } else {
+        url.to_string()
+    }
+}
+
 fn fetch_discovery(issuer: &str) -> Option<OIDCDiscovery> {
     let issuer = issuer.to_string();
     std::thread::spawn(move || {
         // In Docker environments, replace localhost with keycloak service name for actual HTTP requests
         // This allows tokens to have issuer=localhost while containers access keycloak service
-        let actual_url = issuer.replace("localhost", "keycloak");
+        let actual_url = resolve_url(&issuer);
 
         let url = format!(
             "{}/.well-known/openid-configuration",
@@ -155,7 +163,7 @@ impl Module for OAuthModule {
             && let (Some(cid), Some(csec)) = (&provider_cfg.client_id, &provider_cfg.client_secret)
         {
             // Replace localhost with keycloak for Docker network access
-            let actual_introspect_url = introspect_url.replace("localhost", "keycloak");
+            let actual_introspect_url = resolve_url(introspect_url);
 
             // Log token details for debugging (first 50 chars to avoid exposing full token)
             tracing::debug!(
@@ -223,7 +231,7 @@ impl Module for OAuthModule {
         // Fallback: verify JWT locally if JWKS available
         if let Some(jwks_uri) = &discovery.jwks_uri {
             // Replace localhost with keycloak for Docker network access
-            let actual_jwks_uri = jwks_uri.replace("localhost", "keycloak");
+            let actual_jwks_uri = resolve_url(jwks_uri);
 
             let jwks_val = JWKS.get_or_init(|| {
                 fetch_jwks(&actual_jwks_uri).unwrap_or(serde_json::json!({"keys": []}))

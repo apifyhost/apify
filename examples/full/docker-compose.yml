@@ -26,6 +26,7 @@ services:
     environment:
       - RUST_LOG=debug,apify=debug,apify::modules::oauth=debug
       - APIFY_THREADS=2
+      - APIFY_OAUTH_REPLACE_LOCALHOST=true
       - KEYCLOAK_URL=http://localhost:8080
       - KEYCLOAK_REALM=apify
       - KEYCLOAK_CLIENT_ID=apify-test-client
@@ -44,6 +45,7 @@ services:
     environment:
       - RUST_LOG=debug,apify=debug,apify::modules::oauth=debug
       - APIFY_THREADS=2
+      - APIFY_OAUTH_REPLACE_LOCALHOST=true
       - KEYCLOAK_URL=http://localhost:8080
       - KEYCLOAK_REALM=apify
       - KEYCLOAK_CLIENT_ID=apify-test-client
