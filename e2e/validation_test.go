@@ -169,10 +169,20 @@ var _ = Describe("OpenAPI Validation", func() {
 
 		// Write Config
 		configContent := fmt.Sprintf(`
+control-plane:
+  listen:
+    ip: 127.0.0.1
+    port: %s
+  database:
+    driver: sqlite
+    database: //%s
+
 listeners:
   - port: %s
     ip: 127.0.0.1
     protocol: HTTP
+    apis:
+      - validation-api
 
 consumers:
   - name: default
@@ -182,7 +192,7 @@ consumers:
 datasource:
   sqlite1:
     driver: sqlite
-    database: %s
+    database: //%s
     max_pool_size: 1
 
 log_level: "info"
@@ -192,7 +202,7 @@ modules:
     enabled: true
   metrics:
     enabled: false
-`, serverPort, dbFile)
+`, serverPort, dbFile, serverPort, dbFile)
 		err = os.WriteFile(configFile, []byte(configContent), 0644)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -218,7 +228,7 @@ modules:
 
 		// Wait for CP to be ready
 		Eventually(func() error {
-			resp, err := client.Get(baseURL + "/healthz")
+			resp, err := client.Get(baseURL + "/_meta/apis")
 			if err != nil {
 				return err
 			}

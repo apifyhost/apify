@@ -33,6 +33,22 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Load main configuration from specified file path
     let config = Config::from_file(&cli.config)?;
 
+    // Get global modules configuration
+    let tracing_config = config.modules.as_ref().and_then(|m| m.tracing.as_ref());
+    let tracing_enabled = tracing_config.and_then(|t| t.enabled).unwrap_or(true);
+    let otlp_endpoint = tracing_config.and_then(|t| t.otlp_endpoint.as_deref());
+    let log_level = config.log_level.as_deref();
+
+    if cli.control_plane {
+         init_tracing("apify-cp", None, log_level)?;
+    } else {
+        if tracing_enabled && otlp_endpoint.is_some() {
+            eprintln!("Deferring tracing initialization to Tokio runtime (OpenTelemetry enabled)");
+        } else {
+            init_tracing("apify", None, log_level)?;
+        }
+    }
+
     // Initialize Metadata DB connection and load configs
     let rt_init = apify::tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -153,15 +169,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             }
         })?;
 
-    // Get global modules configuration
-    let tracing_config = config.modules.as_ref().and_then(|m| m.tracing.as_ref());
-    let tracing_enabled = tracing_config.and_then(|t| t.enabled).unwrap_or(true);
-
     if cli.control_plane {
         if let Some(cp_config) = config.control_plane {
             if let Some(db) = control_plane_db {
-                // Initialize tracing for control plane (simple logging)
-                init_tracing("apify-cp", None, config.log_level.as_deref())?;
                 tracing::info!("Starting Control Plane Server");
                 rt_init.block_on(apify::control_plane::start_control_plane_server(
                     cp_config, db,
@@ -173,18 +183,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     }
 
-    let otlp_endpoint = tracing_config.and_then(|t| t.otlp_endpoint.as_deref());
-    let log_level = config.log_level.as_deref();
 
-    // If OpenTelemetry is configured AND enabled, we need to defer ALL tracing initialization
-    // to the metrics server thread (which has Tokio runtime)
-    // Otherwise, initialize basic logging here
-    if tracing_enabled && otlp_endpoint.is_some() {
-        // Print to stderr since tracing isn't initialized yet
-        eprintln!("Deferring tracing initialization to Tokio runtime (OpenTelemetry enabled)");
-    } else {
-        init_tracing("apify", None, log_level)?;
-    }
 
     tracing::info!(
         config_file = %cli.config,
