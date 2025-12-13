@@ -42,6 +42,7 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 		}
 
 		env = StartTestEnv(map[string]string{
+			"items":       "examples/basic/config/openapi/items.yaml",
 			"items_oauth": "examples/oauth/config/openapi/items_oauth.yaml",
 		})
 		baseURL = env.BaseURL
