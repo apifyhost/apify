@@ -39,7 +39,11 @@ pub fn init_logging(log_level: Option<&str>) {
         .with_filter(filter);
 
     // Initialize with just logging layer
-    if tracing_subscriber::registry().with(fmt_layer).try_init().is_ok() {
+    if tracing_subscriber::registry()
+        .with(fmt_layer)
+        .try_init()
+        .is_ok()
+    {
         TRACING_INITIALIZED.store(true, Ordering::SeqCst);
     }
 }

@@ -2,15 +2,15 @@ use crate::app_state::OpenApiStateConfig;
 use crate::config::{Authenticator, DatabaseSettings, ModulesConfig, OpenAPIConfig};
 use crate::database::DatabaseManager;
 use crate::schema_generator::{ColumnDefinition, TableSchema};
+use hyper::server::conn::http1;
+use hyper::service::service_fn;
+use hyper_util::rt::TokioIo;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use tokio::net::TcpListener;
-use hyper::server::conn::http1;
-use hyper::service::service_fn;
 use std::sync::Arc;
-use hyper_util::rt::TokioIo;
+use tokio::net::TcpListener;
 
 pub fn get_metadata_schemas() -> Vec<TableSchema> {
     vec![
@@ -329,9 +329,7 @@ pub async fn load_datasources(
 pub async fn load_listeners(
     db: &DatabaseManager,
 ) -> Result<Option<Vec<crate::config::ListenerConfig>>, Box<dyn std::error::Error + Send + Sync>> {
-    let records = db
-        .select("_meta_listeners", None, None, None, None)
-        .await?;
+    let records = db.select("_meta_listeners", None, None, None, None).await?;
 
     if records.is_empty() {
         return Ok(None);
@@ -339,11 +337,11 @@ pub async fn load_listeners(
 
     let mut listeners = Vec::new();
     for record in records {
-        if let Some(config_val) = record.get("config") {
-            if let Some(config_str) = config_val.as_str() {
-                let listener: crate::config::ListenerConfig = serde_json::from_str(config_str)?;
-                listeners.push(listener);
-            }
+        if let Some(config_val) = record.get("config")
+            && let Some(config_str) = config_val.as_str()
+        {
+            let listener: crate::config::ListenerConfig = serde_json::from_str(config_str)?;
+            listeners.push(listener);
         }
     }
 
@@ -638,10 +636,12 @@ pub async fn handle_control_plane_request(
                         match std::fs::read_to_string(&path) {
                             Ok(spec_content) => {
                                 let spec_value = if let Ok(api_config) =
-                                    serde_yaml::from_str::<crate::config::OpenAPIConfig>(&spec_content)
-                                {
+                                    serde_yaml::from_str::<crate::config::OpenAPIConfig>(
+                                        &spec_content,
+                                    ) {
                                     api_config.openapi.spec
-                                } else if let Ok(val) = serde_yaml::from_str::<Value>(&spec_content) {
+                                } else if let Ok(val) = serde_yaml::from_str::<Value>(&spec_content)
+                                {
                                     val
                                 } else {
                                     tracing::warn!("Failed to parse API spec: {}", path);
@@ -653,7 +653,8 @@ pub async fn handle_control_plane_request(
                                 let id = uuid::Uuid::new_v4().to_string();
                                 let updated_at = std::time::SystemTime::now()
                                     .duration_since(std::time::UNIX_EPOCH)?
-                                    .as_secs() as i64;
+                                    .as_secs()
+                                    as i64;
 
                                 let mut data = HashMap::new();
                                 data.insert("id".to_string(), Value::String(id));
@@ -721,24 +722,27 @@ pub async fn start_control_plane_server(
 
         tokio::task::spawn(async move {
             if let Err(err) = http1::Builder::new()
-                .serve_connection(io, service_fn(move |req| {
-                    let db = db_clone.clone();
-                    async move {
-                        match handle_control_plane_request(req, &db).await {
-                            Ok(res) => Ok::<_, hyper::Error>(res),
-                            Err(e) => {
-                                tracing::error!("Internal server error: {}", e);
-                                let res = hyper::Response::builder()
-                                    .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
-                                    .body(http_body_util::Full::new(hyper::body::Bytes::from(
-                                        format!("Internal Server Error: {}", e),
-                                    )))
-                                    .unwrap();
-                                Ok(res)
+                .serve_connection(
+                    io,
+                    service_fn(move |req| {
+                        let db = db_clone.clone();
+                        async move {
+                            match handle_control_plane_request(req, &db).await {
+                                Ok(res) => Ok::<_, hyper::Error>(res),
+                                Err(e) => {
+                                    tracing::error!("Internal server error: {}", e);
+                                    let res = hyper::Response::builder()
+                                        .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
+                                        .body(http_body_util::Full::new(hyper::body::Bytes::from(
+                                            format!("Internal Server Error: {}", e),
+                                        )))
+                                        .unwrap();
+                                    Ok(res)
+                                }
                             }
                         }
-                    }
-                }))
+                    }),
+                )
                 .await
             {
                 tracing::error!("Error serving connection: {:?}", err);

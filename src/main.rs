@@ -40,13 +40,11 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let log_level = config.log_level.as_deref();
 
     if cli.control_plane {
-         init_tracing("apify-cp", None, log_level)?;
+        init_tracing("apify-cp", None, log_level)?;
+    } else if tracing_enabled && otlp_endpoint.is_some() {
+        eprintln!("Deferring tracing initialization to Tokio runtime (OpenTelemetry enabled)");
     } else {
-        if tracing_enabled && otlp_endpoint.is_some() {
-            eprintln!("Deferring tracing initialization to Tokio runtime (OpenTelemetry enabled)");
-        } else {
-            init_tracing("apify", None, log_level)?;
-        }
+        init_tracing("apify", None, log_level)?;
     }
 
     // Initialize Metadata DB connection and load configs
@@ -182,8 +180,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             return Err("Control plane configuration missing".into());
         }
     }
-
-
 
     tracing::info!(
         config_file = %cli.config,
