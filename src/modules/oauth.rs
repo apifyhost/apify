@@ -168,7 +168,7 @@ impl Module for OAuthModule {
                 introspect_url = %actual_introspect_url,
                 "Attempting token introspection"
             );
-            
+
             let form = [("token", token.to_string())];
             let url = actual_introspect_url.clone();
             let client_id = cid.clone();
@@ -181,7 +181,7 @@ impl Module for OAuthModule {
                     .basic_auth(client_id, Some(client_secret))
                     .form(&form)
                     .send();
-                
+
                 match resp {
                     Ok(r) => r.json::<serde_json::Value>().ok(),
                     Err(_) => None,
