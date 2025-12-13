@@ -27,6 +27,7 @@ services:
         condition: service_healthy
     environment:
       - RUST_LOG=info
+      - APIFY_THREADS=2
 
 volumes:
   postgres_data:

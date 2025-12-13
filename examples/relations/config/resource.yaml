@@ -1,0 +1,13 @@
+listeners:
+  - port: 3000
+    ip: 0.0.0.0
+    protocol: HTTP
+    apis:
+      - path: ./openapi/orders.yaml
+        datasource: sqlite1
+
+datasource:
+  sqlite1:
+    driver: sqlite
+    database: /app/data/orders.db
+    max_pool_size: 5

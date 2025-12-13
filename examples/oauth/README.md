@@ -41,7 +41,7 @@ Demonstrates OAuth/OIDC authentication with Keycloak and automatic audit trail t
 TOKEN=$(curl -X POST http://localhost:8080/realms/apify/protocol/openid-connect/token \
   -d "grant_type=password" \
   -d "client_id=apify-client" \
-  -d "client_secret=your-client-secret" \
+  -d "client_secret=apify-test-secret" \
   -d "username=testuser" \
   -d "password=testpass" | jq -r .access_token)
 
@@ -103,3 +103,9 @@ curl -X PUT http://localhost:3000/secure-items/1 \
 ./quickstart.sh oauth stop    # Stop services
 ./quickstart.sh oauth clean   # Stop and remove data
 ```
+
+## Configuration
+
+- **Main Config**: `config/config.yaml`
+- **Resources**: `config/resource.yaml` (listeners, auth, datasources)
+- **OpenAPI Spec**: `config/openapi/items_oauth.yaml`

@@ -45,9 +45,12 @@ services:
       keycloak:
         condition: service_healthy
     environment:
+      - APIFY_OAUTH_REPLACE_LOCALHOST=true
+      - APIFY_THREADS=2
       - KEYCLOAK_URL=http://localhost:8080
       - KEYCLOAK_REALM=apify
       - KEYCLOAK_CLIENT_ID=apify-client
+      - KEYCLOAK_CLIENT_SECRET=apify-test-secret
       - KEYCLOAK_CLIENT_SECRET=your-client-secret
 
 volumes:

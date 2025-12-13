@@ -55,6 +55,10 @@ impl RequestValidator {
         if let Some(ref spec) = config.openapi_spec {
             validators = Self::compile_validators(spec);
         }
+        // Debug: log registered validators
+        for key in validators.keys() {
+            eprintln!("Debug: RequestValidator registered: {} {}", key.0, key.1);
+        }
         Self { config, validators }
     }
 
@@ -109,10 +113,15 @@ impl RequestValidator {
                                 && let Some(json_media) = content.get("application/json")
                                 && let Some(schema) = json_media.get("schema")
                             {
-                                match JSONSchema::options()
-                                    .with_document("root.json".to_string(), spec.clone())
-                                    .compile(schema)
+                                // Create a self-contained schema by adding components from the root spec
+                                let mut schema_with_components = schema.clone();
+                                if let Some(components) = spec.get("components")
+                                    && let Some(obj) = schema_with_components.as_object_mut()
                                 {
+                                    obj.insert("components".to_string(), components.clone());
+                                }
+
+                                match JSONSchema::options().compile(&schema_with_components) {
                                     Ok(compiled) => {
                                         route_val.body_schema = Some(compiled);
                                     }
@@ -254,6 +263,13 @@ impl Module for RequestValidator {
                         .collect::<Vec<_>>()
                         .join("; ");
 
+                    eprintln!("Validation Error: {}", error_msg);
+                    // Debug: print the schema being used (if possible, JSONSchema doesn't implement Debug nicely usually, but let's try printing the key)
+                    eprintln!(
+                        "Debug: Validation failed for route: {} {}",
+                        ctx.method, route.path_pattern
+                    );
+
                     return ModuleOutcome::Respond(error_response(
                         StatusCode::BAD_REQUEST,
                         &error_msg,
@@ -306,6 +322,8 @@ impl Module for RequestValidator {
                                 })
                                 .collect::<Vec<_>>()
                                 .join("; ");
+
+                            eprintln!("Validation Error: {}", error_msg);
 
                             return ModuleOutcome::Respond(error_response(
                                 StatusCode::BAD_REQUEST,

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -14,48 +13,40 @@ import (
 
 var _ = Describe("Apify Relations", func() {
 	var (
+		env     *TestEnv
 		baseURL string
 		apiKey  string
 		client  *http.Client
 	)
 
-	BeforeEach(func() {
-		baseURL = os.Getenv("BASE_URL")
-		if baseURL == "" {
-			baseURL = "http://localhost:3000"
-		}
-
-		apiKey = os.Getenv("API_KEY")
-		if apiKey == "" {
-			apiKey = "e2e-test-key-001"
-		}
-
+	startEnv := func() {
+		env = StartTestEnv(map[string]string{
+			"orders": "examples/relations/config/openapi/orders.yaml",
+			"users":  "examples/relations/config/openapi/users.yaml",
+		})
+		baseURL = env.BaseURL
+		apiKey = env.APIKey
 		client = &http.Client{
 			Timeout: 10 * time.Second,
 		}
+	}
 
-		// Verify service is ready
-		Eventually(func() error {
-			resp, err := client.Get(baseURL + "/healthz")
-			if err != nil {
-				return fmt.Errorf("failed to connect: %w", err)
-			}
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusOK {
-				return fmt.Errorf("health check failed with status %d", resp.StatusCode)
-			}
-			return nil
-		}, "10s", "500ms").Should(Succeed(), "Service should be ready")
-	})
+	stopEnv := func() {
+		if env != nil {
+			env.Stop()
+		}
+	}
 
 	Describe("hasMany Relations (Orders with Items)", Ordered, func() {
+		BeforeAll(startEnv)
+		AfterAll(stopEnv)
+
 		var orderID int64
 
 		It("should create an order with nested items", func() {
 			payload := map[string]interface{}{
 				"customer_name": "John Doe",
-				"total_amount":  299.97,
+				"total":         299.97,
 				"status":        "pending",
 				"items": []map[string]interface{}{
 					{
@@ -164,8 +155,8 @@ var _ = Describe("Apify Relations", func() {
 			// Update order with completely new items
 			payload := map[string]interface{}{
 				"customer_name": "John Doe",
-				"total_amount":  399.99,
-				"status":        "processing",
+				"total":         399.99,
+				"status":        "confirmed",
 				"items": []map[string]interface{}{
 					{
 						"product_name": "Product C",
@@ -210,7 +201,7 @@ var _ = Describe("Apify Relations", func() {
 			err = json.NewDecoder(resp.Body).Decode(&order)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(order["status"]).To(Equal("processing"))
+			Expect(order["status"]).To(Equal("confirmed"))
 
 			items, ok := order["items"].([]interface{})
 			Expect(ok).To(BeTrue())
@@ -245,7 +236,7 @@ var _ = Describe("Apify Relations", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 
 			// Verify items are also deleted (list should not contain items with this order_id)
-			req, err = http.NewRequest("GET", baseURL+"/order-items", nil)
+			req, err = http.NewRequest("GET", baseURL+"/order_items", nil)
 			Expect(err).NotTo(HaveOccurred())
 			req.Header.Set("X-Api-Key", apiKey)
 
@@ -267,18 +258,20 @@ var _ = Describe("Apify Relations", func() {
 	})
 
 	Describe("hasOne and belongsTo Relations (Users with Profiles)", Ordered, func() {
+		BeforeAll(startEnv)
+		AfterAll(stopEnv)
+
 		var userID int64
 		var profileID int64
 
 		It("should create a user with nested profile", func() {
 			payload := map[string]interface{}{
-				"username":  "testuser123",
-				"email":     "test@example.com",
-				"full_name": "Test User",
+				"username": "testuser123",
+				"email":    "test@example.com",
 				"profile": map[string]interface{}{
+					"full_name":  "Test User",
 					"bio":        "Software engineer",
 					"avatar_url": "https://example.com/avatar.jpg",
-					"phone":      "+1234567890",
 				},
 			}
 
@@ -328,7 +321,6 @@ var _ = Describe("Apify Relations", func() {
 			profile, ok := user["profile"].(map[string]interface{})
 			Expect(ok).To(BeTrue(), "profile should be an object")
 			Expect(profile["bio"]).To(Equal("Software engineer"))
-			Expect(profile["phone"]).To(Equal("+1234567890"))
 			Expect(profile["user_id"]).To(BeNumerically("==", userID))
 
 			// Save profile ID for belongsTo test
@@ -338,7 +330,7 @@ var _ = Describe("Apify Relations", func() {
 		})
 
 		It("should GET profile with auto-loaded user (belongsTo)", func() {
-			req, err := http.NewRequest("GET", fmt.Sprintf("%s/user-profiles/%d", baseURL, profileID), nil)
+			req, err := http.NewRequest("GET", fmt.Sprintf("%s/user_profiles/%d", baseURL, profileID), nil)
 			Expect(err).NotTo(HaveOccurred())
 			req.Header.Set("X-Api-Key", apiKey)
 
@@ -397,13 +389,12 @@ var _ = Describe("Apify Relations", func() {
 
 		It("should UPDATE user with replaced profile", func() {
 			payload := map[string]interface{}{
-				"username":  "testuser123",
-				"email":     "newemail@example.com",
-				"full_name": "Updated User",
+				"username": "testuser123",
+				"email":    "newemail@example.com",
 				"profile": map[string]interface{}{
+					"full_name":  "Updated User",
 					"bio":        "Senior software engineer",
 					"avatar_url": "https://example.com/new-avatar.jpg",
-					"phone":      "+9876543210",
 				},
 			}
 
@@ -438,12 +429,11 @@ var _ = Describe("Apify Relations", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(user["email"]).To(Equal("newemail@example.com"))
-			Expect(user["full_name"]).To(Equal("Updated User"))
-
+			
 			profile, ok := user["profile"].(map[string]interface{})
 			Expect(ok).To(BeTrue())
+			Expect(profile["full_name"]).To(Equal("Updated User"))
 			Expect(profile["bio"]).To(Equal("Senior software engineer"))
-			Expect(profile["phone"]).To(Equal("+9876543210"))
 
 			// Old profile should be deleted, new one created
 			newProfileID, ok := profile["id"].(float64)
@@ -474,7 +464,7 @@ var _ = Describe("Apify Relations", func() {
 			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
 
 			// Verify profile is also deleted
-			req, err = http.NewRequest("GET", baseURL+"/user-profiles", nil)
+			req, err = http.NewRequest("GET", baseURL+"/user_profiles", nil)
 			Expect(err).NotTo(HaveOccurred())
 			req.Header.Set("X-Api-Key", apiKey)
 
@@ -496,11 +486,14 @@ var _ = Describe("Apify Relations", func() {
 	})
 
 	Describe("Audit Fields in Relations", func() {
+		BeforeEach(startEnv)
+		AfterEach(stopEnv)
+
 		It("should propagate audit fields to nested records", func() {
 			payload := map[string]interface{}{
 				"customer_name": "Audit Test Customer",
-				"total_amount":  100.00,
-				"status":        "new",
+				"total":         100.00,
+				"status":        "pending",
 				"items": []map[string]interface{}{
 					{
 						"product_name": "Audit Product",

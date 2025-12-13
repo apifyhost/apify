@@ -38,11 +38,17 @@ impl APIGenerator {
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let route_patterns = Self::build_route_patterns(&spec)?;
 
-        // Use provided schemas instead of re-extracting
-        let table_schemas = schemas
-            .into_iter()
-            .map(|schema| (schema.table_name.clone(), schema))
-            .collect();
+        for pattern in &route_patterns {
+            eprintln!(
+                "Debug: APIGenerator registered pattern: {} {:?}",
+                pattern.path_pattern, pattern.methods
+            );
+        }
+
+        let mut table_schemas = HashMap::new();
+        for schema in schemas {
+            table_schemas.insert(schema.table_name.clone(), schema);
+        }
 
         Ok(Self {
             spec,
@@ -161,13 +167,23 @@ impl APIGenerator {
     }
 
     /// Match a request path and method to determine the operation
-    pub fn match_operation(&self, method: &str, path: &str) -> Option<&RoutePattern> {
-        self.route_patterns
-            .iter()
-            .find(|&pattern| {
-                pattern.regex.is_match(path) && pattern.methods.contains(&method.to_uppercase())
-            })
-            .map(|v| v as _)
+    pub fn match_operation(&self, method: &str, path: &str) -> Option<RoutePattern> {
+        let method_upper = method.to_uppercase();
+        eprintln!(
+            "Debug: match_operation called for {} {}",
+            method_upper, path
+        );
+        let operation = self.route_patterns.iter().find(|pattern| {
+            let matched = pattern.regex.is_match(path) && pattern.methods.contains(&method_upper);
+            if matched {
+                eprintln!(
+                    "Debug: Matched route: {} for path: {}",
+                    pattern.path_pattern, path
+                );
+            }
+            matched
+        });
+        operation.cloned()
     }
 
     /// Extract path parameters from a matched route

@@ -9,6 +9,7 @@ openapi:
     components:
       schemas:
         User:
+          x-table-name: users
           type: object
           required:
             - username
@@ -41,6 +42,7 @@ openapi:
               readOnly: true
 
         UserProfile:
+          x-table-name: user_profiles
           type: object
           properties:
             id:
@@ -76,6 +78,7 @@ openapi:
     paths:
       /users:
         get:
+          x-table-name: users
           summary: List all users
           responses:
             '200':
@@ -88,6 +91,7 @@ openapi:
                       $ref: '#/components/schemas/User'
 
         post:
+          x-table-name: users
           summary: Create a new user with profile
           requestBody:
             required: true
@@ -115,6 +119,7 @@ openapi:
 
       /users/{id}:
         get:
+          x-table-name: users
           summary: Get user by ID
           parameters:
             - name: id
@@ -130,8 +135,45 @@ openapi:
                   schema:
                     $ref: '#/components/schemas/User'
 
-      /userprofiles:
+        put:
+          x-table-name: users
+          summary: Update a user
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          requestBody:
+            required: true
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/User'
+          responses:
+            '200':
+              description: User updated
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/User'
+
+        delete:
+          x-table-name: users
+          summary: Delete a user
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: integer
+          responses:
+            '204':
+              description: User deleted
+
+      /user_profiles:
         get:
+          x-table-name: user_profiles
           summary: List all user profiles
           responses:
             '200':
@@ -143,8 +185,9 @@ openapi:
                     items:
                       $ref: '#/components/schemas/UserProfile'
 
-      /userprofiles/{id}:
+      /user_profiles/{id}:
         get:
+          x-table-name: user_profiles
           summary: Get profile by ID
           parameters:
             - name: id
@@ -159,3 +202,125 @@ openapi:
                 application/json:
                   schema:
                     $ref: '#/components/schemas/UserProfile'
+
+    x-table-schemas:
+      - table_name: "users"
+        columns:
+          - name: "id"
+            column_type: "INTEGER"
+            primary_key: true
+            auto_increment: true
+            nullable: false
+            unique: false
+          - name: "username"
+            column_type: "TEXT"
+            nullable: false
+            primary_key: false
+            auto_increment: false
+            unique: false
+          - name: "email"
+            column_type: "TEXT"
+            nullable: false
+            primary_key: false
+            auto_increment: false
+            unique: false
+          - name: "createdBy"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            auto_increment: false
+            unique: false
+            auto_field: true
+          - name: "updatedBy"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            auto_increment: false
+            unique: false
+            auto_field: true
+          - name: "createdAt"
+            column_type: "DATETIME"
+            nullable: true
+            primary_key: false
+            auto_increment: false
+            unique: false
+            auto_field: true
+          - name: "updatedAt"
+            column_type: "DATETIME"
+            nullable: true
+            primary_key: false
+            auto_increment: false
+            unique: false
+            auto_field: true
+        indexes: []
+        relations:
+          - field_name: "profile"
+            relation_type: "hasOne"
+            target_table: "user_profiles"
+            foreign_key: "user_id"
+      - table_name: "user_profiles"
+        columns:
+          - name: "id"
+            column_type: "INTEGER"
+            primary_key: true
+            auto_increment: true
+            nullable: false
+            unique: false
+          - name: "user_id"
+            column_type: "INTEGER"
+            nullable: false
+            primary_key: false
+            auto_increment: false
+            unique: false
+          - name: "full_name"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            auto_increment: false
+            unique: false
+          - name: "bio"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            auto_increment: false
+            unique: false
+          - name: "avatar_url"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            auto_increment: false
+            unique: false
+          - name: "createdBy"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            auto_increment: false
+            unique: false
+            auto_field: true
+          - name: "updatedBy"
+            column_type: "TEXT"
+            nullable: true
+            primary_key: false
+            auto_increment: false
+            unique: false
+            auto_field: true
+          - name: "createdAt"
+            column_type: "DATETIME"
+            nullable: true
+            primary_key: false
+            auto_increment: false
+            unique: false
+            auto_field: true
+          - name: "updatedAt"
+            column_type: "DATETIME"
+            nullable: true
+            primary_key: false
+            auto_increment: false
+            unique: false
+            auto_field: true
+        indexes: []
+        relations:
+          - field_name: "user"
+            relation_type: "belongsTo"
+            target_table: "users"
+            foreign_key: "user_id"

@@ -33,26 +33,44 @@ impl OAuthModule {
 static DISCOVERY: OnceCell<OIDCDiscovery> = OnceCell::new();
 static JWKS: OnceCell<serde_json::Value> = OnceCell::new();
 
-fn fetch_discovery(issuer: &str) -> Option<OIDCDiscovery> {
-    // In Docker environments, replace localhost with keycloak service name for actual HTTP requests
-    // This allows tokens to have issuer=localhost while containers access keycloak service
-    let actual_url = issuer.replace("localhost", "keycloak");
+fn resolve_url(url: &str) -> String {
+    if std::env::var("APIFY_OAUTH_REPLACE_LOCALHOST").is_ok() {
+        url.replace("localhost", "keycloak")
+    } else {
+        url.to_string()
+    }
+}
 
-    let url = format!(
-        "{}/.well-known/openid-configuration",
-        actual_url.trim_end_matches('/')
-    );
-    reqwest::blocking::get(&url)
-        .ok()?
-        .json::<OIDCDiscovery>()
-        .ok()
+fn fetch_discovery(issuer: &str) -> Option<OIDCDiscovery> {
+    let issuer = issuer.to_string();
+    std::thread::spawn(move || {
+        // In Docker environments, replace localhost with keycloak service name for actual HTTP requests
+        // This allows tokens to have issuer=localhost while containers access keycloak service
+        let actual_url = resolve_url(&issuer);
+
+        let url = format!(
+            "{}/.well-known/openid-configuration",
+            actual_url.trim_end_matches('/')
+        );
+        reqwest::blocking::get(&url)
+            .ok()?
+            .json::<OIDCDiscovery>()
+            .ok()
+    })
+    .join()
+    .unwrap_or(None)
 }
 
 fn fetch_jwks(jwks_uri: &str) -> Option<serde_json::Value> {
-    reqwest::blocking::get(jwks_uri)
-        .ok()?
-        .json::<serde_json::Value>()
-        .ok()
+    let jwks_uri = jwks_uri.to_string();
+    std::thread::spawn(move || {
+        reqwest::blocking::get(jwks_uri)
+            .ok()?
+            .json::<serde_json::Value>()
+            .ok()
+    })
+    .join()
+    .unwrap_or(None)
 }
 
 impl Module for OAuthModule {
@@ -145,7 +163,7 @@ impl Module for OAuthModule {
             && let (Some(cid), Some(csec)) = (&provider_cfg.client_id, &provider_cfg.client_secret)
         {
             // Replace localhost with keycloak for Docker network access
-            let actual_introspect_url = introspect_url.replace("localhost", "keycloak");
+            let actual_introspect_url = resolve_url(introspect_url);
 
             // Log token details for debugging (first 50 chars to avoid exposing full token)
             tracing::debug!(
@@ -158,16 +176,29 @@ impl Module for OAuthModule {
                 introspect_url = %actual_introspect_url,
                 "Attempting token introspection"
             );
-            let form = [("token", token)];
-            let client = reqwest::blocking::Client::new();
-            let resp = client
-                .post(&actual_introspect_url)
-                .basic_auth(cid, Some(csec))
-                .form(&form)
-                .send();
-            if let Ok(r) = resp
-                && let Ok(json) = r.json::<serde_json::Value>()
-            {
+
+            let form = [("token", token.to_string())];
+            let url = actual_introspect_url.clone();
+            let client_id = cid.clone();
+            let client_secret = csec.clone();
+
+            let introspection_result = std::thread::spawn(move || {
+                let client = reqwest::blocking::Client::new();
+                let resp = client
+                    .post(&url)
+                    .basic_auth(client_id, Some(client_secret))
+                    .form(&form)
+                    .send();
+
+                match resp {
+                    Ok(r) => r.json::<serde_json::Value>().ok(),
+                    Err(_) => None,
+                }
+            })
+            .join()
+            .unwrap_or(None);
+
+            if let Some(json) = introspection_result {
                 tracing::debug!(
                     response = %json,
                     "Token introspection full response"
@@ -200,7 +231,7 @@ impl Module for OAuthModule {
         // Fallback: verify JWT locally if JWKS available
         if let Some(jwks_uri) = &discovery.jwks_uri {
             // Replace localhost with keycloak for Docker network access
-            let actual_jwks_uri = jwks_uri.replace("localhost", "keycloak");
+            let actual_jwks_uri = resolve_url(jwks_uri);
 
             let jwks_val = JWKS.get_or_init(|| {
                 fetch_jwks(&actual_jwks_uri).unwrap_or(serde_json::json!({"keys": []}))

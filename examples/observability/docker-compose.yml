@@ -25,6 +25,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    environment:
+      - APIFY_THREADS=2
 
   jaeger:
     image: jaegertracing/all-in-one:latest

@@ -90,6 +90,24 @@ async fn handle_request_inner(
         ));
     }
 
+    // Control Plane handling
+    if let Some(db) = &state.control_plane_db
+        && ctx.path.starts_with("/_meta/")
+    {
+        let mut req_builder = Request::builder()
+            .method(ctx.method.clone())
+            .uri(ctx.uri.clone());
+        if let Some(headers) = req_builder.headers_mut() {
+            *headers = ctx.headers.clone();
+        }
+
+        return crate::control_plane::handle_control_plane_request(
+            req_builder.body(body_stream)?,
+            db,
+        )
+        .await;
+    }
+
     // Try CRUD handler first if available
     if let Some(crud_handler) = &state.crud_handler {
         // Phase: BodyParse (only for methods that expect body)
@@ -121,7 +139,7 @@ async fn handle_request_inner(
             ctx.matched_route = Some(pattern.clone());
             ctx.path_params = crud_handler
                 .api_generator
-                .extract_path_params(pattern, &ctx.path);
+                .extract_path_params(&pattern, &ctx.path);
         }
 
         // Determine active registry for Access and BodyParse phases
@@ -195,6 +213,7 @@ async fn handle_request_inner(
         }
 
         // Phase: Data (CRUD execution)
+        eprintln!("Debug: Executing CRUD for {} {}", method, ctx.path);
         match crud_handler
             .handle_request(
                 method.as_str(),
@@ -207,6 +226,7 @@ async fn handle_request_inner(
             .await
         {
             Ok(result) => {
+                eprintln!("Debug: CRUD success for {} {}", method, ctx.path);
                 ctx.result_json = Some(result);
             }
             Err(CRUDError::NotFoundError(_)) => {
@@ -216,9 +236,11 @@ async fn handle_request_inner(
                 ));
             }
             Err(CRUDError::ValidationError(msg)) => {
+                eprintln!("Validation Error: {}", msg);
                 return Ok(create_error_response(StatusCode::BAD_REQUEST, &msg));
             }
             Err(CRUDError::InvalidParameterError(msg)) => {
+                eprintln!("Invalid Parameter Error: {}", msg);
                 return Ok(create_error_response(StatusCode::BAD_REQUEST, &msg));
             }
             Err(CRUDError::DatabaseError(e)) => {

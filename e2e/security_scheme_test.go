@@ -2,7 +2,6 @@ package e2e_test
 
 import (
 	"net/http"
-	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -11,24 +10,27 @@ import (
 
 var _ = Describe("OpenAPI Security Scheme", func() {
 	var (
+		env     *TestEnv
 		baseURL string
 		apiKey  string
 		client  *http.Client
 	)
 
 	BeforeEach(func() {
-		baseURL = os.Getenv("BASE_URL")
-		if baseURL == "" {
-			baseURL = "http://localhost:3000"
-		}
-
-		apiKey = os.Getenv("API_KEY")
-		if apiKey == "" {
-			apiKey = "e2e-test-key-001"
-		}
-
+		env = StartTestEnv(map[string]string{
+			"items_oauth": "examples/oauth/config/openapi/items_oauth.yaml",
+			"items":       "examples/basic/config/openapi/items.yaml",
+		})
+		baseURL = env.BaseURL
+		apiKey = env.APIKey
 		client = &http.Client{
 			Timeout: 10 * time.Second,
+		}
+	})
+
+	AfterEach(func() {
+		if env != nil {
+			env.Stop()
 		}
 	})
 

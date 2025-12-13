@@ -648,6 +648,7 @@ jobs:
           # Verify basic example structure
           test -f examples/basic/docker-compose.yml || { echo "Missing basic/docker-compose.yml"; exit 1; }
           test -f examples/basic/config/config.yaml || { echo "Missing basic/config.yaml"; exit 1; }
+          test -f examples/basic/config/resource.yaml || { echo "Missing basic/resource.yaml"; exit 1; }
           test -f examples/basic/config/openapi/items.yaml || { echo "Missing basic/items.yaml"; exit 1; }
           
           # Verify docker-compose.yml has correct image tag

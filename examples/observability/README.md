@@ -68,3 +68,9 @@ curl 'http://localhost:9091/api/v1/query?query=apify_http_requests_total'
 ./quickstart.sh observability stop    # Stop services
 ./quickstart.sh observability clean   # Stop and remove data
 ```
+
+## Configuration
+
+- **Main Config**: `config/config.yaml`
+- **Resources**: `config/resource.yaml` (listeners, auth, datasources)
+- **OpenAPI Spec**: `config/openapi/items.yaml`
