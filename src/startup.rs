@@ -11,7 +11,11 @@ pub type RuntimeInitData = (
     Option<Vec<crate::config::ListenerConfig>>,
 );
 
-pub fn setup_logging(config: &Config) -> Result<(bool, Option<String>, Option<String>), Box<dyn std::error::Error + Send + Sync>> {
+pub type LoggingSetup = (bool, Option<String>, Option<String>);
+
+pub fn setup_logging(
+    config: &Config,
+) -> Result<LoggingSetup, Box<dyn std::error::Error + Send + Sync>> {
     let tracing_config = config.modules.as_ref().and_then(|m| m.tracing.as_ref());
     let tracing_enabled = tracing_config.and_then(|t| t.enabled).unwrap_or(true);
     let otlp_endpoint = tracing_config.and_then(|t| t.otlp_endpoint.as_deref());
@@ -36,7 +40,9 @@ pub fn build_runtime() -> Result<tokio::runtime::Runtime, std::io::Error> {
         .build()
 }
 
-pub async fn init_database(config: &Config) -> Result<DatabaseManager, Box<dyn std::error::Error + Send + Sync>> {
+pub async fn init_database(
+    config: &Config,
+) -> Result<DatabaseManager, Box<dyn std::error::Error + Send + Sync>> {
     let db_config = if let Some(cp_config) = &config.control_plane {
         let s = &cp_config.database;
         let url = if s.driver == "sqlite" {
@@ -71,7 +77,5 @@ pub async fn init_database(config: &Config) -> Result<DatabaseManager, Box<dyn s
         crate::database::DatabaseRuntimeConfig::sqlite_default()
     };
 
-    DatabaseManager::new(db_config)
-        .await
-        .map_err(|e| e.into())
+    DatabaseManager::new(db_config).await.map_err(|e| e.into())
 }

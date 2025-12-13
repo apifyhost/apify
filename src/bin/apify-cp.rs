@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
         if let Some(cp_config) = config.control_plane {
             tracing::info!("Starting Control Plane Server");
-            
+
             // Initialize metadata schema
             db.initialize_schema(apify::control_plane::get_metadata_schemas())
                 .await

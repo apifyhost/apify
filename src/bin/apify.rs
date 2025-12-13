@@ -3,12 +3,9 @@
 use apify::{
     app_state::OpenApiStateConfig,
     config::{ApiRef, Config, OpenAPIConfig},
-    modules::{
-        metrics::init_metrics,
-        tracing::shutdown_tracing,
-    },
+    modules::{metrics::init_metrics, tracing::shutdown_tracing},
     server::{start_docs_server, start_listener},
-    startup::{build_runtime, init_database, setup_logging, RuntimeInitData},
+    startup::{RuntimeInitData, build_runtime, init_database, setup_logging},
 };
 use clap::Parser;
 use std::path::Path;
@@ -311,49 +308,48 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             } else {
                 None
             }
-        }) {
-            if listener_idx == 0 {
-                let listener_config_clone = listener_config.clone();
-                let datasources_clone = datasources.clone();
-                let openapi_configs_clone = openapi_configs.clone();
-                let auth_config_clone = auth_config.clone();
-                let access_log_config = config.modules.as_ref().and_then(|m| m.access_log.clone());
-                let access_log_config_clone = access_log_config.clone();
+        }) && listener_idx == 0
+        {
+            let listener_config_clone = listener_config.clone();
+            let datasources_clone = datasources.clone();
+            let openapi_configs_clone = openapi_configs.clone();
+            let auth_config_clone = auth_config.clone();
+            let access_log_config = config.modules.as_ref().and_then(|m| m.access_log.clone());
+            let access_log_config_clone = access_log_config.clone();
 
-                let handle = thread::spawn(
-                    move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-                        tracing::info!(port = docs_port, "Starting docs server");
+            let handle = thread::spawn(
+                move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+                    tracing::info!(port = docs_port, "Starting docs server");
 
-                        // Create a runtime for AppState creation
-                        let rt = tokio::runtime::Builder::new_current_thread()
-                            .enable_all()
-                            .build()?;
+                    // Create a runtime for AppState creation
+                    let rt = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()?;
 
-                        let state = rt.block_on(async {
-                            apify::app_state::AppState::new_with_crud(
-                                apify::app_state::AppStateConfig {
-                                    routes: listener_config_clone.routes,
-                                    datasources: datasources_clone,
-                                    openapi_configs: openapi_configs_clone,
-                                    listener_modules: listener_config_clone.modules,
-                                    auth_config: auth_config_clone,
-                                    public_url: Some(format!(
-                                        "http://localhost:{}",
-                                        listener_config_clone.port
-                                    )),
-                                    access_log_config: access_log_config_clone,
-                                    control_plane_db: None,
-                                },
-                            )
-                            .await
-                        })?;
+                    let state = rt.block_on(async {
+                        apify::app_state::AppState::new_with_crud(
+                            apify::app_state::AppStateConfig {
+                                routes: listener_config_clone.routes,
+                                datasources: datasources_clone,
+                                openapi_configs: openapi_configs_clone,
+                                listener_modules: listener_config_clone.modules,
+                                auth_config: auth_config_clone,
+                                public_url: Some(format!(
+                                    "http://localhost:{}",
+                                    listener_config_clone.port
+                                )),
+                                access_log_config: access_log_config_clone,
+                                control_plane_db: None,
+                            },
+                        )
+                        .await
+                    })?;
 
-                        start_docs_server(docs_port, std::sync::Arc::new(state))?;
-                        Ok(())
-                    },
-                );
-                handles.push(handle);
-            }
+                    start_docs_server(docs_port, std::sync::Arc::new(state))?;
+                    Ok(())
+                },
+            );
+            handles.push(handle);
         }
     }
 
