@@ -106,8 +106,13 @@ pub fn start_listener(
             let state_swap = Arc::clone(&state);
             tokio::spawn(async move {
                 use std::time::Duration;
+                let poll_interval = std::env::var("APIFY_CONFIG_POLL_INTERVAL")
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(10);
+                
                 loop {
-                    tokio::time::sleep(Duration::from_secs(10)).await;
+                    tokio::time::sleep(Duration::from_secs(poll_interval)).await;
 
                     // 1. Load Listeners
                     let listeners = match crate::control_plane::load_listeners(&db).await {
