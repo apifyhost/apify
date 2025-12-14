@@ -448,14 +448,14 @@ fn apply_modules_cfg(
                         "default".to_string(),
                     )));
                 }
-                _ => eprintln!("Unknown access module: {}", name),
+                _ => tracing::warn!("Unknown access module: {}", name),
             }
         }
     }
     // Rewrite modules placeholder
     if let Some(list) = cfg.rewrite {
         for name in list {
-            eprintln!("Unknown rewrite module (not implemented yet): {}", name);
+            tracing::warn!("Unknown rewrite module (not implemented yet): {}", name);
         }
     }
     reg

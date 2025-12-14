@@ -44,7 +44,7 @@ impl DatabaseRuntimeConfig {
             if driver == "sqlite" && !url.starts_with("sqlite:") {
                 url = format!("sqlite:{}", url);
             }
-            eprintln!("Using database URL from env: {}", url);
+            tracing::info!("Using database URL from env: {}", url);
             return Self {
                 driver,
                 url,
@@ -56,7 +56,7 @@ impl DatabaseRuntimeConfig {
             .map(|d| d.join("apify.sqlite").to_string_lossy().to_string())
             .unwrap_or_else(|_| "./apify.sqlite".to_string());
         let url = format!("sqlite:{}", db_path);
-        eprintln!("Using SQLite database file: {}", url);
+        tracing::info!("Using SQLite database file: {}", url);
         Self {
             driver: "sqlite".into(),
             url,

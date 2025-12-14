@@ -96,7 +96,7 @@ impl RequestLogger {
                 let mut output: Box<dyn Write + Send> = match file {
                     Ok(f) => Box::new(f),
                     Err(e) => {
-                        eprintln!("Failed to open access log file {}: {}", path_str, e);
+                        tracing::error!("Failed to open access log file {}: {}", path_str, e);
                         // Fallback to stdout if file fails
                         Box::new(std::io::stdout())
                     }
@@ -104,7 +104,7 @@ impl RequestLogger {
 
                 while let Some(log_line) = receiver.blocking_recv() {
                     if let Err(e) = writeln!(output, "{}", log_line) {
-                        eprintln!("Failed to write access log: {}", e);
+                        tracing::error!("Failed to write access log: {}", e);
                     }
                 }
             });

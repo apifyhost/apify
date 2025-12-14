@@ -68,7 +68,7 @@ pub fn start_listener(
         // <-- Restored critical pattern
         let addr = listener_config.to_socket_addr()?;
         let listener = create_reuse_port_socket(addr)?;
-        println!("Thread {} bound to http://{}", thread_id, addr);
+        tracing::info!("Thread {} bound to http://{}", thread_id, addr);
 
         // Clone configs for poller
         let initial_datasources = datasources.clone();
@@ -78,7 +78,7 @@ pub fn start_listener(
         let port = listener_config.port;
 
         // Create application state
-        println!("Thread {} creating AppState...", thread_id);
+        tracing::info!("Thread {} creating AppState...", thread_id);
         let state = match AppState::new_with_crud(crate::app_state::AppStateConfig {
             routes: listener_config.routes.clone(),
             datasources,
@@ -92,11 +92,11 @@ pub fn start_listener(
         .await
         {
             Ok(s) => {
-                println!("Thread {} AppState created successfully", thread_id);
+                tracing::info!("Thread {} AppState created successfully", thread_id);
                 Arc::new(ArcSwap::from_pointee(s))
             }
             Err(e) => {
-                eprintln!("Thread {} failed to create AppState: {}", thread_id, e);
+                tracing::error!("Thread {} failed to create AppState: {}", thread_id, e);
                 return Err(format!("Thread {} AppState creation failed: {}", thread_id, e).into());
             }
         };
@@ -118,7 +118,7 @@ pub fn start_listener(
                     let listeners = match crate::control_plane::load_listeners(&db).await {
                         Ok(l) => l,
                         Err(e) => {
-                            eprintln!("Failed to reload listeners: {}", e);
+                            tracing::error!("Failed to reload listeners: {}", e);
                             continue;
                         }
                     };
@@ -133,7 +133,7 @@ pub fn start_listener(
                         None => {
                             // Listener removed? We can't really shut down the thread easily from here without more logic.
                             // For now, just ignore or log warning.
-                            // eprintln!("Listener for port {} not found in DB", port);
+                            // tracing::warn!("Listener for port {} not found in DB", port);
                             continue;
                         }
                     };
@@ -142,7 +142,7 @@ pub fn start_listener(
                     let new_datasources = match crate::control_plane::load_datasources(&db).await {
                         Ok(d) => d,
                         Err(e) => {
-                            eprintln!("Failed to reload datasources: {}", e);
+                            tracing::error!("Failed to reload datasources: {}", e);
                             continue;
                         }
                     };
@@ -153,7 +153,7 @@ pub fn start_listener(
                     let new_auth = match crate::control_plane::load_auth_configs(&db).await {
                         Ok(a) => a,
                         Err(e) => {
-                            eprintln!("Failed to reload auth: {}", e);
+                            tracing::error!("Failed to reload auth: {}", e);
                             continue;
                         }
                     };
@@ -164,7 +164,7 @@ pub fn start_listener(
                     let api_configs_map = match crate::control_plane::load_api_configs(&db).await {
                         Ok(c) => c,
                         Err(e) => {
-                            eprintln!("Failed to reload api configs: {}", e);
+                            tracing::error!("Failed to reload api configs: {}", e);
                             continue;
                         }
                     };
@@ -216,25 +216,25 @@ pub fn start_listener(
                     {
                         Ok(s) => s,
                         Err(e) => {
-                            eprintln!("Failed to create new AppState: {}", e);
+                            tracing::error!("Failed to create new AppState: {}", e);
                             continue;
                         }
                     };
 
                     // 7. Swap
                     state_swap.store(Arc::new(new_state));
-                    // println!("Configuration reloaded for port {}", port);
+                    // tracing::info!("Configuration reloaded for port {}", port);
                 }
             });
         }
 
-        println!("Thread {} entering accept loop", thread_id);
+        tracing::info!("Thread {} entering accept loop", thread_id);
         // Continuously accept and handle connections
         loop {
             match listener.accept().await {
                 Ok((stream, remote_addr)) => {
                     if let Err(e) = stream.set_nodelay(true) {
-                        eprintln!("Thread {} set_nodelay error: {}", thread_id, e);
+                        tracing::warn!("Thread {} set_nodelay error: {}", thread_id, e);
                         continue;
                     }
                     let io = TokioIo::new(stream);
@@ -250,12 +250,16 @@ pub fn start_listener(
                             .serve_connection(io, service)
                             .await
                         {
-                            eprintln!("Thread {} connection handling error: {:?}", thread_id, err);
+                            tracing::error!(
+                                "Thread {} connection handling error: {:?}",
+                                thread_id,
+                                err
+                            );
                         }
                     });
                 }
                 Err(e) => {
-                    eprintln!("Thread {} accept error: {}", thread_id, e);
+                    tracing::error!("Thread {} accept error: {}", thread_id, e);
                     continue;
                 }
             }
@@ -283,7 +287,7 @@ pub fn start_docs_server(
     rt.block_on(async move {
         let addr: SocketAddr = format!("0.0.0.0:{}", port).parse()?;
         let listener = create_reuse_port_socket(addr)?;
-        println!("Docs server listening on http://{}", addr);
+        tracing::info!("Docs server listening on http://{}", addr);
 
         loop {
             match listener.accept().await {
@@ -299,12 +303,12 @@ pub fn start_docs_server(
                         });
                         if let Err(err) = http1::Builder::new().serve_connection(io, service).await
                         {
-                            eprintln!("Docs connection error: {:?}", err);
+                            tracing::error!("Docs connection error: {:?}", err);
                         }
                     });
                 }
                 Err(e) => {
-                    eprintln!("Docs accept error: {}", e);
+                    tracing::error!("Docs accept error: {}", e);
                     continue;
                 }
             }

@@ -274,7 +274,7 @@ var _ = Describe("Observability Features", func() {
 			}
 
 			elapsed := time.Since(startTime)
-			fmt.Printf("50 requests completed in %v\n", elapsed)
+			GinkgoWriter.Printf("50 requests completed in %v\n", elapsed)
 
 			// Metrics should still be available
 			metricsResp, err := client.Get(metricsURL)
