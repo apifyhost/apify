@@ -7,6 +7,7 @@ use super::{Arc, http_body_util::Full, hyper::body::Bytes};
 use crate::modules::ModuleOutcome;
 use crate::modules::metrics::RequestMetrics;
 use crate::phases::{Phase, RequestContext};
+use arc_swap::ArcSwap;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error;
@@ -16,8 +17,9 @@ use std::error::Error;
 #[tracing::instrument(skip(req, state), fields(http.method = %req.method(), http.uri = %req.uri()))]
 pub async fn handle_request(
     req: Request<hyper::body::Incoming>,
-    state: Arc<AppState>,
+    state: Arc<ArcSwap<AppState>>,
 ) -> Result<Response<Full<Bytes>>, Box<dyn Error + Send + Sync>> {
+    let state = state.load_full();
     let (parts, body_stream) = req.into_parts();
     let method = parts.method.clone();
     let path = parts.uri.path().to_string();
