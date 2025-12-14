@@ -175,7 +175,7 @@ jobs:
       - name: Start Apify with Postgres using docker compose
         run: |
           cd examples/full
-          docker compose up -d apify-postgres postgres
+          docker compose up -d apify-cp apify-dp postgres
           docker compose ps
 
       - name: Wait for service to be ready
@@ -190,7 +190,7 @@ jobs:
             sleep 2
           done
           echo "Service failed to start within timeout"
-          cd examples/full && docker compose logs apify-postgres
+          cd examples/full && docker compose logs apify-cp apify-dp
           exit 1
 
       - name: Run E2E tests (including OAuth)
@@ -210,8 +210,10 @@ jobs:
       - name: Show logs on failure
         if: failure()
         run: |
-          echo "=== Apify logs ==="
-          cd examples/full && docker compose logs apify-postgres
+          echo "=== Apify CP logs ==="
+          cd examples/full && docker compose logs apify-cp
+          echo "=== Apify DP logs ==="
+          cd examples/full && docker compose logs apify-dp
           echo "=== PostgreSQL logs ==="
           cd examples/full && docker compose logs postgres
           echo "=== Keycloak logs ==="

@@ -14,13 +14,23 @@ scrape_configs:
           instance: 'apify-sqlite'
           database: 'sqlite'
 
-  # Apify PostgreSQL instance
-  - job_name: 'apify-postgres'
+  # Apify PostgreSQL Data Plane
+  - job_name: 'apify-dp'
     static_configs:
-      - targets: ['apify-postgres:9090']
+      - targets: ['apify-dp:9090']
         labels:
-          instance: 'apify-postgres'
+          instance: 'apify-dp'
           database: 'postgres'
+          role: 'data-plane'
+
+  # Apify PostgreSQL Control Plane
+  - job_name: 'apify-cp'
+    static_configs:
+      - targets: ['apify-cp:9090']
+        labels:
+          instance: 'apify-cp'
+          database: 'postgres'
+          role: 'control-plane'
 
   # Prometheus self-monitoring
   - job_name: 'prometheus'
