@@ -11,9 +11,9 @@ Run with SQLite:
 docker compose up apify-sqlite
 ```
 
-Run with PostgreSQL:
+Run with PostgreSQL (Split Control Plane and Data Plane):
 ```bash
-docker compose up postgres apify-postgres
+docker compose up postgres apify-cp apify-dp
 ```
 
 ### Using Docker CLI
@@ -41,6 +41,30 @@ docker run -d \
   -v $(pwd)/apify/config:/app/config:ro \
   -e POSTGRES_HOST=your-postgres-host \
   apify:latest
+```
+
+### Control Plane and Data Plane Separation
+
+You can run Control Plane and Data Plane as separate services for better scalability and security.
+
+```bash
+# Run Control Plane
+docker run -d \
+  --name apify-cp \
+  -p 4000:4000 \
+  -v $(pwd)/config:/app/config:ro \
+  -v apify-metadata:/app/data \
+  apify:latest \
+  apify --control-plane -c /app/config/config.yaml
+
+# Run Data Plane
+docker run -d \
+  --name apify-dp \
+  -p 3000:3000 \
+  -v $(pwd)/config:/app/config:ro \
+  -v apify-metadata:/app/data \
+  apify:latest \
+  apify --data-plane -c /app/config/config.yaml
 ```
 
 ## Image Details
@@ -77,8 +101,8 @@ docker compose up -d apify-sqlite
 ./e2e/test.sh
 
 # Test with PostgreSQL
-docker compose up -d postgres apify-postgres
-BASE_URL=http://localhost:3001 ./e2e/test.sh
+docker compose up -d postgres apify-cp apify-dp
+BASE_URL=http://localhost:3000 ./e2e/test.sh
 ```
 
 ## CI/CD

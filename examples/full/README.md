@@ -24,7 +24,8 @@ Complete Apify setup with all features enabled. **Used for E2E testing.**
 ## Access Points
 
 ### APIs
-- **PostgreSQL API**: http://localhost:3000
+- **PostgreSQL Data Plane**: http://localhost:3000
+- **PostgreSQL Control Plane**: http://localhost:4000
 - **SQLite API**: http://localhost:3001
 
 ### Authentication

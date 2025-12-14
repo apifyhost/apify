@@ -18,11 +18,31 @@ struct Cli {
     /// Path to the configuration file (YAML format)
     #[arg(short, long, default_value = "config.yaml")]
     config: String,
+
+    /// Enable Control Plane
+    #[arg(long)]
+    control_plane: bool,
+
+    /// Enable Data Plane (default is true, unless --control-plane is set and this is not explicitly set)
+    #[arg(long)]
+    data_plane: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Parse command-line arguments
     let cli = Cli::parse();
+
+    // Determine modes
+    // If neither is specified, default to Data Plane only (backward compatibility)
+    // If only control_plane is specified, run only CP.
+    // If only data_plane is specified, run only DP.
+    // If both, run both.
+    let (run_cp, run_dp) = if cli.control_plane || cli.data_plane {
+        (cli.control_plane, cli.data_plane)
+    } else {
+        // Default: Data Plane only
+        (false, true)
+    };
 
     // Load main configuration from specified file path
     let config = Config::from_file(&cli.config)?;
@@ -36,6 +56,32 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (control_plane_db, db_openapi_configs, db_auth_config, db_datasources, db_listeners): RuntimeInitData =
         rt_init.block_on(async {
             let db = init_database(&config).await.map_err(|e| e.to_string())?;
+
+            // If Control Plane is enabled, initialize schema and start server
+            if run_cp {
+                if let Some(cp_config) = config.control_plane.clone() {
+                    tracing::info!("Starting Control Plane Server");
+                    // Initialize metadata schema
+                    db.initialize_schema(apify::control_plane::get_metadata_schemas())
+                        .await
+                        .map_err(|e| e.to_string())?;
+
+                    let db_clone = db.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = apify::control_plane::start_control_plane_server(cp_config, db_clone).await {
+                            tracing::error!("Control Plane Server failed: {}", e);
+                        }
+                    });
+                } else {
+                    tracing::warn!("Control Plane enabled but configuration missing");
+                }
+            }
+
+            if !run_dp {
+                // If only CP is running, we just need to keep the runtime alive.
+                // But we are inside block_on, so we return empty data and handle the wait outside.
+                return Ok::<_, String>((None, std::collections::HashMap::new(), None, None, None));
+            }
 
             tracing::info!("Starting in Data Plane mode");
             // Load configs from DB
@@ -92,13 +138,36 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 }
             };
 
-            Ok::<_, String>((None, api_configs, auth_configs, datasources, listeners))
+            Ok::<_, String>((Some(db), api_configs, auth_configs, datasources, listeners))
         })?;
 
     tracing::info!(
         config_file = %cli.config,
         "Configuration loaded successfully"
     );
+
+    // If Data Plane is NOT enabled, we just wait for CP
+    if !run_dp {
+        if run_cp {
+            tracing::info!("Running in Control Plane only mode");
+
+            // Let's handle signals
+            let (tx, rx) = std::sync::mpsc::channel();
+            ctrlc::set_handler(move || {
+                tx.send(()).expect("Could not send signal on channel.");
+            })
+            .expect("Error setting Ctrl-C handler");
+
+            tracing::info!("Waiting for Ctrl-C...");
+            rx.recv().expect("Could not receive from channel.");
+            tracing::info!("Shutting down...");
+            return Ok(());
+        } else {
+            // Neither?
+            tracing::warn!("Neither Data Plane nor Control Plane enabled. Exiting.");
+            return Ok(());
+        }
+    }
 
     // Use datasources from config if available, merge with DB datasources
     let mut datasources_map = config.datasource.clone().unwrap_or_default();
