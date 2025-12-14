@@ -147,8 +147,10 @@ modules:
 	}
 	env.CPCmd.Dir = projectRoot
 	env.CPCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+env.DBFile)
-	// env.CPCmd.Stdout = GinkgoWriter
-	// env.CPCmd.Stderr = GinkgoWriter
+	
+	var cpStdout, cpStderr bytes.Buffer
+	env.CPCmd.Stdout = &cpStdout
+	env.CPCmd.Stderr = &cpStderr
 
 	err = env.CPCmd.Start()
 	Expect(err).NotTo(HaveOccurred())
@@ -166,7 +168,9 @@ modules:
 			return fmt.Errorf("status code %d", resp.StatusCode)
 		}
 		return nil
-	}, 60*time.Second, 1*time.Second).Should(Succeed())
+	}, 60*time.Second, 1*time.Second).Should(Succeed(), func() string {
+		return fmt.Sprintf("Control Plane failed to start.\nStdout: %s\nStderr: %s", cpStdout.String(), cpStderr.String())
+	})
 
 	// Start Data Plane
 	if _, err := os.Stat(binPath); err == nil {
@@ -176,8 +180,10 @@ modules:
 	}
 	env.ServerCmd.Dir = projectRoot
 	env.ServerCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+env.DBFile, "APIFY_CONFIG_POLL_INTERVAL=1")
-	// env.ServerCmd.Stdout = GinkgoWriter
-	// env.ServerCmd.Stderr = GinkgoWriter
+	
+	var dpStdout, dpStderr bytes.Buffer
+	env.ServerCmd.Stdout = &dpStdout
+	env.ServerCmd.Stderr = &dpStderr
 
 	err = env.ServerCmd.Start()
 	Expect(err).NotTo(HaveOccurred())
@@ -193,7 +199,9 @@ modules:
 			return fmt.Errorf("status %d", resp.StatusCode)
 		}
 		return nil
-	}, "60s", "1s").Should(Succeed(), "Server failed to start")
+	}, "60s", "1s").Should(Succeed(), func() string {
+		return fmt.Sprintf("Data Plane failed to start.\nStdout: %s\nStderr: %s", dpStdout.String(), dpStderr.String())
+	})
 
 	// Dynamic Configuration: Register APIs
 	var apiPaths []string
