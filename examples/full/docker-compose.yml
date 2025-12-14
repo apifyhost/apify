@@ -17,8 +17,10 @@ services:
 
   apify-sqlite:
     image: apifyhost/apify:latest
+    command: ["apify", "--control-plane", "--data-plane", "-c", "/app/config/config.yaml"]
     ports:
       - "3001:3000"
+      - "4001:4000"
       - "9092:9090"
     volumes:
       - ./config:/app/config:ro
@@ -32,16 +34,32 @@ services:
       - KEYCLOAK_CLIENT_ID=apify-test-client
       - KEYCLOAK_CLIENT_SECRET=apify-test-secret
 
-  apify-postgres:
+  apify-cp:
+    image: apifyhost/apify:latest
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./config:/app/config:ro
+      - postgres_metadata:/app/data
+    command: ["apify", "--control-plane", "-c", "/app/config/config.yaml"]
+    environment:
+      - RUST_LOG=debug,apify=debug
+      - APIFY_THREADS=2
+
+  apify-dp:
     image: apifyhost/apify:latest
     ports:
       - "3000:3000"
       - "9091:9090"
     volumes:
       - ./config:/app/config:ro
+      - postgres_metadata:/app/data
     depends_on:
       postgres:
         condition: service_healthy
+      apify-cp:
+        condition: service_started
+    command: ["apify", "--data-plane", "-c", "/app/config/config.yaml"]
     environment:
       - RUST_LOG=debug,apify=debug,apify::modules::oauth=debug
       - APIFY_THREADS=2
@@ -107,6 +125,7 @@ services:
 volumes:
   postgres_data:
   sqlite_data:
+  postgres_metadata:
   prometheus_data:
   grafana_data:
 
