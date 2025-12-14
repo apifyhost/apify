@@ -138,11 +138,17 @@ modules:
 	Expect(err).NotTo(HaveOccurred())
 
 	// Start Control Plane
-	env.CPCmd = exec.Command("cargo", "run", "--bin", "apify", "--", "--control-plane", "--config", env.ConfigFile)
+	// Use pre-built binary if available to speed up tests and avoid timeouts
+	binPath := filepath.Join(projectRoot, "target", "debug", "apify")
+	if _, err := os.Stat(binPath); err == nil {
+		env.CPCmd = exec.Command(binPath, "--control-plane", "--config", env.ConfigFile)
+	} else {
+		env.CPCmd = exec.Command("cargo", "run", "--bin", "apify", "--", "--control-plane", "--config", env.ConfigFile)
+	}
 	env.CPCmd.Dir = projectRoot
 	env.CPCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+env.DBFile)
-	env.CPCmd.Stdout = GinkgoWriter
-	env.CPCmd.Stderr = GinkgoWriter
+	// env.CPCmd.Stdout = GinkgoWriter
+	// env.CPCmd.Stderr = GinkgoWriter
 
 	err = env.CPCmd.Start()
 	Expect(err).NotTo(HaveOccurred())
@@ -163,11 +169,15 @@ modules:
 	}, 60*time.Second, 1*time.Second).Should(Succeed())
 
 	// Start Data Plane
-	env.ServerCmd = exec.Command("cargo", "run", "--bin", "apify", "--", "--data-plane", "--config", env.ConfigFile)
+	if _, err := os.Stat(binPath); err == nil {
+		env.ServerCmd = exec.Command(binPath, "--data-plane", "--config", env.ConfigFile)
+	} else {
+		env.ServerCmd = exec.Command("cargo", "run", "--bin", "apify", "--", "--data-plane", "--config", env.ConfigFile)
+	}
 	env.ServerCmd.Dir = projectRoot
 	env.ServerCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+env.DBFile, "APIFY_CONFIG_POLL_INTERVAL=1")
-	env.ServerCmd.Stdout = GinkgoWriter
-	env.ServerCmd.Stderr = GinkgoWriter
+	// env.ServerCmd.Stdout = GinkgoWriter
+	// env.ServerCmd.Stderr = GinkgoWriter
 
 	err = env.ServerCmd.Start()
 	Expect(err).NotTo(HaveOccurred())
