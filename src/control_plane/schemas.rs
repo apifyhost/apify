@@ -207,6 +207,16 @@ pub fn get_metadata_schemas() -> Vec<TableSchema> {
                     auto_field: false,
                 },
                 ColumnDefinition {
+                    name: "created_at".to_string(),
+                    column_type: "INTEGER".to_string(),
+                    nullable: false,
+                    primary_key: false,
+                    unique: false,
+                    auto_increment: false,
+                    default_value: None,
+                    auto_field: false,
+                },
+                ColumnDefinition {
                     name: "updated_at".to_string(),
                     column_type: "INTEGER".to_string(),
                     nullable: false,

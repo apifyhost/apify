@@ -2,13 +2,13 @@
 
 use super::app_state::AppState;
 use super::config::ListenerConfig;
-use crate::app_state::AppStateConfig;
-use crate::config::ApiRef;
 use super::handler::handle_request;
 use super::hyper::server::conn::http1;
 use super::hyper::service::service_fn;
 use super::tokio::net::TcpListener;
 use super::{Arc, hyper_util::rt::TokioIo, tokio};
+use crate::app_state::AppStateConfig;
+use crate::config::ApiRef;
 use arc_swap::ArcSwap;
 use socket2::{Domain, Socket, Type};
 use std::error::Error;
@@ -110,7 +110,7 @@ pub fn start_listener(
                     .ok()
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(10);
-                
+
                 loop {
                     tokio::time::sleep(Duration::from_secs(poll_interval)).await;
 
@@ -124,7 +124,11 @@ pub fn start_listener(
                     };
 
                     // Find config for this port
-                    let new_listener_config = match listeners.unwrap_or_default().into_iter().find(|l| l.port == port) {
+                    let new_listener_config = match listeners
+                        .unwrap_or_default()
+                        .into_iter()
+                        .find(|l| l.port == port)
+                    {
                         Some(l) => l,
                         None => {
                             // Listener removed? We can't really shut down the thread easily from here without more logic.

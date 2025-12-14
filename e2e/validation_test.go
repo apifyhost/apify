@@ -2,13 +2,8 @@ package e2e_test
 
 import (
 	"bytes"
-	"encoding/json"
-	"fmt"
-	"net"
 	"net/http"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"

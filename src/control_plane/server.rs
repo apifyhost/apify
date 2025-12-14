@@ -12,15 +12,23 @@ use super::apis::handle_apis_request;
 use super::auth::handle_auth_request;
 use super::datasources::handle_datasources_request;
 use super::import::handle_import_request;
+use super::listeners::handle_listeners_request;
 
 pub async fn handle_control_plane_request(
     req: hyper::Request<hyper::body::Incoming>,
     db: &DatabaseManager,
 ) -> Result<hyper::Response<Full<Bytes>>, Box<dyn std::error::Error + Send + Sync>> {
-    let path = req.uri().path();
+    let path = req.uri().path().to_string();
+    tracing::info!("Control Plane Request: {} {}", req.method(), path);
 
     if path == "/_meta/apis" {
-        handle_apis_request(req, db).await
+        let res = handle_apis_request(req, db).await;
+        if let Ok(ref r) = res {
+            tracing::info!("API Request handled, status: {}", r.status());
+        }
+        res
+    } else if path == "/_meta/listeners" {
+        handle_listeners_request(req, db).await
     } else if path == "/_meta/datasources" {
         handle_datasources_request(req, db).await
     } else if path == "/_meta/auth" {

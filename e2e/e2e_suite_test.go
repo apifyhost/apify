@@ -201,6 +201,13 @@ modules:
 		err = yaml.Unmarshal(content, &specObj)
 		Expect(err).NotTo(HaveOccurred())
 
+		// Handle nested structure in some example files (openapi.spec.openapi)
+		if oa, ok := specObj["openapi"].(map[string]interface{}); ok {
+			if sp, ok := oa["spec"].(map[string]interface{}); ok {
+				specObj = sp
+			}
+		}
+
 		payload := map[string]interface{}{
 			"name":    name,
 			"version": "1.0.0",
