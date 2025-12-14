@@ -70,6 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     tokio::spawn(async move {
                         if let Err(e) = apify::control_plane::start_control_plane_server(cp_config, db_clone).await {
                             tracing::error!("Control Plane Server failed: {}", e);
+                            std::process::exit(1);
                         }
                     });
                 } else {

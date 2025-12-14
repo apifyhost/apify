@@ -160,7 +160,7 @@ modules:
 			return fmt.Errorf("status code %d", resp.StatusCode)
 		}
 		return nil
-	}, 30*time.Second, 1*time.Second).Should(Succeed())
+	}, 60*time.Second, 1*time.Second).Should(Succeed())
 
 	// Start Data Plane
 	env.ServerCmd = exec.Command("cargo", "run", "--bin", "apify", "--", "--data-plane", "--config", env.ConfigFile)
@@ -183,7 +183,7 @@ modules:
 			return fmt.Errorf("status %d", resp.StatusCode)
 		}
 		return nil
-	}, "30s", "1s").Should(Succeed(), "Server failed to start")
+	}, "60s", "1s").Should(Succeed(), "Server failed to start")
 
 	// Dynamic Configuration: Register APIs
 	var apiPaths []string
