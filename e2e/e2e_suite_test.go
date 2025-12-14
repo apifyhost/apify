@@ -24,6 +24,21 @@ func TestE2E(t *testing.T) {
 	RunSpecs(t, "Apify E2E Test Suite")
 }
 
+var _ = BeforeSuite(func() {
+	// Build the binary once before running any tests to avoid timeouts due to compilation
+	wd, _ := os.Getwd()
+	projectRoot := filepath.Dir(wd)
+	
+	fmt.Println("Building apify binary...")
+	cmd := exec.Command("cargo", "build", "--bin", "apify")
+	cmd.Dir = projectRoot
+	cmd.Stdout = GinkgoWriter
+	cmd.Stderr = GinkgoWriter
+	err := cmd.Run()
+	Expect(err).NotTo(HaveOccurred(), "Failed to build apify binary")
+	fmt.Println("Binary built successfully")
+})
+
 type TestEnv struct {
 	ServerCmd  *exec.Cmd
 	CPCmd      *exec.Cmd
