@@ -39,9 +39,10 @@ impl APIGenerator {
         let route_patterns = Self::build_route_patterns(&spec)?;
 
         for pattern in &route_patterns {
-            eprintln!(
-                "Debug: APIGenerator registered pattern: {} {:?}",
-                pattern.path_pattern, pattern.methods
+            tracing::debug!(
+                "APIGenerator registered pattern: {} {:?}",
+                pattern.path_pattern,
+                pattern.methods
             );
         }
 
@@ -169,16 +170,14 @@ impl APIGenerator {
     /// Match a request path and method to determine the operation
     pub fn match_operation(&self, method: &str, path: &str) -> Option<RoutePattern> {
         let method_upper = method.to_uppercase();
-        eprintln!(
-            "Debug: match_operation called for {} {}",
-            method_upper, path
-        );
+        tracing::debug!("match_operation called for {} {}", method_upper, path);
         let operation = self.route_patterns.iter().find(|pattern| {
             let matched = pattern.regex.is_match(path) && pattern.methods.contains(&method_upper);
             if matched {
-                eprintln!(
-                    "Debug: Matched route: {} for path: {}",
-                    pattern.path_pattern, path
+                tracing::debug!(
+                    "Matched pattern: {} for path: {}",
+                    pattern.path_pattern,
+                    path
                 );
             }
             matched

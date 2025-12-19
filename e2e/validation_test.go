@@ -2,13 +2,8 @@ package e2e_test
 
 import (
 	"bytes"
-	"encoding/json"
-	"fmt"
-	"net"
 	"net/http"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -17,32 +12,12 @@ import (
 
 var _ = Describe("OpenAPI Validation", func() {
 	var (
-		serverCmd   *exec.Cmd
-		cpCmd       *exec.Cmd
-		serverPort  string
-		baseURL     string
-		configFile  string
-		dbFile      string
-		client      *http.Client
-		tmpDir      string
+		env     *TestEnv
+		baseURL string
+		client  *http.Client
 	)
 
 	BeforeEach(func() {
-		var err error
-		// Get a free port
-		l, err := net.Listen("tcp", "127.0.0.1:0")
-		Expect(err).NotTo(HaveOccurred())
-		serverPort = fmt.Sprintf("%d", l.Addr().(*net.TCPAddr).Port)
-		l.Close()
-		baseURL = "http://127.0.0.1:" + serverPort
-
-		// Create temporary directory
-		tmpDir, err = os.MkdirTemp("", "apify-validation-test")
-		Expect(err).NotTo(HaveOccurred())
-
-		configFile = filepath.Join(tmpDir, "config.yaml")
-		dbFile = filepath.Join(tmpDir, "test.sqlite")
-
 		// Write API definition
 		apiSpecJSON := `
 {
@@ -167,138 +142,24 @@ var _ = Describe("OpenAPI Validation", func() {
 }
 `
 
-		// Write Config
-		configContent := fmt.Sprintf(`
-control-plane:
-  listen:
-    ip: 127.0.0.1
-    port: %s
-  database:
-    driver: sqlite
-    database: //%s
+		// Create a temporary file for the spec
+		tmpFile, err := os.CreateTemp("", "validation-api-*.json")
+		Expect(err).NotTo(HaveOccurred())
+		defer tmpFile.Close()
 
-listeners:
-  - port: %s
-    ip: 127.0.0.1
-    protocol: HTTP
-    apis:
-      - validation-api
-
-consumers:
-  - name: default
-    keys:
-      - test-key
-
-datasource:
-  sqlite1:
-    driver: sqlite
-    database: //%s
-    max_pool_size: 1
-
-log_level: "info"
-
-modules:
-  tracing:
-    enabled: true
-  metrics:
-    enabled: false
-`, serverPort, dbFile, serverPort, dbFile)
-		err = os.WriteFile(configFile, []byte(configContent), 0644)
+		_, err = tmpFile.WriteString(apiSpecJSON)
 		Expect(err).NotTo(HaveOccurred())
 
-		// Create empty DB file
-		f, err := os.Create(dbFile)
-		Expect(err).NotTo(HaveOccurred())
-		f.Close()
-
-		// Start Server (Control Plane)
-		wd, _ := os.Getwd()
-		projectRoot := filepath.Dir(wd)
-		
-		cpCmd = exec.Command("cargo", "run", "--bin", "apify-cp", "--", "--config", configFile)
-		cpCmd.Dir = projectRoot
-		cpCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+dbFile)
-		cpCmd.Stdout = GinkgoWriter
-		cpCmd.Stderr = GinkgoWriter
-		
-		err = cpCmd.Start()
-		Expect(err).NotTo(HaveOccurred())
-
+		env = StartTestEnv(map[string]string{
+			"validation-api": tmpFile.Name(),
+		})
+		baseURL = env.BaseURL
 		client = &http.Client{Timeout: 5 * time.Second}
-
-		// Wait for CP to be ready
-		Eventually(func() error {
-			resp, err := client.Get(baseURL + "/_meta/apis")
-			if err != nil {
-				return err
-			}
-			defer resp.Body.Close()
-			if resp.StatusCode != 200 {
-				return fmt.Errorf("status code %d", resp.StatusCode)
-			}
-			return nil
-		}, 300*time.Second, 1*time.Second).Should(Succeed())
-
-		// Post API Spec
-		// Wrap the spec in the expected payload format
-		var specObj map[string]interface{}
-		err = json.Unmarshal([]byte(apiSpecJSON), &specObj)
-		Expect(err).NotTo(HaveOccurred())
-
-		payload := map[string]interface{}{
-			"name":    "validation-api",
-			"version": "1.0.0",
-			"spec":    specObj,
-		}
-		payloadBytes, err := json.Marshal(payload)
-		Expect(err).NotTo(HaveOccurred())
-
-		resp, err := client.Post(baseURL+"/_meta/apis", "application/json", bytes.NewBuffer(payloadBytes))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(201))
-		resp.Body.Close()
-
-		// Stop Control Plane
-		if cpCmd.Process != nil {
-			cpCmd.Process.Kill()
-			cpCmd.Wait()
-		}
-
-		// Start Server (Data Plane)
-		serverCmd = exec.Command("cargo", "run", "--bin", "apify", "--", "--config", configFile)
-		serverCmd.Dir = projectRoot
-		serverCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+dbFile)
-		serverCmd.Stdout = GinkgoWriter
-		serverCmd.Stderr = GinkgoWriter
-		
-		err = serverCmd.Start()
-		Expect(err).NotTo(HaveOccurred())
-
-		// Wait for server to be ready
-		Eventually(func() error {
-			resp, err := client.Get(baseURL + "/healthz")
-			if err != nil {
-				return err
-			}
-			defer resp.Body.Close()
-			if resp.StatusCode != 200 {
-				return fmt.Errorf("status %d", resp.StatusCode)
-			}
-			return nil
-		}, "120s", "1s").Should(Succeed(), "Server failed to start")
 	})
 
 	AfterEach(func() {
-		if serverCmd != nil && serverCmd.Process != nil {
-			serverCmd.Process.Kill()
-			serverCmd.Wait()
-		}
-		if cpCmd != nil && cpCmd.Process != nil {
-			cpCmd.Process.Kill()
-			cpCmd.Wait()
-		}
-		if tmpDir != "" {
-			os.RemoveAll(tmpDir)
+		if env != nil {
+			env.Stop()
 		}
 	})
 

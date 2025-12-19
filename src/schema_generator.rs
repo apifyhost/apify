@@ -61,9 +61,6 @@ impl SchemaGenerator {
     pub fn extract_schemas_from_openapi(
         spec: &Value,
     ) -> Result<Vec<TableSchema>, Box<dyn std::error::Error + Send + Sync>> {
-        use std::io::Write;
-        eprintln!("    extract_schemas_from_openapi: START");
-        let _ = std::io::stderr().flush();
         let mut schemas = Vec::new();
 
         tracing::debug!(
@@ -71,28 +68,12 @@ impl SchemaGenerator {
             has_paths = spec.get("paths").is_some(),
             "Starting schema extraction from OpenAPI spec"
         );
-        eprintln!("    extract_schemas_from_openapi: After debug log");
-        let _ = std::io::stderr().flush();
 
         // Look for x-table-schema extensions in the OpenAPI spec
-        eprintln!("    extract_schemas_from_openapi: Checking x-table-schemas");
-        let _ = std::io::stderr().flush();
         if let Some(extensions) = spec.get("x-table-schemas").and_then(|v| v.as_array()) {
-            eprintln!(
-                "    extract_schemas_from_openapi: Found {} x-table-schemas",
-                extensions.len()
-            );
-            let _ = std::io::stderr().flush();
             tracing::debug!(schemas_count = extensions.len(), "Found x-table-schemas");
             for schema_value in extensions {
-                eprintln!("    extract_schemas_from_openapi: Parsing schema...");
-                let _ = std::io::stderr().flush();
                 let schema: TableSchema = serde_json::from_value(schema_value.clone())?;
-                eprintln!(
-                    "    extract_schemas_from_openapi: Parsed schema: {}",
-                    schema.table_name
-                );
-                let _ = std::io::stderr().flush();
                 tracing::debug!(
                     table = %schema.table_name,
                     columns_count = schema.columns.len(),
@@ -101,15 +82,7 @@ impl SchemaGenerator {
                 );
                 schemas.push(schema);
             }
-        } else {
-            eprintln!("    extract_schemas_from_openapi: NO x-table-schemas found");
-            let _ = std::io::stderr().flush();
         }
-        eprintln!(
-            "    extract_schemas_from_openapi: After x-table-schemas, schemas.len()={}",
-            schemas.len()
-        );
-        let _ = std::io::stderr().flush();
 
         // Also try to extract from paths (alternative approach)
         if let Some(paths) = spec.get("paths").and_then(|p| p.as_object()) {
@@ -125,40 +98,18 @@ impl SchemaGenerator {
         }
 
         // Extract relations from paths (requestBody and responses)
-        eprintln!("    extract_schemas_from_openapi: About to extract relations from paths");
-        let _ = std::io::stderr().flush();
         if let Some(paths) = spec.get("paths").and_then(|p| p.as_object()) {
-            eprintln!(
-                "    extract_schemas_from_openapi: Calling extract_relations_from_paths with {} paths",
-                paths.len()
-            );
-            let _ = std::io::stderr().flush();
             Self::extract_relations_from_paths(&mut schemas, paths);
-            eprintln!("    extract_schemas_from_openapi: After extract_relations_from_paths");
-            let _ = std::io::stderr().flush();
         }
-        eprintln!("    extract_schemas_from_openapi: After relations extraction");
-        let _ = std::io::stderr().flush();
 
         // Fallback: derive from components.schemas if no explicit schemas found
-        eprintln!(
-            "    extract_schemas_from_openapi: Checking fallback, schemas.len()={}",
-            schemas.len()
-        );
-        let _ = std::io::stderr().flush();
         if schemas.is_empty()
             && let Some(derived) = Self::derive_from_components(spec)
             && !derived.is_empty()
         {
-            eprintln!("    extract_schemas_from_openapi: Using fallback derived schemas");
             return Ok(derived);
         }
 
-        eprintln!(
-            "    extract_schemas_from_openapi: DONE, returning {} schemas",
-            schemas.len()
-        );
-        let _ = std::io::stderr().flush();
         Ok(schemas)
     }
 
@@ -195,17 +146,8 @@ impl SchemaGenerator {
                             "[extract_relations_from_paths] Found operation"
                         );
 
-                        println!(
-                            "DEBUG: [extract_relations_from_paths] Checking requestBody for {} {}",
-                            method, path_str
-                        );
-
                         // Extract relations from requestBody schema
                         if let Some(request_body) = op_obj.get("requestBody") {
-                            println!(
-                                "DEBUG: [extract_relations_from_paths] Found requestBody for {} {}",
-                                method, path_str
-                            );
                             let before_count: usize =
                                 schemas.iter().map(|s| s.relations.len()).sum();
                             tracing::info!(
@@ -213,9 +155,6 @@ impl SchemaGenerator {
                                 "[extract_relations_from_paths] Checking requestBody"
                             );
                             Self::extract_relations_from_schema(schemas, &table_name, request_body);
-                            println!(
-                                "DEBUG: [extract_relations_from_paths] Returned from extract_relations_from_schema for requestBody"
-                            );
                             let after_count: usize =
                                 schemas.iter().map(|s| s.relations.len()).sum();
                             let new_relations = after_count - before_count;
@@ -226,63 +165,33 @@ impl SchemaGenerator {
                                 );
                                 relations_found += new_relations;
                             }
-                        } else {
-                            println!(
-                                "DEBUG: [extract_relations_from_paths] No requestBody for {} {}",
-                                method, path_str
-                            );
                         }
 
                         // Extract relations from response schema
                         if let Some(responses) = op_obj.get("responses").and_then(|r| r.as_object())
                         {
-                            println!(
-                                "DEBUG: [extract_relations_from_paths] Checking responses for {} {}",
-                                method, path_str
-                            );
                             tracing::info!(
                                 response_count = responses.len(),
                                 table = %table_name,
                                 "[extract_relations_from_paths] Checking responses"
                             );
                             for (status, response) in responses.iter() {
-                                println!(
-                                    "DEBUG: [extract_relations_from_paths] Processing response {} for {} {}",
-                                    status, method, path_str
-                                );
                                 tracing::info!(
                                     status = %status,
                                     table = %table_name,
                                     "[extract_relations_from_paths] Processing response"
                                 );
                                 Self::extract_relations_from_schema(schemas, &table_name, response);
-                                println!(
-                                    "DEBUG: [extract_relations_from_paths] Finished response {} for {} {}",
-                                    status, method, path_str
-                                );
                                 tracing::info!(
                                     status = %status,
                                     "[extract_relations_from_paths] Finished response"
                                 );
                             }
-                            println!(
-                                "DEBUG: [extract_relations_from_paths] Finished all responses for {} {}",
-                                method, path_str
-                            );
                             tracing::info!(
                                 table = %table_name,
                                 "[extract_relations_from_paths] Finished all responses"
                             );
-                        } else {
-                            println!(
-                                "DEBUG: [extract_relations_from_paths] No responses for {} {}",
-                                method, path_str
-                            );
                         }
-                        println!(
-                            "DEBUG: [extract_relations_from_paths] Finished operation {} {}",
-                            method, path_str
-                        );
                         tracing::info!(
                             operation_num = operations_found,
                             "[extract_relations_from_paths] Finished operation"
@@ -291,7 +200,6 @@ impl SchemaGenerator {
                 }
             }
         }
-        println!("DEBUG: [extract_relations_from_paths] DONE loop");
         tracing::info!(
             operations_found = operations_found,
             relations_found = relations_found,
@@ -315,10 +223,6 @@ impl SchemaGenerator {
         table_name: &str,
         schema_container: &Value,
     ) {
-        println!(
-            "DEBUG: [extract_relations_from_schema] ENTERED for table {}",
-            table_name
-        );
         tracing::info!(table = %table_name, "[extract_relations_from_schema] ENTERED");
         // Navigate to the actual schema (might be in content.application/json.schema)
         let schema = if let Some(content) = schema_container.get("content") {
@@ -925,7 +829,6 @@ mod tests {
         };
 
         let sql = SchemaGenerator::generate_create_table_sql_sqlite(&schema);
-        println!("{}", sql);
 
         assert!(sql.contains("CREATE TABLE IF NOT EXISTS users"));
         assert!(sql.contains("id INTEGER PRIMARY KEY AUTOINCREMENT"));

@@ -57,7 +57,7 @@ impl RequestValidator {
         }
         // Debug: log registered validators
         for key in validators.keys() {
-            eprintln!("Debug: RequestValidator registered: {} {}", key.0, key.1);
+            tracing::debug!("RequestValidator registered: {} {}", key.0, key.1);
         }
         Self { config, validators }
     }
@@ -263,11 +263,12 @@ impl Module for RequestValidator {
                         .collect::<Vec<_>>()
                         .join("; ");
 
-                    eprintln!("Validation Error: {}", error_msg);
+                    tracing::warn!("Validation Error: {}", error_msg);
                     // Debug: print the schema being used (if possible, JSONSchema doesn't implement Debug nicely usually, but let's try printing the key)
-                    eprintln!(
-                        "Debug: Validation failed for route: {} {}",
-                        ctx.method, route.path_pattern
+                    tracing::debug!(
+                        "Validation failed for route: {} {}",
+                        ctx.method,
+                        route.path_pattern
                     );
 
                     return ModuleOutcome::Respond(error_response(
@@ -323,7 +324,7 @@ impl Module for RequestValidator {
                                 .collect::<Vec<_>>()
                                 .join("; ");
 
-                            eprintln!("Validation Error: {}", error_msg);
+                            tracing::warn!("Validation Error: {}", error_msg);
 
                             return ModuleOutcome::Respond(error_response(
                                 StatusCode::BAD_REQUEST,

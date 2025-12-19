@@ -10,9 +10,13 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"encoding/json"
+	"bytes"
+	"strconv"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"gopkg.in/yaml.v3"
 )
 
 func TestE2E(t *testing.T) {
@@ -20,11 +24,27 @@ func TestE2E(t *testing.T) {
 	RunSpecs(t, "Apify E2E Test Suite")
 }
 
+var _ = BeforeSuite(func() {
+	// Build the binary once before running any tests to avoid timeouts due to compilation
+	wd, _ := os.Getwd()
+	projectRoot := filepath.Dir(wd)
+	
+	fmt.Println("Building apify binary...")
+	cmd := exec.Command("cargo", "build", "--bin", "apify")
+	cmd.Dir = projectRoot
+	cmd.Stdout = GinkgoWriter
+	cmd.Stderr = GinkgoWriter
+	err := cmd.Run()
+	Expect(err).NotTo(HaveOccurred(), "Failed to build apify binary")
+	fmt.Println("Binary built successfully")
+})
+
 type TestEnv struct {
 	ServerCmd  *exec.Cmd
 	CPCmd      *exec.Cmd
 	TmpDir     string
 	BaseURL    string
+	CPBaseURL  string
 	APIKey     string
 	ConfigFile string
 	DBFile     string
@@ -38,13 +58,20 @@ func StartTestEnv(specFiles map[string]string) *TestEnv {
 	wd, _ := os.Getwd()
 	projectRoot := filepath.Dir(wd)
 
-	// Get a free port
+	// Get a free port for DP
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	Expect(err).NotTo(HaveOccurred())
-	serverPort := fmt.Sprintf("%d", l.Addr().(*net.TCPAddr).Port)
+	dpPort := fmt.Sprintf("%d", l.Addr().(*net.TCPAddr).Port)
 	l.Close()
-	env.BaseURL = "http://127.0.0.1:" + serverPort
+	env.BaseURL = "http://127.0.0.1:" + dpPort
 	env.APIKey = "e2e-test-key-001"
+
+	// Get a free port for CP
+	l, err = net.Listen("tcp", "127.0.0.1:0")
+	Expect(err).NotTo(HaveOccurred())
+	cpPort := fmt.Sprintf("%d", l.Addr().(*net.TCPAddr).Port)
+	l.Close()
+	env.CPBaseURL = "http://127.0.0.1:" + cpPort
 
 	// Get a free port for metrics
 	l, err = net.Listen("tcp", "127.0.0.1:0")
@@ -63,28 +90,6 @@ func StartTestEnv(specFiles map[string]string) *TestEnv {
 	f, err := os.Create(env.DBFile)
 	Expect(err).NotTo(HaveOccurred())
 	f.Close()
-
-	// Generate config.yaml
-	apisYaml := ""
-	if len(specFiles) > 0 {
-		apisYaml = "\n    apis:"
-		for name, path := range specFiles {
-			// Read the actual content from the source path
-			// Assuming path is relative to project root
-			fullPath := filepath.Join(projectRoot, path)
-			content, err := os.ReadFile(fullPath)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Write spec to file
-			specPath := filepath.Join(env.TmpDir, name+".yaml")
-			err = os.WriteFile(specPath, content, 0644)
-			Expect(err).NotTo(HaveOccurred())
-
-			apisYaml += fmt.Sprintf(`
-      - path: %s
-`, specPath)
-		}
-	}
 
 	keycloakURL := os.Getenv("KEYCLOAK_URL")
 	oidcConfig := ""
@@ -113,7 +118,7 @@ listeners:
   - port: %s
     ip: 127.0.0.1
     protocol: HTTP
-%s
+    apis: []
 
 auth:
   - name: e2e-api-keys
@@ -142,17 +147,25 @@ modules:
   metrics:
     enabled: true
     port: %s
-`, serverPort, env.DBFile, serverPort, apisYaml, env.APIKey, oidcConfig, env.DBFile, env.MetricsPort)
+`, cpPort, env.DBFile, dpPort, env.APIKey, oidcConfig, env.DBFile, env.MetricsPort)
 
 	err = os.WriteFile(env.ConfigFile, []byte(configContent), 0644)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Start Control Plane
-	env.CPCmd = exec.Command("cargo", "run", "--bin", "apify-cp", "--", "--config", env.ConfigFile)
+	// Use pre-built binary if available to speed up tests and avoid timeouts
+	binPath := filepath.Join(projectRoot, "target", "debug", "apify")
+	if _, err := os.Stat(binPath); err == nil {
+		env.CPCmd = exec.Command(binPath, "--control-plane", "--config", env.ConfigFile)
+	} else {
+		env.CPCmd = exec.Command("cargo", "run", "--bin", "apify", "--", "--control-plane", "--config", env.ConfigFile)
+	}
 	env.CPCmd.Dir = projectRoot
 	env.CPCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+env.DBFile)
-	env.CPCmd.Stdout = GinkgoWriter
-	env.CPCmd.Stderr = GinkgoWriter
+	
+	var cpStdout, cpStderr bytes.Buffer
+	env.CPCmd.Stdout = &cpStdout
+	env.CPCmd.Stderr = &cpStderr
 
 	err = env.CPCmd.Start()
 	Expect(err).NotTo(HaveOccurred())
@@ -161,7 +174,7 @@ modules:
 
 	// Wait for CP to be ready
 	Eventually(func() error {
-		resp, err := client.Get(env.BaseURL + "/_meta/apis")
+		resp, err := client.Get(env.CPBaseURL + "/_meta/apis")
 		if err != nil {
 			return err
 		}
@@ -170,20 +183,22 @@ modules:
 			return fmt.Errorf("status code %d", resp.StatusCode)
 		}
 		return nil
-	}, 300*time.Second, 1*time.Second).Should(Succeed())
-
-	// Stop Control Plane
-	if env.CPCmd.Process != nil {
-		env.CPCmd.Process.Kill()
-		env.CPCmd.Wait()
-	}
+	}, 60*time.Second, 1*time.Second).Should(Succeed(), func() string {
+		return fmt.Sprintf("Control Plane failed to start.\nStdout: %s\nStderr: %s", cpStdout.String(), cpStderr.String())
+	})
 
 	// Start Data Plane
-	env.ServerCmd = exec.Command("cargo", "run", "--bin", "apify", "--", "--config", env.ConfigFile)
+	if _, err := os.Stat(binPath); err == nil {
+		env.ServerCmd = exec.Command(binPath, "--data-plane", "--config", env.ConfigFile)
+	} else {
+		env.ServerCmd = exec.Command("cargo", "run", "--bin", "apify", "--", "--data-plane", "--config", env.ConfigFile)
+	}
 	env.ServerCmd.Dir = projectRoot
-	env.ServerCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+env.DBFile)
-	env.ServerCmd.Stdout = GinkgoWriter
-	env.ServerCmd.Stderr = GinkgoWriter
+	env.ServerCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+env.DBFile, "APIFY_CONFIG_POLL_INTERVAL=1")
+	
+	var dpStdout, dpStderr bytes.Buffer
+	env.ServerCmd.Stdout = &dpStdout
+	env.ServerCmd.Stderr = &dpStderr
 
 	err = env.ServerCmd.Start()
 	Expect(err).NotTo(HaveOccurred())
@@ -199,7 +214,72 @@ modules:
 			return fmt.Errorf("status %d", resp.StatusCode)
 		}
 		return nil
-	}, "120s", "1s").Should(Succeed(), "Server failed to start")
+	}, "60s", "1s").Should(Succeed(), func() string {
+		return fmt.Sprintf("Data Plane failed to start.\nStdout: %s\nStderr: %s", dpStdout.String(), dpStderr.String())
+	})
+
+	// Dynamic Configuration: Register APIs
+	var apiPaths []string
+	for name, path := range specFiles {
+		var fullPath string
+		if filepath.IsAbs(path) {
+			fullPath = path
+		} else {
+			fullPath = filepath.Join(projectRoot, path)
+		}
+		content, err := os.ReadFile(fullPath)
+		Expect(err).NotTo(HaveOccurred())
+
+		var specObj map[string]interface{}
+		err = yaml.Unmarshal(content, &specObj)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Handle nested structure in some example files (openapi.spec.openapi)
+		if oa, ok := specObj["openapi"].(map[string]interface{}); ok {
+			if sp, ok := oa["spec"].(map[string]interface{}); ok {
+				specObj = sp
+			}
+		}
+
+		payload := map[string]interface{}{
+			"name":    name,
+			"version": "1.0.0",
+			"spec":    specObj,
+		}
+		payloadBytes, _ := json.Marshal(payload)
+
+		resp, err := client.Post(env.CPBaseURL+"/_meta/apis", "application/json", bytes.NewBuffer(payloadBytes))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(201))
+		resp.Body.Close()
+
+		apiPaths = append(apiPaths, name)
+	}
+
+	// Update Listener to include these APIs
+	if len(apiPaths) > 0 {
+		var apiRefs []interface{}
+		for _, p := range apiPaths {
+			apiRefs = append(apiRefs, p)
+		}
+
+		dpPortInt, _ := strconv.Atoi(dpPort)
+		listenerConfig := map[string]interface{}{
+			"port":     dpPortInt,
+			"ip":       "127.0.0.1",
+			"protocol": "HTTP",
+			"apis":     apiRefs,
+		}
+
+		payloadBytes, _ := json.Marshal(listenerConfig)
+		resp, err := client.Post(env.CPBaseURL+"/_meta/listeners", "application/json", bytes.NewBuffer(payloadBytes))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(201))
+		resp.Body.Close()
+
+		// Wait for DP to pick up changes (poll interval 1s + buffer)
+		time.Sleep(2 * time.Second)
+	}
 
 	return env
 }

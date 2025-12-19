@@ -7,6 +7,7 @@ use super::{Arc, http_body_util::Full, hyper::body::Bytes};
 use crate::modules::ModuleOutcome;
 use crate::modules::metrics::RequestMetrics;
 use crate::phases::{Phase, RequestContext};
+use arc_swap::ArcSwap;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error;
@@ -16,8 +17,9 @@ use std::error::Error;
 #[tracing::instrument(skip(req, state), fields(http.method = %req.method(), http.uri = %req.uri()))]
 pub async fn handle_request(
     req: Request<hyper::body::Incoming>,
-    state: Arc<AppState>,
+    state: Arc<ArcSwap<AppState>>,
 ) -> Result<Response<Full<Bytes>>, Box<dyn Error + Send + Sync>> {
+    let state = state.load_full();
     let (parts, body_stream) = req.into_parts();
     let method = parts.method.clone();
     let path = parts.uri.path().to_string();
@@ -184,7 +186,7 @@ async fn handle_request_inner(
                     return Ok(resp);
                 }
                 ModuleOutcome::Error(e) => {
-                    eprintln!("BodyParse Module error: {e}");
+                    tracing::error!("BodyParse Module error: {e}");
                     return Ok(create_error_response(
                         StatusCode::INTERNAL_SERVER_ERROR,
                         "Module error",
@@ -203,7 +205,7 @@ async fn handle_request_inner(
                     return Ok(resp);
                 }
                 ModuleOutcome::Error(e) => {
-                    eprintln!("Module error: {e}");
+                    tracing::error!("Module error: {e}");
                     return Ok(create_error_response(
                         StatusCode::INTERNAL_SERVER_ERROR,
                         "Module error",
@@ -213,7 +215,7 @@ async fn handle_request_inner(
         }
 
         // Phase: Data (CRUD execution)
-        eprintln!("Debug: Executing CRUD for {} {}", method, ctx.path);
+        tracing::debug!("Executing CRUD for {} {}", method, ctx.path);
         match crud_handler
             .handle_request(
                 method.as_str(),
@@ -226,7 +228,7 @@ async fn handle_request_inner(
             .await
         {
             Ok(result) => {
-                eprintln!("Debug: CRUD success for {} {}", method, ctx.path);
+                tracing::debug!("CRUD success for {} {}", method, ctx.path);
                 ctx.result_json = Some(result);
             }
             Err(CRUDError::NotFoundError(_)) => {
@@ -236,15 +238,15 @@ async fn handle_request_inner(
                 ));
             }
             Err(CRUDError::ValidationError(msg)) => {
-                eprintln!("Validation Error: {}", msg);
+                tracing::warn!("Validation Error: {}", msg);
                 return Ok(create_error_response(StatusCode::BAD_REQUEST, &msg));
             }
             Err(CRUDError::InvalidParameterError(msg)) => {
-                eprintln!("Invalid Parameter Error: {}", msg);
+                tracing::warn!("Invalid Parameter Error: {}", msg);
                 return Ok(create_error_response(StatusCode::BAD_REQUEST, &msg));
             }
             Err(CRUDError::DatabaseError(e)) => {
-                eprintln!("Database error: {:?}", e);
+                tracing::error!("Database error: {:?}", e);
                 return Ok(create_error_response(
                     StatusCode::INTERNAL_SERVER_ERROR,
                     &format!("Database error: {}", e),

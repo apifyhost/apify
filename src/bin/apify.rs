@@ -70,6 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     tokio::spawn(async move {
                         if let Err(e) = apify::control_plane::start_control_plane_server(cp_config, db_clone).await {
                             tracing::error!("Control Plane Server failed: {}", e);
+                            std::process::exit(1);
                         }
                     });
                 } else {
@@ -241,9 +242,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         handles.push(metrics_handle);
 
         if tracing_enabled && otlp_endpoint.is_some() {
-            eprintln!(
-                "Metrics endpoint will start on port {} with OpenTelemetry tracing",
-                metrics_port
+            tracing::info!(
+                port = metrics_port,
+                "Metrics endpoint will start with OpenTelemetry tracing"
             );
         } else {
             tracing::info!(port = metrics_port, "Metrics endpoint started");
@@ -472,11 +473,11 @@ fn start_metrics_server(
             // Initialize with OpenTelemetry support
             if let Err(e) = init_tracing_with_otel("apify", endpoint, log_level.as_deref()).await {
                 // Fallback to basic logging
-                eprintln!(
+                init_logging(log_level.as_deref());
+                tracing::error!(
                     "Failed to initialize OpenTelemetry: {}, falling back to basic logging",
                     e
                 );
-                init_logging(log_level.as_deref());
             }
         } else {
             // Just basic logging (shouldn't reach here if main() already initialized)

@@ -7,6 +7,9 @@ use super::hyper::server::conn::http1;
 use super::hyper::service::service_fn;
 use super::tokio::net::TcpListener;
 use super::{Arc, hyper_util::rt::TokioIo, tokio};
+use crate::app_state::AppStateConfig;
+use crate::config::ApiRef;
+use arc_swap::ArcSwap;
 use socket2::{Domain, Socket, Type};
 use std::error::Error;
 use std::net::{SocketAddr, TcpListener as StdTcpListener};
@@ -65,15 +68,22 @@ pub fn start_listener(
         // <-- Restored critical pattern
         let addr = listener_config.to_socket_addr()?;
         let listener = create_reuse_port_socket(addr)?;
-        println!("Thread {} bound to http://{}", thread_id, addr);
+        tracing::info!("Thread {} bound to http://{}", thread_id, addr);
+
+        // Clone configs for poller
+        let initial_datasources = datasources.clone();
+        let initial_auth = auth_config.clone();
+        let initial_access_log = access_log_config.clone();
+        let db_for_poller = control_plane_db.clone();
+        let port = listener_config.port;
 
         // Create application state
-        println!("Thread {} creating AppState...", thread_id);
+        tracing::info!("Thread {} creating AppState...", thread_id);
         let state = match AppState::new_with_crud(crate::app_state::AppStateConfig {
-            routes: listener_config.routes,
+            routes: listener_config.routes.clone(),
             datasources,
             openapi_configs,
-            listener_modules: listener_config.modules,
+            listener_modules: listener_config.modules.clone(),
             auth_config,
             public_url: None,
             access_log_config,
@@ -82,22 +92,149 @@ pub fn start_listener(
         .await
         {
             Ok(s) => {
-                println!("Thread {} AppState created successfully", thread_id);
-                Arc::new(s)
+                tracing::info!("Thread {} AppState created successfully", thread_id);
+                Arc::new(ArcSwap::from_pointee(s))
             }
             Err(e) => {
-                eprintln!("Thread {} failed to create AppState: {}", thread_id, e);
+                tracing::error!("Thread {} failed to create AppState: {}", thread_id, e);
                 return Err(format!("Thread {} AppState creation failed: {}", thread_id, e).into());
             }
         };
 
-        println!("Thread {} entering accept loop", thread_id);
+        // Spawn poller if DB is available
+        if let Some(db) = db_for_poller {
+            let state_swap = Arc::clone(&state);
+            tokio::spawn(async move {
+                use std::time::Duration;
+                let poll_interval = std::env::var("APIFY_CONFIG_POLL_INTERVAL")
+                    .ok()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(10);
+
+                loop {
+                    tokio::time::sleep(Duration::from_secs(poll_interval)).await;
+
+                    // 1. Load Listeners
+                    let listeners = match crate::control_plane::load_listeners(&db).await {
+                        Ok(l) => l,
+                        Err(e) => {
+                            tracing::error!("Failed to reload listeners: {}", e);
+                            continue;
+                        }
+                    };
+
+                    // Find config for this port
+                    let new_listener_config = match listeners
+                        .unwrap_or_default()
+                        .into_iter()
+                        .find(|l| l.port == port)
+                    {
+                        Some(l) => l,
+                        None => {
+                            // Listener removed? We can't really shut down the thread easily from here without more logic.
+                            // For now, just ignore or log warning.
+                            // tracing::warn!("Listener for port {} not found in DB", port);
+                            continue;
+                        }
+                    };
+
+                    // 2. Load Datasources
+                    let new_datasources = match crate::control_plane::load_datasources(&db).await {
+                        Ok(d) => d,
+                        Err(e) => {
+                            tracing::error!("Failed to reload datasources: {}", e);
+                            continue;
+                        }
+                    };
+                    let mut final_datasources = initial_datasources.clone().unwrap_or_default();
+                    final_datasources.extend(new_datasources.unwrap_or_default());
+
+                    // 3. Load Auth
+                    let new_auth = match crate::control_plane::load_auth_configs(&db).await {
+                        Ok(a) => a,
+                        Err(e) => {
+                            tracing::error!("Failed to reload auth: {}", e);
+                            continue;
+                        }
+                    };
+                    let mut final_auth = initial_auth.clone().unwrap_or_default();
+                    final_auth.extend(new_auth.unwrap_or_default());
+
+                    // 4. Load API Configs
+                    let api_configs_map = match crate::control_plane::load_api_configs(&db).await {
+                        Ok(c) => c,
+                        Err(e) => {
+                            tracing::error!("Failed to reload api configs: {}", e);
+                            continue;
+                        }
+                    };
+
+                    // 5. Construct OpenApiStateConfig list based on new_listener_config.apis
+                    let mut new_openapi_configs = Vec::new();
+                    for api_ref in new_listener_config.apis.clone().unwrap_or_default() {
+                        match api_ref {
+                            ApiRef::Path(path) => {
+                                if let Some(cfg) = api_configs_map.get(&path) {
+                                    new_openapi_configs.push(cfg.clone());
+                                }
+                            }
+                            ApiRef::WithConfig {
+                                path,
+                                modules,
+                                datasource,
+                                access_log,
+                            } => {
+                                if let Some(cfg) = api_configs_map.get(&path) {
+                                    let mut c = cfg.clone();
+                                    if datasource.is_some() {
+                                        c.datasource = datasource;
+                                    }
+                                    if modules.is_some() {
+                                        c.modules = modules;
+                                    }
+                                    if access_log.is_some() {
+                                        c.access_log = access_log;
+                                    }
+                                    new_openapi_configs.push(c);
+                                }
+                            }
+                        }
+                    }
+
+                    // 6. Create new AppState
+                    let new_state = match AppState::new_with_crud(AppStateConfig {
+                        routes: new_listener_config.routes,
+                        datasources: Some(final_datasources),
+                        openapi_configs: new_openapi_configs,
+                        listener_modules: new_listener_config.modules,
+                        auth_config: Some(final_auth),
+                        public_url: None,
+                        access_log_config: initial_access_log.clone(),
+                        control_plane_db: Some(db.clone()),
+                    })
+                    .await
+                    {
+                        Ok(s) => s,
+                        Err(e) => {
+                            tracing::error!("Failed to create new AppState: {}", e);
+                            continue;
+                        }
+                    };
+
+                    // 7. Swap
+                    state_swap.store(Arc::new(new_state));
+                    // tracing::info!("Configuration reloaded for port {}", port);
+                }
+            });
+        }
+
+        tracing::info!("Thread {} entering accept loop", thread_id);
         // Continuously accept and handle connections
         loop {
             match listener.accept().await {
                 Ok((stream, remote_addr)) => {
                     if let Err(e) = stream.set_nodelay(true) {
-                        eprintln!("Thread {} set_nodelay error: {}", thread_id, e);
+                        tracing::warn!("Thread {} set_nodelay error: {}", thread_id, e);
                         continue;
                     }
                     let io = TokioIo::new(stream);
@@ -113,12 +250,16 @@ pub fn start_listener(
                             .serve_connection(io, service)
                             .await
                         {
-                            eprintln!("Thread {} connection handling error: {:?}", thread_id, err);
+                            tracing::error!(
+                                "Thread {} connection handling error: {:?}",
+                                thread_id,
+                                err
+                            );
                         }
                     });
                 }
                 Err(e) => {
-                    eprintln!("Thread {} accept error: {}", thread_id, e);
+                    tracing::error!("Thread {} accept error: {}", thread_id, e);
                     continue;
                 }
             }
@@ -146,7 +287,7 @@ pub fn start_docs_server(
     rt.block_on(async move {
         let addr: SocketAddr = format!("0.0.0.0:{}", port).parse()?;
         let listener = create_reuse_port_socket(addr)?;
-        println!("Docs server listening on http://{}", addr);
+        tracing::info!("Docs server listening on http://{}", addr);
 
         loop {
             match listener.accept().await {
@@ -162,12 +303,12 @@ pub fn start_docs_server(
                         });
                         if let Err(err) = http1::Builder::new().serve_connection(io, service).await
                         {
-                            eprintln!("Docs connection error: {:?}", err);
+                            tracing::error!("Docs connection error: {:?}", err);
                         }
                     });
                 }
                 Err(e) => {
-                    eprintln!("Docs accept error: {}", e);
+                    tracing::error!("Docs accept error: {}", e);
                     continue;
                 }
             }
