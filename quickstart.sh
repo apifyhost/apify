@@ -57,12 +57,38 @@ ensure_docker() {
   }
 }
 
+download_example() {
+  echo "Downloading example '$EXAMPLE' from GitHub..."
+  
+  if ! command -v curl >/dev/null 2>&1; then
+    echo_fail "curl is required to download examples"
+    exit 1
+  fi
+  if ! command -v tar >/dev/null 2>&1; then
+    echo_fail "tar is required to download examples"
+    exit 1
+  fi
+
+  mkdir -p examples
+  
+  # Download and extract specific folder
+  # Note: apify-main is the default folder name in the archive for main branch
+  if ! curl -fsSL https://github.com/apifyhost/apify/archive/main.tar.gz | \
+       tar -xz -C examples --strip-components=2 "apify-main/examples/$EXAMPLE" 2>/dev/null; then
+    echo_fail "Failed to download example '$EXAMPLE'. Please check your internet connection or example name."
+    exit 1
+  fi
+  
+  if [ ! -d "$EXAMPLE_DIR" ]; then
+    echo_fail "Failed to download example '$EXAMPLE'. Directory not created."
+    exit 1
+  fi
+}
+
 check_example_dir() {
   if [ ! -d "$EXAMPLE_DIR" ]; then
-    echo_fail "Example '$EXAMPLE' not found"
-    echo ""
-    echo "Available examples: basic, oauth, observability, full"
-    exit 1
+    echo_warning "Example '$EXAMPLE' not found locally."
+    download_example
   fi
 }
 
