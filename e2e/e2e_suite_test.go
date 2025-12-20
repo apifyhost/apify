@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"encoding/json"
 	"bytes"
 	"strconv"
 
@@ -92,19 +91,8 @@ func StartTestEnv(specFiles map[string]string) *TestEnv {
 	f.Close()
 
 	keycloakURL := os.Getenv("KEYCLOAK_URL")
-	oidcConfig := ""
-	if keycloakURL != "" {
-		oidcConfig = fmt.Sprintf(`
-  - name: keycloak
-    type: oidc
-    enabled: true
-    config:
-      issuer: %s/realms/apify
-      client_id: apify-test-client
-      client_secret: apify-test-secret
-`, keycloakURL)
-	}
 
+	// 1. Create minimal config for startup (CP only)
 	configContent := fmt.Sprintf(`
 control-plane:
   listen:
@@ -114,31 +102,6 @@ control-plane:
     driver: sqlite
     database: //%s
 
-listeners:
-  - port: %s
-    ip: 127.0.0.1
-    protocol: HTTP
-    apis: []
-
-auth:
-  - name: e2e-api-keys
-    type: api-key
-    enabled: true
-    config:
-      source: header
-      key_name: X-Api-Key
-      consumers:
-        - name: default
-          keys:
-            - %s
-%s
-
-datasource:
-  default:
-    driver: sqlite
-    database: //%s
-    max_pool_size: 1
-
 log_level: "info"
 
 modules:
@@ -147,7 +110,7 @@ modules:
   metrics:
     enabled: true
     port: %s
-`, cpPort, env.DBFile, dpPort, env.APIKey, oidcConfig, env.DBFile, env.MetricsPort)
+`, cpPort, env.DBFile, env.MetricsPort)
 
 	err = os.WriteFile(env.ConfigFile, []byte(configContent), 0644)
 	Expect(err).NotTo(HaveOccurred())
@@ -187,6 +150,76 @@ modules:
 		return fmt.Sprintf("Control Plane failed to start.\nStdout: %s\nStderr: %s", cpStdout.String(), cpStderr.String())
 	})
 
+	// 2. Prepare Import Config
+	var authConfigs []map[string]interface{}
+	authConfigs = append(authConfigs, map[string]interface{}{
+		"name":    "e2e-api-keys",
+		"type":    "api-key",
+		"enabled": true,
+		"config": map[string]interface{}{
+			"source":   "header",
+			"key_name": "X-Api-Key",
+			"consumers": []map[string]interface{}{
+				{
+					"name": "default",
+					"keys": []string{env.APIKey},
+				},
+			},
+		},
+	})
+
+	if keycloakURL != "" {
+		authConfigs = append(authConfigs, map[string]interface{}{
+			"name":    "keycloak",
+			"type":    "oidc",
+			"enabled": true,
+			"config": map[string]interface{}{
+				"issuer":        fmt.Sprintf("%s/realms/apify", keycloakURL),
+				"client_id":     "apify-test-client",
+				"client_secret": "apify-test-secret",
+			},
+		})
+	}
+
+	var apiPaths []string
+	for _, path := range specFiles {
+		var fullPath string
+		if filepath.IsAbs(path) {
+			fullPath = path
+		} else {
+			fullPath = filepath.Join(projectRoot, path)
+		}
+		apiPaths = append(apiPaths, fullPath)
+	}
+
+	dpPortInt, _ := strconv.Atoi(dpPort)
+	importConfig := map[string]interface{}{
+		"auth": authConfigs,
+		"datasource": map[string]interface{}{
+			"default": map[string]interface{}{
+				"driver":        "sqlite",
+				"database":      "//" + env.DBFile,
+				"max_pool_size": 1,
+			},
+		},
+		"listeners": []map[string]interface{}{
+			{
+				"port":     dpPortInt,
+				"ip":       "127.0.0.1",
+				"protocol": "HTTP",
+				"apis":     apiPaths,
+			},
+		},
+	}
+
+	importYaml, err := yaml.Marshal(importConfig)
+	Expect(err).NotTo(HaveOccurred())
+
+	resp, err := client.Post(env.CPBaseURL+"/_meta/import", "application/x-yaml", bytes.NewBuffer(importYaml))
+	Expect(err).NotTo(HaveOccurred())
+	Expect(resp.StatusCode).To(Equal(200))
+	resp.Body.Close()
+
 	// Start Data Plane
 	if _, err := os.Stat(binPath); err == nil {
 		env.ServerCmd = exec.Command(binPath, "--data-plane", "--config", env.ConfigFile)
@@ -217,69 +250,6 @@ modules:
 	}, "60s", "1s").Should(Succeed(), func() string {
 		return fmt.Sprintf("Data Plane failed to start.\nStdout: %s\nStderr: %s", dpStdout.String(), dpStderr.String())
 	})
-
-	// Dynamic Configuration: Register APIs
-	var apiPaths []string
-	for name, path := range specFiles {
-		var fullPath string
-		if filepath.IsAbs(path) {
-			fullPath = path
-		} else {
-			fullPath = filepath.Join(projectRoot, path)
-		}
-		content, err := os.ReadFile(fullPath)
-		Expect(err).NotTo(HaveOccurred())
-
-		var specObj map[string]interface{}
-		err = yaml.Unmarshal(content, &specObj)
-		Expect(err).NotTo(HaveOccurred())
-
-		// Handle nested structure in some example files (openapi.spec.openapi)
-		if oa, ok := specObj["openapi"].(map[string]interface{}); ok {
-			if sp, ok := oa["spec"].(map[string]interface{}); ok {
-				specObj = sp
-			}
-		}
-
-		payload := map[string]interface{}{
-			"name":    name,
-			"version": "1.0.0",
-			"spec":    specObj,
-		}
-		payloadBytes, _ := json.Marshal(payload)
-
-		resp, err := client.Post(env.CPBaseURL+"/_meta/apis", "application/json", bytes.NewBuffer(payloadBytes))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(201))
-		resp.Body.Close()
-
-		apiPaths = append(apiPaths, name)
-	}
-
-	// Update Listener to include these APIs
-	if len(apiPaths) > 0 {
-		var apiRefs []interface{}
-		for _, p := range apiPaths {
-			apiRefs = append(apiRefs, p)
-		}
-
-		dpPortInt, _ := strconv.Atoi(dpPort)
-		listenerConfig := map[string]interface{}{
-			"port":     dpPortInt,
-			"ip":       "127.0.0.1",
-			"protocol": "HTTP",
-			"apis":     apiRefs,
-		}
-
-		payloadBytes, _ := json.Marshal(listenerConfig)
-		resp, err := client.Post(env.CPBaseURL+"/_meta/listeners", "application/json", bytes.NewBuffer(payloadBytes))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(201))
-		resp.Body.Close()
-
-		// Wait for DP to pick up changes (poll interval 1s + buffer)
-		time.Sleep(2 * time.Second)
-	}
 
 	return env
 }

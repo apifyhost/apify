@@ -64,11 +64,11 @@ RUN mkdir -p /app/config /app/data /app/logs && \
 USER apify
 
 # Expose default port
-EXPOSE 3000
+EXPOSE 3000 4000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD ["/usr/local/bin/apify", "--version"] || exit 1
 
 # Use CMD instead of ENTRYPOINT to allow easy override
-CMD ["/usr/local/bin/apify", "-c", "/app/config/config.yaml"]
+CMD ["/usr/local/bin/apify", "--control-plane", "--data-plane", "-c", "/app/config/config.yaml"]

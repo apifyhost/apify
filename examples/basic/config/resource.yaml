@@ -34,3 +34,21 @@ datasource:
     database: apify_db
     ssl_mode: disable
     max_pool_size: 10
+
+modules:
+  tracing:
+    enabled: true
+    otlp_endpoint: null
+
+  metrics:
+    enabled: true
+    port: 9090
+
+  access_log:
+    enabled: true
+    path: "logs/access.log"
+    format: "json"
+    headers: ["user-agent", "content-type", "x-request-id"]
+    query: true
+    body: false
+    cookies: false
