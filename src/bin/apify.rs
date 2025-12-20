@@ -251,7 +251,14 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     }
 
-    let listeners = config.listeners.or(db_listeners);
+    let listeners = if let Some(mut l) = config.listeners {
+        if let Some(db_l) = db_listeners {
+            l.extend(db_l);
+        }
+        Some(l)
+    } else {
+        db_listeners
+    };
     for (listener_idx, listener_config) in listeners.into_iter().flatten().enumerate() {
         let auth_config_clone = auth_config.clone();
 

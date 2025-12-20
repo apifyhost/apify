@@ -106,7 +106,7 @@ start_example() {
   docker compose up -d
 
   echo "Waiting for service to be ready..."
-  if wait_for_service "Apify" "http://127.0.0.1:3000/healthz"; then
+  if wait_for_service "Apify" "http://127.0.0.1:9090/metrics"; then
     echo_pass "Apify is ready!"
     output_info
     return 0

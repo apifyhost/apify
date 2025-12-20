@@ -30,6 +30,11 @@ services:
     environment:
       - RUST_LOG=info
       - APIFY_THREADS=2
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9090/metrics || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:

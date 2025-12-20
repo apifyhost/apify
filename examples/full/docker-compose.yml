@@ -68,6 +68,11 @@ services:
       - KEYCLOAK_REALM=apify
       - KEYCLOAK_CLIENT_ID=apify-test-client
       - KEYCLOAK_CLIENT_SECRET=apify-test-secret
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9090/metrics || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   jaeger:
     image: jaegertracing/all-in-one:latest
