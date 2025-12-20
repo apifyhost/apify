@@ -251,7 +251,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     }
 
-    let listeners = if let Some(mut l) = config.listeners {
+    let mut listeners = if let Some(mut l) = config.listeners {
         if let Some(db_l) = db_listeners {
             l.extend(db_l);
         }
@@ -259,6 +259,47 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     } else {
         db_listeners
     };
+
+    // Distribute global APIs to listeners
+    if let Some(global_apis) = &config.apis {
+        if let Some(listeners_vec) = &mut listeners {
+            for api_config in global_apis {
+                let api_ref = ApiRef::WithConfig {
+                    path: api_config.path.clone(),
+                    modules: api_config.modules.clone(),
+                    datasource: api_config.datasource.clone(),
+                    access_log: api_config.access_log.clone(),
+                };
+
+                if let Some(target_listeners) = &api_config.listeners {
+                    for listener_name in target_listeners {
+                        let mut found = false;
+                        for listener in listeners_vec.iter_mut() {
+                            if let Some(name) = &listener.name {
+                                if name == listener_name {
+                                    if listener.apis.is_none() {
+                                        listener.apis = Some(Vec::new());
+                                    }
+                                    listener.apis.as_mut().unwrap().push(api_ref.clone());
+                                    found = true;
+                                }
+                            }
+                        }
+                        if !found {
+                            tracing::warn!(
+                                "Listener '{}' not found for API '{}'",
+                                listener_name,
+                                api_config.path
+                            );
+                        }
+                    }
+                } else {
+                    tracing::warn!("Global API {} has no listeners configured", api_config.path);
+                }
+            }
+        }
+    }
+
     for (listener_idx, listener_config) in listeners.into_iter().flatten().enumerate() {
         let auth_config_clone = auth_config.clone();
 

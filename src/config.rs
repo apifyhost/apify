@@ -9,6 +9,7 @@ use std::net::SocketAddr;
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub listeners: Option<Vec<ListenerConfig>>,
+    pub apis: Option<Vec<ApiConfig>>, // Global APIs configuration
     #[serde(alias = "control-plane")]
     pub control_plane: Option<ControlPlaneConfig>,
     pub auth: Option<Vec<Authenticator>>, // Unified authentication configuration
@@ -160,6 +161,7 @@ pub struct OpenAPISettings {
 /// Listener configuration (port, IP, routes, etc.)
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ListenerConfig {
+    pub name: Option<String>, // Listener name for reference
     pub port: u16,
     pub ip: String,
     pub protocol: String,
@@ -201,6 +203,16 @@ pub struct ValidationConfig {
 pub struct ModulesConfig {
     pub access: Option<Vec<String>>,  // e.g., ["auth_header", "jwt"]
     pub rewrite: Option<Vec<String>>, // e.g., ["prefix_strip:/api"] (future)
+}
+
+/// API configuration (top-level)
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ApiConfig {
+    pub path: String,
+    pub datasource: Option<String>,
+    pub listeners: Option<Vec<String>>, // List of listener names
+    pub modules: Option<ModulesConfig>,
+    pub access_log: Option<AccessLogConfig>,
 }
 
 /// API reference in listener: path string or object with path + per-API modules + datasource

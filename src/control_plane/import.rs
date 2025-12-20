@@ -70,8 +70,43 @@ pub async fn handle_import_request(
     }
 
     // Import Listeners
-    if let Some(listeners) = &config.listeners {
-        for listener in listeners {
+    // Import Listeners and APIs
+    if let Some(mut listeners) = config.listeners {
+        // Distribute global APIs to listeners
+        if let Some(global_apis) = &config.apis {
+            for api_config in global_apis {
+                let api_ref = crate::config::ApiRef::WithConfig {
+                    path: api_config.path.clone(),
+                    modules: api_config.modules.clone(),
+                    datasource: api_config.datasource.clone(),
+                    access_log: api_config.access_log.clone(),
+                };
+
+                if let Some(target_listeners) = &api_config.listeners {
+                    for listener_name in target_listeners {
+                        let mut found = false;
+                        for listener in listeners.iter_mut() {
+                            if let Some(name) = &listener.name {
+                                if name == listener_name {
+                                    if listener.apis.is_none() {
+                                        listener.apis = Some(Vec::new());
+                                    }
+                                    listener.apis.as_mut().unwrap().push(api_ref.clone());
+                                    found = true;
+                                }
+                            }
+                        }
+                        if !found {
+                            tracing::warn!("Listener '{}' not found for API '{}'", listener_name, api_config.path);
+                        }
+                    }
+                } else {
+                     tracing::warn!("Global API {} has no listeners configured", api_config.path);
+                }
+            }
+        }
+
+        for listener in &listeners {
             let id = uuid::Uuid::new_v4().to_string();
             let config_str = serde_json::to_string(listener)?;
             let updated_at = std::time::SystemTime::now()
@@ -98,10 +133,8 @@ pub async fn handle_import_request(
                 tracing::warn!("Failed to import listener: {}", e);
             }
         }
-    }
 
-    // Import APIs
-    if let Some(listeners) = config.listeners {
+        // Import APIs from the modified listeners
         for listener in listeners {
             if let Some(apis) = listener.apis {
                 for api_ref in apis {
