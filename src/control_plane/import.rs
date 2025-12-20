@@ -86,15 +86,14 @@ pub async fn handle_import_request(
                     for listener_name in target_listeners {
                         let mut found = false;
                         for listener in listeners.iter_mut() {
-                            if let Some(name) = &listener.name {
-                                if name == listener_name {
+                            if let Some(name) = &listener.name
+                                && name == listener_name {
                                     if listener.apis.is_none() {
                                         listener.apis = Some(Vec::new());
                                     }
                                     listener.apis.as_mut().unwrap().push(api_ref.clone());
                                     found = true;
                                 }
-                            }
                         }
                         if !found {
                             tracing::warn!("Listener '{}' not found for API '{}'", listener_name, api_config.path);

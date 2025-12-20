@@ -261,8 +261,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     };
 
     // Distribute global APIs to listeners
-    if let Some(global_apis) = &config.apis {
-        if let Some(listeners_vec) = &mut listeners {
+    if let Some(global_apis) = &config.apis
+        && let Some(listeners_vec) = &mut listeners {
             for api_config in global_apis {
                 let api_ref = ApiRef::WithConfig {
                     path: api_config.path.clone(),
@@ -275,15 +275,14 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     for listener_name in target_listeners {
                         let mut found = false;
                         for listener in listeners_vec.iter_mut() {
-                            if let Some(name) = &listener.name {
-                                if name == listener_name {
+                            if let Some(name) = &listener.name
+                                && name == listener_name {
                                     if listener.apis.is_none() {
                                         listener.apis = Some(Vec::new());
                                     }
                                     listener.apis.as_mut().unwrap().push(api_ref.clone());
                                     found = true;
                                 }
-                            }
                         }
                         if !found {
                             tracing::warn!(
@@ -298,7 +297,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 }
             }
         }
-    }
 
     for (listener_idx, listener_config) in listeners.into_iter().flatten().enumerate() {
         let auth_config_clone = auth_config.clone();
