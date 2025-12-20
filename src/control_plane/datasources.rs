@@ -57,7 +57,7 @@ pub async fn handle_datasources_request(
             let config = payload.get("config").ok_or("Missing config")?;
 
             // Validate config
-            let _ds_config: DatabaseSettings = serde_json::from_value(config.clone())?;
+            let ds_config: DatabaseSettings = serde_json::from_value(config.clone())?;
             let config_str = serde_json::to_string(config)?;
 
             let id = uuid::Uuid::new_v4().to_string();
@@ -68,6 +68,7 @@ pub async fn handle_datasources_request(
             let mut data = HashMap::new();
             data.insert("id".to_string(), Value::String(id.clone()));
             data.insert("name".to_string(), Value::String(name.to_string()));
+            data.insert("type".to_string(), Value::String(ds_config.driver));
             data.insert("config".to_string(), Value::String(config_str));
             data.insert(
                 "updated_at".to_string(),
