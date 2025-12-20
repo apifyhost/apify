@@ -87,20 +87,25 @@ pub async fn handle_import_request(
                         let mut found = false;
                         for listener in listeners.iter_mut() {
                             if let Some(name) = &listener.name
-                                && name == listener_name {
-                                    if listener.apis.is_none() {
-                                        listener.apis = Some(Vec::new());
-                                    }
-                                    listener.apis.as_mut().unwrap().push(api_ref.clone());
-                                    found = true;
+                                && name == listener_name
+                            {
+                                if listener.apis.is_none() {
+                                    listener.apis = Some(Vec::new());
                                 }
+                                listener.apis.as_mut().unwrap().push(api_ref.clone());
+                                found = true;
+                            }
                         }
                         if !found {
-                            tracing::warn!("Listener '{}' not found for API '{}'", listener_name, api_config.path);
+                            tracing::warn!(
+                                "Listener '{}' not found for API '{}'",
+                                listener_name,
+                                api_config.path
+                            );
                         }
                     }
                 } else {
-                     tracing::warn!("Global API {} has no listeners configured", api_config.path);
+                    tracing::warn!("Global API {} has no listeners configured", api_config.path);
                 }
             }
         }
