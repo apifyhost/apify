@@ -17,8 +17,10 @@ services:
 
   apify:
     image: apifyhost/apify:latest
+    command: ["/usr/local/bin/apify", "--control-plane", "--data-plane", "-c", "/app/config/config.yaml"]
     ports:
       - "3000:3000"
+      - "4000:4000"
       - "9090:9090"
     volumes:
       - ./config:/app/config:ro

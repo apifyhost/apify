@@ -79,6 +79,82 @@ Each phase can have custom modules with flexible configuration at multiple level
 
 ---
 
+### 🎛️ Control Plane
+
+Apify provides a Control Plane (CP) for dynamic management of APIs, datasources, and configurations without restarting the Data Plane.
+
+#### Import APIs via Control Plane
+
+There are two ways to import APIs into the Control Plane:
+
+##### Method 1: Import Single API (Recommended)
+
+Directly upload the OpenAPI specification JSON via the `/_meta/apis` endpoint. This is the most direct method and does not require the file to exist on the server.
+
+**Endpoint:** `POST /_meta/apis`
+**Content-Type:** `application/json`
+
+**Request Body:**
+```json
+{
+  "name": "my-service-api",
+  "version": "1.0.0",
+  "datasource_name": "postgres-db",  // Optional: Associated datasource name
+  "spec": {                          // Required: OpenAPI Spec JSON object
+    "openapi": "3.0.0",
+    "info": {
+      "title": "My Service",
+      "version": "1.0.0"
+    },
+    "paths": {
+      ...
+    }
+  }
+}
+```
+
+**Curl Example:**
+```bash
+curl -X POST http://127.0.0.1:4000/_meta/apis \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "demo-api",
+    "version": "1.0.0",
+    "spec": {
+      "openapi": "3.0.0",
+      "info": {"title": "Demo", "version": "1.0.0"},
+      "paths": {}
+    }
+  }'
+```
+
+##### Method 2: Bulk Import Config
+
+Import a complete configuration file (like `config.yaml`) via the `/_meta/import` endpoint.
+
+**Note:** This method requires that any file paths referenced in the config (e.g., `path: ./openapi/spec.yaml`) must exist **locally on the server running the Control Plane**. If running in Docker, you must mount these files into the container.
+
+**Endpoint:** `POST /_meta/import`
+**Content-Type:** `application/x-yaml` (or raw body)
+
+**Curl Example:**
+```bash
+# Assuming you have a config.yaml file
+curl -X POST http://127.0.0.1:4000/_meta/import \
+  --data-binary @config.yaml
+```
+
+**config.yaml Structure Example:**
+```yaml
+listeners:
+  - port: 3000
+    apis:
+      - path: /path/to/server/local/file.yaml # Absolute or relative path on the server
+        datasource: my-db
+```
+
+---
+
 ### 🚀 Getting Started
 
 #### Quickstart (Recommended)

@@ -9,62 +9,6 @@ control-plane:
 log_level: "info"
 
 modules:
-  tracing:
-    enabled: true
-    otlp_endpoint: http://jaeger:4317
-  metrics:
-    enabled: true
-    port: 9090
-
-listeners:
-  - port: 3000
-    ip: 0.0.0.0
-    protocol: HTTP
-    apis:
-      - path: ./openapi/items.yaml
-        datasource: postgres1
-      - path: ./openapi/items_oauth.yaml
-        datasource: postgres1
-      - path: ./openapi/orders.yaml
-        datasource: postgres1
-      - path: ./openapi/users.yaml
-        datasource: postgres1
-
-auth:
-  - name: default-api-keys
-    type: api-key
-    enabled: true
-    config:
-      source: header
-      key_name: X-Api-Key
-      consumers:
-        - name: default
-          keys:
-            - dev-key-123
-            - e2e-test-key-001
-
-  - name: keycloak
-    type: oidc
-    enabled: true
-    config:
-      issuer: "${KEYCLOAK_URL:http://localhost:8080}/realms/${KEYCLOAK_REALM:apify}"
-      client_id: "${KEYCLOAK_CLIENT_ID:apify-test-client}"
-      client_secret: "${KEYCLOAK_CLIENT_SECRET:apify-test-secret}"
-      audience: "apify-api"
-      introspection: true
-
-datasource:
-  sqlite1:
-    driver: sqlite
-    database: ./apify.sqlite
-    max_pool_size: 5
-
-  postgres1:
-    driver: postgres
-    host: postgres
-    port: 5432
-    user: apify
-    password: apify_test_password
-    database: apify_e2e
-    ssl_mode: disable
-    max_pool_size: 10
+  openapi_docs:
+    enabled: false
+    port: 3001

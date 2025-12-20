@@ -86,6 +86,10 @@ pub async fn handle_import_request(
             );
             data.insert("config".to_string(), Value::String(config_str));
             data.insert(
+                "created_at".to_string(),
+                Value::Number(serde_json::Number::from(updated_at)),
+            );
+            data.insert(
                 "updated_at".to_string(),
                 Value::Number(serde_json::Number::from(updated_at)),
             );

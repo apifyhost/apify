@@ -1,78 +1,14 @@
-listeners:
-  - port: 3000
+control-plane:
+  listen:
     ip: 0.0.0.0
-    protocol: HTTP
-    apis:
-      - path: ./openapi/items.yaml
-        datasource: postgres1
-
-auth:
-  - name: default-api-keys
-    type: api-key
-    enabled: true
-    config:
-      source: header
-      key_name: X-Api-Key
-      consumers:
-        - name: default
-          keys:
-            - dev-key-123
-            - my-api-key-001
-
-datasource:
-  sqlite1:
+    port: 4000
+  database:
     driver: sqlite
-    database: /app/data/apify.sqlite
-    max_pool_size: 5
+    database: /app/data/control_plane.sqlite
 
-  postgres1:
-    driver: postgres
-    host: postgres
-    port: 5432
-    user: apify
-    password: apify_password
-    database: apify_db
-    ssl_mode: disable
-    max_pool_size: 10
-
-
-# Log level: trace, debug, info, warn, error
-# Can be overridden with RUST_LOG environment variable
 log_level: "info"
 
-# Global modules configuration
 modules:
-  tracing:
-    # Enable distributed tracing
-    # Default: true
-    enabled: true
-
-    # OpenTelemetry OTLP endpoint for distributed tracing
-    # Set to null to disable tracing
-    otlp_endpoint: null
-
-  metrics:
-    # Enable Prometheus metrics endpoint
-    # Default: true
-    enabled: true
-    port: 9090
-
-  access_log:
-    enabled: true
-    path: "logs/access.log"
-    format: "json"
-    # Optional: Customize what to log
-    headers: ["user-agent", "content-type", "x-request-id"]
-    query: true
-    body: false
-    cookies: false
-
-    # Port for Prometheus metrics HTTP endpoint
-    # Default: 9090
-    port: 9090
-
   openapi_docs:
-    # Enable OpenAPI docs server
     enabled: false
-    # Port for OpenAPI docs (Swagger UI)
     port: 3001
