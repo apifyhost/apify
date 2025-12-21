@@ -3,7 +3,7 @@
 use apify::{
     app_state::OpenApiStateConfig,
     config::{ApiRef, Config, OpenAPIConfig},
-    modules::{metrics::init_metrics, tracing::shutdown_tracing},
+    modules::metrics::init_metrics,
     server::{start_docs_server, start_listener},
     startup::{RuntimeInitData, build_runtime, init_database, setup_logging},
 };
@@ -300,7 +300,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     }
 
-    for (listener_idx, listener_config) in listeners.into_iter().flatten().enumerate() {
+    for (listener_idx, listener_config) in listeners.clone().into_iter().flatten().enumerate() {
         let auth_config_clone = auth_config.clone();
 
         // Load OpenAPI configurations for this listener with datasource info
@@ -471,25 +471,135 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     }
 
-    // Wait for all threads to complete
-    for (idx, handle) in handles.into_iter().enumerate() {
-        match handle.join() {
-            Ok(Ok(())) => {
-                tracing::info!(thread_idx = idx, "Thread exited normally");
-            }
-            Ok(Err(e)) => {
-                tracing::error!(thread_idx = idx, error = %e, "Thread execution error");
-            }
-            Err(e) => {
-                tracing::error!(thread_idx = idx, error = ?e, "Thread panicked");
-            }
+    // Track running listeners to avoid duplicates
+    let mut running_listeners: std::collections::HashSet<String> = std::collections::HashSet::new();
+    if let Some(l_list) = &listeners {
+        for l in l_list {
+            let key = format!("{}:{}", l.ip, l.port);
+            running_listeners.insert(key);
         }
     }
 
-    tracing::info!("All threads exited, shutting down");
-    shutdown_tracing();
+    tracing::info!("Entering main supervisor loop");
 
-    Ok(())
+    loop {
+        // Check for new listeners if Control Plane DB is available
+        if let Some(db) = &control_plane_db {
+            let new_listeners =
+                rt_init.block_on(async { apify::control_plane::load_listeners(db).await });
+
+            match new_listeners {
+                Ok(Some(list)) => {
+                    for listener_config in list {
+                        let key = format!("{}:{}", listener_config.ip, listener_config.port);
+                        if !running_listeners.contains(&key) {
+                            tracing::info!(key = %key, "Found new listener configuration, spawning...");
+
+                            // Prepare config clones
+                            let datasources_clone = datasources.clone();
+                            let auth_config_clone = auth_config.clone();
+                            let access_log_config =
+                                config.modules.as_ref().and_then(|m| m.access_log.clone());
+                            let control_plane_db_clone = control_plane_db.clone();
+
+                            // Resolve OpenAPI configs for this listener
+                            let api_configs_map = rt_init.block_on(async {
+                                apify::control_plane::load_api_configs(db)
+                                    .await
+                                    .unwrap_or_default()
+                            });
+
+                            let mut openapi_configs = Vec::new();
+                            if let Some(api_refs) = &listener_config.apis {
+                                for api_ref in api_refs {
+                                    match api_ref {
+                                        ApiRef::Path(p) => {
+                                            // Check if in DB first
+                                            if let Some(db_config) = api_configs_map.get(p) {
+                                                openapi_configs.push(db_config.clone());
+                                            } else {
+                                                let api_path = config_dir.join(p);
+                                                if let Ok(openapi_config) = OpenAPIConfig::from_file(
+                                                    &api_path.to_string_lossy(),
+                                                ) {
+                                                    openapi_configs.push(OpenApiStateConfig {
+                                                        config: openapi_config,
+                                                        modules: None,
+                                                        datasource: None,
+                                                        access_log: None,
+                                                    });
+                                                }
+                                            }
+                                        }
+                                        ApiRef::WithConfig {
+                                            path,
+                                            modules,
+                                            datasource,
+                                            access_log,
+                                        } => {
+                                            // Check if in DB first
+                                            if let Some(db_config) = api_configs_map.get(path) {
+                                                let mut config = db_config.clone();
+                                                if datasource.is_some() {
+                                                    config.datasource = datasource.clone();
+                                                }
+                                                if modules.is_some() {
+                                                    config.modules = modules.clone();
+                                                }
+                                                if access_log.is_some() {
+                                                    config.access_log = access_log.clone();
+                                                }
+                                                openapi_configs.push(config);
+                                            } else {
+                                                let api_path = config_dir.join(path);
+                                                if let Ok(openapi_config) = OpenAPIConfig::from_file(
+                                                    &api_path.to_string_lossy(),
+                                                ) {
+                                                    let ds_info = datasource.clone();
+                                                    openapi_configs.push(OpenApiStateConfig {
+                                                        config: openapi_config,
+                                                        modules: modules.clone(),
+                                                        datasource: ds_info,
+                                                        access_log: access_log.clone(),
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Spawn threads
+                            for thread_id in 0..num_threads {
+                                let l_clone = listener_config.clone();
+                                let ds_clone = datasources_clone.clone();
+                                let oa_clone = openapi_configs.clone();
+                                let ac_clone = auth_config_clone.clone();
+                                let al_clone = access_log_config.clone();
+                                let cp_clone = control_plane_db_clone.clone();
+
+                                thread::spawn(move || {
+                                    let _ = start_listener(
+                                        l_clone, thread_id, ds_clone, oa_clone, ac_clone, al_clone,
+                                        cp_clone,
+                                    );
+                                });
+                            }
+
+                            running_listeners.insert(key);
+                        }
+                    }
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    tracing::warn!("Failed to load listeners in supervisor loop: {}", e);
+                }
+            }
+        }
+
+        // Sleep
+        std::thread::sleep(std::time::Duration::from_secs(5));
+    }
 }
 
 /// Start metrics HTTP server

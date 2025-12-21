@@ -99,12 +99,12 @@ impl SqliteBackend {
                 "No data provided for insert".to_string(),
             ));
         }
-        let cols: Vec<String> = data.keys().cloned().collect();
+        let (cols, vals): (Vec<String>, Vec<Value>) = data.into_iter().unzip();
         let mut qb = QueryBuilder::<Sqlite>::new("INSERT INTO ");
         qb.push(table).push(" (");
         qb.push(cols.join(", ")).push(") VALUES (");
         let mut sep = qb.separated(", ");
-        for v in data.values() {
+        for v in &vals {
             push_bind_sqlite(&mut sep, v);
         }
         qb.push(")");

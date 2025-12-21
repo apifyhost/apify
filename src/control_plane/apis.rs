@@ -82,7 +82,21 @@ pub async fn handle_apis_request(
                 .get("version")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing version")?;
-            let spec = payload.get("spec").ok_or("Missing spec")?;
+
+            let spec_content = if let Some(s) = payload.get("spec") {
+                if s.is_string() {
+                    s.as_str().unwrap().to_string()
+                } else {
+                    s.to_string()
+                }
+            } else if let Some(p) = payload.get("path").and_then(|v| v.as_str()) {
+                tokio::fs::read_to_string(p)
+                    .await
+                    .map_err(|e| format!("Failed to read spec file: {}", e))?
+            } else {
+                return Err("Missing spec or path".into());
+            };
+
             let datasource_name = payload.get("datasource_name").and_then(|v| v.as_str());
             let modules_config = payload.get("modules_config");
 
@@ -95,7 +109,7 @@ pub async fn handle_apis_request(
             data.insert("id".to_string(), Value::String(id.clone()));
             data.insert("name".to_string(), Value::String(name.to_string()));
             data.insert("version".to_string(), Value::String(version.to_string()));
-            data.insert("spec".to_string(), Value::String(spec.to_string()));
+            data.insert("spec".to_string(), Value::String(spec_content.clone()));
             if let Some(ds) = datasource_name {
                 data.insert("datasource_name".to_string(), Value::String(ds.to_string()));
             }
@@ -110,8 +124,10 @@ pub async fn handle_apis_request(
             db.insert("_meta_api_configs", data).await?;
 
             // Extract schemas from spec and initialize them in the DB
-            let schemas =
-                crate::schema_generator::SchemaGenerator::extract_schemas_from_openapi(spec)?;
+            let spec_value: serde_json::Value = serde_json::from_str(&spec_content)?;
+            let schemas = crate::schema_generator::SchemaGenerator::extract_schemas_from_openapi(
+                &spec_value,
+            )?;
             db.initialize_schema(schemas).await?;
 
             Ok(Response::builder()

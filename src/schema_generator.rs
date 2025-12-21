@@ -102,11 +102,20 @@ impl SchemaGenerator {
             Self::extract_relations_from_paths(&mut schemas, paths);
         }
 
+        tracing::info!(
+            schema_count = schemas.len(),
+            "Checking if fallback derivation is needed"
+        );
+
         // Fallback: derive from components.schemas if no explicit schemas found
         if schemas.is_empty()
             && let Some(derived) = Self::derive_from_components(spec)
             && !derived.is_empty()
         {
+            tracing::info!(
+                derived_count = derived.len(),
+                "Derived schemas from components"
+            );
             return Ok(derived);
         }
 
@@ -362,13 +371,22 @@ impl SchemaGenerator {
     /// - Special cases: created_at -> DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     /// - Extensions: x-unique => UNIQUE; x-index => create index
     fn derive_from_components(spec: &Value) -> Option<Vec<TableSchema>> {
+        tracing::info!("Attempting to derive schemas from components");
         let components = spec.get("components")?.get("schemas")?.as_object()?;
+        tracing::info!(
+            schema_count = components.len(),
+            "Found schemas in components"
+        );
         let mut tables = Vec::new();
 
         for (schema_name, schema_value) in components.iter() {
+            tracing::info!(schema_name = %schema_name, "Processing schema");
             let obj = match schema_value.as_object() {
                 Some(o) => o,
-                None => continue,
+                None => {
+                    tracing::warn!(schema_name = %schema_name, "Schema is not an object");
+                    continue;
+                }
             };
 
             // Only process object schemas or those with properties
@@ -379,6 +397,7 @@ impl SchemaGenerator {
                 .unwrap_or(false)
                 || obj.get("properties").is_some();
             if !is_object {
+                tracing::warn!(schema_name = %schema_name, "Schema is not an object type or has no properties");
                 continue;
             }
 

@@ -1,0 +1,56 @@
+site_name: Apify Documentation
+site_url: https://apifyhost.github.io/apify/
+repo_url: https://github.com/apifyhost/apify
+repo_name: apifyhost/apify
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - toc.integrate
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Quick Start: getting-started/quickstart.md
+    - Installation: getting-started/installation.md
+    - Docker Guide: getting-started/docker.md
+  - Core Concepts:
+    - Architecture: concepts/architecture.md
+    - Control Plane: concepts/control-plane.md
+    - Data Plane: concepts/data-plane.md
+    - Request Lifecycle: concepts/request-lifecycle.md
+  - Features:
+    - Zero-Code CRUD: features/zero-code-crud.md
+    - Authentication: features/authentication.md
+    - Audit Trail: features/audit-trail.md
+    - Relations: features/relations.md
+  - Configuration:
+    - Main Config: configuration/main-config.md
+    - API Definition: configuration/api-definition.md
+  - API Reference:
+    - Control Plane API: api/control-plane.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
