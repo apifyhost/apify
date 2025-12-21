@@ -3,12 +3,11 @@ control-plane:
     ip: 0.0.0.0
     port: 4000
   database:
-    driver: sqlite
-    database: /app/data/control_plane.sqlite
+    driver: postgres
+    host: localhost
+    port: 5432
+    user: apify
+    password: apify_password
+    database: apify_db
 
 log_level: "info"
-
-modules:
-  openapi_docs:
-    enabled: false
-    port: 3001

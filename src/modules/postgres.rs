@@ -1,9 +1,9 @@
 //! Postgres backend implementation for DatabaseBackend
 
 use serde_json::{Value, json};
-use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
+use sqlx::postgres::{PgPool, PgPoolOptions, PgRow, PgConnection};
 use sqlx::types::chrono;
-use sqlx::{Column, Postgres, QueryBuilder, Row};
+use sqlx::{Column, Postgres, QueryBuilder, Row, Executor};
 use std::collections::HashMap;
 
 use crate::database::{DatabaseBackend, DatabaseError, DatabaseRuntimeConfig};
@@ -24,58 +24,9 @@ impl PostgresBackend {
         Ok(Self { pool })
     }
 
-    async fn do_initialize_schema(
-        &self,
-        table_schemas: Vec<TableSchema>,
-    ) -> Result<(), DatabaseError> {
-        // Use advisory lock to prevent concurrent schema creation across threads
-        // Lock ID: 123456789 (arbitrary number for schema creation)
-        let lock_acquired = sqlx::query_scalar::<_, bool>("SELECT pg_try_advisory_lock(123456789)")
-            .fetch_one(&self.pool)
-            .await
-            .map_err(DatabaseError::QueryError)?;
 
-        if !lock_acquired {
-            // Another thread is creating the schema, wait for the lock to be released
-            sqlx::query("SELECT pg_advisory_lock(123456789)")
-                .execute(&self.pool)
-                .await
-                .map_err(DatabaseError::QueryError)?;
-            // Lock acquired after waiting, but schema should be ready now, so just unlock and return
-            sqlx::query("SELECT pg_advisory_unlock(123456789)")
-                .execute(&self.pool)
-                .await
-                .map_err(DatabaseError::QueryError)?;
-            return Ok(());
-        }
 
-        // We have the lock, proceed with schema creation
-        let result = async {
-            for schema in table_schemas {
-                let full_sql = SchemaGenerator::generate_create_table_sql_postgres(&schema);
-                for stmt in full_sql.split(';') {
-                    let s = stmt.trim();
-                    if s.is_empty() {
-                        continue;
-                    }
-                    sqlx::raw_sql(s)
-                        .execute(&self.pool)
-                        .await
-                        .map_err(DatabaseError::QueryError)?;
-                }
-            }
-            Ok::<(), DatabaseError>(())
-        }
-        .await;
 
-        // Always unlock, even if there was an error
-        sqlx::query("SELECT pg_advisory_unlock(123456789)")
-            .execute(&self.pool)
-            .await
-            .map_err(DatabaseError::QueryError)?;
-
-        result
-    }
 
     async fn do_select(
         &self,
@@ -344,7 +295,59 @@ impl DatabaseBackend for PostgresBackend {
         table_schemas: Vec<TableSchema>,
     ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<(), DatabaseError>> + Send + 'a>>
     {
-        Box::pin(async move { self.do_initialize_schema(table_schemas).await })
+        Box::pin(async move {
+            let mut conn = self.pool.acquire().await.map_err(DatabaseError::PoolError)?;
+
+            // Use advisory lock to prevent concurrent schema creation across threads
+            // Lock ID: 123456789 (arbitrary number for schema creation)
+            let lock_acquired = sqlx::query_scalar::<_, bool>("SELECT pg_try_advisory_lock(123456789)")
+                .fetch_one(&mut *conn)
+                .await
+                .map_err(DatabaseError::QueryError)?;
+
+            if !lock_acquired {
+                // Another thread is creating the schema, wait for the lock to be released
+                sqlx::query("SELECT pg_advisory_lock(123456789)")
+                    .execute(&mut *conn)
+                    .await
+                    .map_err(DatabaseError::QueryError)?;
+                // Lock acquired after waiting, but schema should be ready now, so just unlock and return
+                sqlx::query("SELECT pg_advisory_unlock(123456789)")
+                    .execute(&mut *conn)
+                    .await
+                    .map_err(DatabaseError::QueryError)?;
+                return Ok(());
+            }
+
+            // We have the lock, proceed with schema creation
+            let result = async {
+                for schema in table_schemas {
+                    let full_sql = SchemaGenerator::generate_create_table_sql_postgres(&schema);
+                    tracing::info!(sql = %full_sql, "Executing schema creation SQL");
+                    for stmt in full_sql.split(';') {
+                        let s = stmt.trim();
+                        if s.is_empty() {
+                            continue;
+                        }
+                        tracing::info!(statement = %s, "Executing SQL statement");
+                        sqlx::raw_sql(s)
+                            .execute(&self.pool)
+                            .await
+                            .map_err(DatabaseError::QueryError)?;
+                    }
+                }
+                Ok::<(), DatabaseError>(())
+            }
+            .await;
+
+            // Always unlock, even if there was an error
+            sqlx::query("SELECT pg_advisory_unlock(123456789)")
+                .execute(&mut *conn)
+                .await
+                .map_err(DatabaseError::QueryError)?;
+
+            result
+        })
     }
     fn select<'a>(
         &'a self,
@@ -421,14 +424,7 @@ fn row_to_json_postgres(row: &PgRow) -> Value {
             continue;
         }
         if let Ok(v) = row.try_get::<String, _>(i) {
-            if ((v.starts_with('{') && v.ends_with('}'))
-                || (v.starts_with('[') && v.ends_with(']')))
-                && let Ok(j) = serde_json::from_str::<Value>(&v)
-            {
-                obj.insert(name, j);
-            } else {
-                obj.insert(name, Value::String(v));
-            }
+            obj.insert(name, Value::String(v));
             continue;
         }
         if let Ok(v) = row.try_get::<i64, _>(i) {
