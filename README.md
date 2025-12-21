@@ -25,18 +25,47 @@ Full documentation is available at **[https://phlow.dev](https://phlow.dev)** (o
 
 ## ⚡️ Quick Start
 
-1.  **Run with Docker**:
-    ```bash
-    docker run -p 8080:8080 -v $(pwd)/config:/app/config apify/apify
-    ```
+### 1. Start the Server
 
-2.  **Define your API**:
-    Create an OpenAPI file in `config/openapi/` and add `x-apify-action` extensions.
+The easiest way to get started is using the provided quickstart script, which sets up a complete environment with Docker Compose.
 
-3.  **Query**:
-    ```bash
-    curl http://localhost:8080/users
-    ```
+```bash
+./quickstart.sh
+```
+
+This will start:
+*   Apify server on port 8080
+*   A sample SQLite database
+*   Keycloak (for OAuth examples)
+*   Prometheus & Grafana (for observability examples)
+
+### 2. Test the API
+
+Once running, you can interact with the sample API:
+
+```bash
+# Create a user
+curl -X POST http://localhost:8080/users \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Alice", "email": "alice@example.com"}'
+
+# List users
+curl http://localhost:8080/users
+```
+
+### 3. Explore Examples
+
+The `quickstart.sh` script supports different modes:
+
+```bash
+./quickstart.sh basic          # Basic CRUD (default)
+./quickstart.sh oauth          # With Keycloak authentication
+./quickstart.sh observability  # With Prometheus & Grafana
+./quickstart.sh full           # All features enabled
+```
+
+See `examples/` directory for configuration details.
+
 
 ## 🛠️ Build from Source
 
