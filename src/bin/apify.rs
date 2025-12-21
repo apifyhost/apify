@@ -3,7 +3,7 @@
 use apify::{
     app_state::OpenApiStateConfig,
     config::{ApiRef, Config, OpenAPIConfig},
-    modules::{metrics::init_metrics, tracing::shutdown_tracing},
+    modules::metrics::init_metrics,
     server::{start_docs_server, start_listener},
     startup::{RuntimeInitData, build_runtime, init_database, setup_logging},
 };
@@ -485,9 +485,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     loop {
         // Check for new listeners if Control Plane DB is available
         if let Some(db) = &control_plane_db {
-            let new_listeners = rt_init.block_on(async {
-                apify::control_plane::load_listeners(db).await
-            });
+            let new_listeners =
+                rt_init.block_on(async { apify::control_plane::load_listeners(db).await });
 
             match new_listeners {
                 Ok(Some(list)) => {
@@ -499,12 +498,15 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             // Prepare config clones
                             let datasources_clone = datasources.clone();
                             let auth_config_clone = auth_config.clone();
-                            let access_log_config = config.modules.as_ref().and_then(|m| m.access_log.clone());
+                            let access_log_config =
+                                config.modules.as_ref().and_then(|m| m.access_log.clone());
                             let control_plane_db_clone = control_plane_db.clone();
 
                             // Resolve OpenAPI configs for this listener
                             let api_configs_map = rt_init.block_on(async {
-                                apify::control_plane::load_api_configs(db).await.unwrap_or_default()
+                                apify::control_plane::load_api_configs(db)
+                                    .await
+                                    .unwrap_or_default()
                             });
 
                             let mut openapi_configs = Vec::new();
@@ -517,7 +519,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                                 openapi_configs.push(db_config.clone());
                                             } else {
                                                 let api_path = config_dir.join(p);
-                                                if let Ok(openapi_config) = OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
+                                                if let Ok(openapi_config) = OpenAPIConfig::from_file(
+                                                    &api_path.to_string_lossy(),
+                                                ) {
                                                     openapi_configs.push(OpenApiStateConfig {
                                                         config: openapi_config,
                                                         modules: None,
@@ -527,17 +531,30 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                                 }
                                             }
                                         }
-                                        ApiRef::WithConfig { path, modules, datasource, access_log } => {
+                                        ApiRef::WithConfig {
+                                            path,
+                                            modules,
+                                            datasource,
+                                            access_log,
+                                        } => {
                                             // Check if in DB first
                                             if let Some(db_config) = api_configs_map.get(path) {
                                                 let mut config = db_config.clone();
-                                                if datasource.is_some() { config.datasource = datasource.clone(); }
-                                                if modules.is_some() { config.modules = modules.clone(); }
-                                                if access_log.is_some() { config.access_log = access_log.clone(); }
+                                                if datasource.is_some() {
+                                                    config.datasource = datasource.clone();
+                                                }
+                                                if modules.is_some() {
+                                                    config.modules = modules.clone();
+                                                }
+                                                if access_log.is_some() {
+                                                    config.access_log = access_log.clone();
+                                                }
                                                 openapi_configs.push(config);
                                             } else {
                                                 let api_path = config_dir.join(path);
-                                                if let Ok(openapi_config) = OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
+                                                if let Ok(openapi_config) = OpenAPIConfig::from_file(
+                                                    &api_path.to_string_lossy(),
+                                                ) {
                                                     let ds_info = datasource.clone();
                                                     openapi_configs.push(OpenApiStateConfig {
                                                         config: openapi_config,
@@ -562,7 +579,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 let cp_clone = control_plane_db_clone.clone();
 
                                 thread::spawn(move || {
-                                     let _ = start_listener(l_clone, thread_id, ds_clone, oa_clone, ac_clone, al_clone, cp_clone);
+                                    let _ = start_listener(
+                                        l_clone, thread_id, ds_clone, oa_clone, ac_clone, al_clone,
+                                        cp_clone,
+                                    );
                                 });
                             }
 
@@ -580,10 +600,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // Sleep
         std::thread::sleep(std::time::Duration::from_secs(5));
     }
-
-    shutdown_tracing();
-
-    Ok(())
 }
 
 /// Start metrics HTTP server

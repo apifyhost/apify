@@ -90,7 +90,9 @@ pub async fn handle_apis_request(
                     s.to_string()
                 }
             } else if let Some(p) = payload.get("path").and_then(|v| v.as_str()) {
-                tokio::fs::read_to_string(p).await.map_err(|e| format!("Failed to read spec file: {}", e))?
+                tokio::fs::read_to_string(p)
+                    .await
+                    .map_err(|e| format!("Failed to read spec file: {}", e))?
             } else {
                 return Err("Missing spec or path".into());
             };
@@ -123,8 +125,9 @@ pub async fn handle_apis_request(
 
             // Extract schemas from spec and initialize them in the DB
             let spec_value: serde_json::Value = serde_json::from_str(&spec_content)?;
-            let schemas =
-                crate::schema_generator::SchemaGenerator::extract_schemas_from_openapi(&spec_value)?;
+            let schemas = crate::schema_generator::SchemaGenerator::extract_schemas_from_openapi(
+                &spec_value,
+            )?;
             db.initialize_schema(schemas).await?;
 
             Ok(Response::builder()

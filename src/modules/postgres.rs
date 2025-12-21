@@ -1,9 +1,9 @@
 //! Postgres backend implementation for DatabaseBackend
 
 use serde_json::{Value, json};
-use sqlx::postgres::{PgPool, PgPoolOptions, PgRow, PgConnection};
+use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
 use sqlx::types::chrono;
-use sqlx::{Column, Postgres, QueryBuilder, Row, Executor};
+use sqlx::{Column, Postgres, QueryBuilder, Row};
 use std::collections::HashMap;
 
 use crate::database::{DatabaseBackend, DatabaseError, DatabaseRuntimeConfig};
@@ -23,10 +23,6 @@ impl PostgresBackend {
             .map_err(DatabaseError::PoolError)?;
         Ok(Self { pool })
     }
-
-
-
-
 
     async fn do_select(
         &self,
@@ -296,14 +292,19 @@ impl DatabaseBackend for PostgresBackend {
     ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<(), DatabaseError>> + Send + 'a>>
     {
         Box::pin(async move {
-            let mut conn = self.pool.acquire().await.map_err(DatabaseError::PoolError)?;
+            let mut conn = self
+                .pool
+                .acquire()
+                .await
+                .map_err(DatabaseError::PoolError)?;
 
             // Use advisory lock to prevent concurrent schema creation across threads
             // Lock ID: 123456789 (arbitrary number for schema creation)
-            let lock_acquired = sqlx::query_scalar::<_, bool>("SELECT pg_try_advisory_lock(123456789)")
-                .fetch_one(&mut *conn)
-                .await
-                .map_err(DatabaseError::QueryError)?;
+            let lock_acquired =
+                sqlx::query_scalar::<_, bool>("SELECT pg_try_advisory_lock(123456789)")
+                    .fetch_one(&mut *conn)
+                    .await
+                    .map_err(DatabaseError::QueryError)?;
 
             if !lock_acquired {
                 // Another thread is creating the schema, wait for the lock to be released
