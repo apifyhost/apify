@@ -3,6 +3,7 @@ package e2e_test
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -233,8 +234,8 @@ modules:
 	env.ServerCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+env.DBFile, "APIFY_CONFIG_POLL_INTERVAL=1")
 
 	var dpStdout, dpStderr bytes.Buffer
-	env.ServerCmd.Stdout = &dpStdout
-	env.ServerCmd.Stderr = &dpStderr
+	env.ServerCmd.Stdout = io.MultiWriter(&dpStdout, GinkgoWriter)
+	env.ServerCmd.Stderr = io.MultiWriter(&dpStderr, GinkgoWriter)
 
 	err = env.ServerCmd.Start()
 	Expect(err).NotTo(HaveOccurred())

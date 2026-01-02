@@ -87,3 +87,80 @@ async fn test_schema_migration_sqlite() {
     let bob = rows.iter().find(|r| r["name"] == "Bob").unwrap();
     assert_eq!(bob["email"], "bob@example.com");
 }
+
+#[test]
+fn test_postgres_compatibility_check() {
+    use apify::schema_generator::{SchemaGenerator, TableSchema, ColumnDefinition};
+
+    // Case 1: Compatible (Integer -> BigInt)
+    let current = TableSchema {
+        table_name: "test".to_string(),
+        columns: vec![ColumnDefinition {
+            name: "val".to_string(),
+            column_type: "integer".to_string(),
+            nullable: true,
+            primary_key: false,
+            auto_increment: false,
+            unique: false,
+            default_value: None,
+            auto_field: false,
+        }],
+        indexes: vec![],
+        relations: vec![],
+    };
+    let desired = TableSchema {
+        table_name: "test".to_string(),
+        columns: vec![ColumnDefinition {
+            name: "val".to_string(),
+            column_type: "bigint".to_string(),
+            nullable: true,
+            primary_key: false,
+            auto_increment: false,
+            unique: false,
+            default_value: None,
+            auto_field: false,
+        }],
+        indexes: vec![],
+        relations: vec![],
+    };
+    let result = SchemaGenerator::generate_migration_sql(&current, &desired, "postgres");
+    assert!(result.is_ok());
+    let sqls = result.unwrap();
+    assert_eq!(sqls.len(), 1);
+    assert!(sqls[0].contains("ALTER COLUMN val TYPE BIGINT"));
+
+    // Case 2: Incompatible (Text -> Integer)
+    let current_text = TableSchema {
+        table_name: "test".to_string(),
+        columns: vec![ColumnDefinition {
+            name: "val".to_string(),
+            column_type: "text".to_string(),
+            nullable: true,
+            primary_key: false,
+            auto_increment: false,
+            unique: false,
+            default_value: None,
+            auto_field: false,
+        }],
+        indexes: vec![],
+        relations: vec![],
+    };
+    let desired_int = TableSchema {
+        table_name: "test".to_string(),
+        columns: vec![ColumnDefinition {
+            name: "val".to_string(),
+            column_type: "integer".to_string(),
+            nullable: true,
+            primary_key: false,
+            auto_increment: false,
+            unique: false,
+            default_value: None,
+            auto_field: false,
+        }],
+        indexes: vec![],
+        relations: vec![],
+    };
+    let result = SchemaGenerator::generate_migration_sql(&current_text, &desired_int, "postgres");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("Incompatible type change"));
+}

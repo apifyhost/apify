@@ -6,6 +6,8 @@ use sqlx::{Column, Row};
 use sqlx::{QueryBuilder, Sqlite};
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use crate::database::{DatabaseBackend, DatabaseError, DatabaseRuntimeConfig};
 use crate::schema_generator::{ColumnDefinition, SchemaGenerator, TableSchema};
@@ -13,6 +15,7 @@ use crate::schema_generator::{ColumnDefinition, SchemaGenerator, TableSchema};
 #[derive(Debug, Clone)]
 pub struct SqliteBackend {
     pub pool: SqlitePool,
+    pub migration_lock: Arc<Mutex<()>>,
 }
 
 impl SqliteBackend {
@@ -30,7 +33,10 @@ impl SqliteBackend {
             .connect_with(opts)
             .await
             .map_err(DatabaseError::PoolError)?;
-        Ok(Self { pool })
+        Ok(Self {
+            pool,
+            migration_lock: Arc::new(Mutex::new(())),
+        })
     }
 
     async fn do_get_table_schema(&self, table: &str) -> Result<Option<TableSchema>, DatabaseError> {
@@ -85,7 +91,10 @@ impl SqliteBackend {
         &self,
         table_schemas: Vec<TableSchema>,
     ) -> Result<(), DatabaseError> {
+        let _guard = self.migration_lock.lock().await;
+        tracing::info!("do_initialize_schema called with {} schemas", table_schemas.len());
         for schema in table_schemas {
+            tracing::info!("Processing schema for table: {}", schema.table_name);
             let current_schema = self.do_get_table_schema(&schema.table_name).await?;
 
             if let Some(current) = current_schema {
@@ -101,6 +110,7 @@ impl SqliteBackend {
                         .map_err(DatabaseError::QueryError)?;
                 }
             } else {
+                tracing::info!("Table {} does not exist, creating...", schema.table_name);
                 let full_sql = SchemaGenerator::generate_create_table_sql_sqlite(&schema);
                 for stmt in full_sql.split(';') {
                     let s = stmt.trim();

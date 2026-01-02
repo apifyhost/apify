@@ -412,4 +412,188 @@ components:
 		Expect(u2["name"]).To(Equal("Bob"))
 		Expect(u2["age"]).To(Equal("thirty"))
 	})
+
+	It("should reject incompatible schema migration (modify column)", func() {
+		// 1. Define initial spec (V1) - Users with name (string) and description (text)
+		v1 := `
+openapi: 3.0.0
+info:
+  title: Users Incompatible API
+  version: 1.0.0
+paths:
+  /users_inc:
+    post:
+      summary: Create user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInc'
+      responses:
+        '200':
+          description: Created
+components:
+  schemas:
+    UserInc:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+        description:
+          type: string
+      x-table-schema:
+        table_name: users_inc
+        indexes: []
+        columns:
+          - name: id
+            column_type: integer
+            primary_key: true
+            auto_increment: true
+            unique: false
+            default_value: null
+            nullable: false
+          - name: name
+            column_type: text
+            nullable: false
+            primary_key: false
+            auto_increment: false
+            unique: false
+            default_value: null
+          - name: description
+            column_type: text
+            nullable: true
+            primary_key: false
+            auto_increment: false
+            unique: false
+            default_value: null
+`
+		// Submit V1
+		submitSpec("products-api", v1)
+		time.Sleep(5 * time.Second)
+
+		// 2. Create a user (V1)
+		user1 := map[string]interface{}{
+			"name":        "Alice",
+			"description": "Some text description",
+		}
+		body, _ := json.Marshal(user1)
+		req, _ := http.NewRequest("POST", baseURL+"/users_inc", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Api-Key", env.APIKey)
+		resp, err := client.Do(req)
+		Expect(err).NotTo(HaveOccurred())
+		if resp.StatusCode != 200 && resp.StatusCode != 201 {
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(resp.Body)
+			fmt.Printf("Create User Error: %s\n", buf.String())
+		}
+		Expect(resp.StatusCode).To(Or(Equal(200), Equal(201)))
+		resp.Body.Close()
+
+		// 3. Define updated spec (V2) - Change description to integer (Incompatible!)
+		v2 := `
+openapi: 3.0.0
+info:
+  title: Users Incompatible API
+  version: 1.0.0
+paths:
+  /users_inc:
+    post:
+      summary: Create user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInc'
+      responses:
+        '200':
+          description: Created
+components:
+  schemas:
+    UserInc:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+        description:
+          type: integer
+      x-table-schema:
+        table_name: users_inc
+        indexes: []
+        columns:
+          - name: id
+            column_type: integer
+            primary_key: true
+            auto_increment: true
+            unique: false
+            default_value: null
+            nullable: false
+          - name: name
+            column_type: text
+            nullable: false
+            primary_key: false
+            auto_increment: false
+            unique: false
+            default_value: null
+          - name: description
+            column_type: integer
+            nullable: true
+            primary_key: false
+            auto_increment: false
+            unique: false
+            default_value: null
+`
+		// Submit V2
+		submitSpec("products-api", v2)
+
+		// Wait for potential migration attempt
+		time.Sleep(3 * time.Second)
+
+		// 4. Verify that the system is still responsive and the previous data is intact
+		// Since migration should have failed, the table should still be there with old data.
+		// Note: The API definition in memory might have updated to V2 (expecting Int),
+		// but the DB schema should still be V1 (Text).
+
+		// If we try to GET the user, it should still return the string description.
+		// Even if the API expects Integer, the JSON serializer might just pass through what's in DB (if using untyped map).
+		req, _ = http.NewRequest("GET", baseURL+"/users_inc", nil)
+		req.Header.Set("X-Api-Key", env.APIKey)
+		resp, err = client.Do(req)
+
+		if err == nil {
+			// If it connects, it might be 404 or 500 or 503.
+			// Or maybe the OLD AppState is still running?
+			// `server.rs` uses `ArcSwap` for state.
+			// The poller updates the state.
+			// `tokio::spawn(async move { loop { ... } })`
+			// Inside the loop:
+			// `let new_state = AppState::new_with_crud(...)`
+			// If `new_with_crud` fails (due to schema migration error), it logs error and CONTINUES loop.
+			// It does NOT update the `state` ArcSwap.
+			// So the OLD state (V1) should still be active!
+
+			// So `GET /users_inc` should return 200 and the OLD data.
+			Expect(resp.StatusCode).To(Equal(200))
+
+			var users []map[string]interface{}
+			json.NewDecoder(resp.Body).Decode(&users)
+			resp.Body.Close()
+
+			Expect(len(users)).To(Equal(1))
+			u1 := users[0]
+			Expect(u1["name"]).To(Equal("Alice"))
+			Expect(u1["description"]).To(Equal("Some text description"))
+		} else {
+			// If connection failed, it means the server crashed, which is also a sign of "rejection" (though less ideal).
+			// But based on `server.rs` logic (I recall seeing a loop and ArcSwap), it should preserve old state.
+			// Let's fail if we can't connect, because we expect high availability.
+			Expect(err).NotTo(HaveOccurred())
+		}
+	})
 })

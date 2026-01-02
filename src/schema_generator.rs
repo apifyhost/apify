@@ -401,6 +401,22 @@ impl SchemaGenerator {
                 continue;
             }
 
+            // Check if x-table-schema is defined in the schema object
+            if let Some(table_schema_val) = obj.get("x-table-schema") {
+                tracing::info!("Found x-table-schema: {:?}", table_schema_val);
+                if let Ok(schema) = serde_json::from_value::<TableSchema>(table_schema_val.clone()) {
+                    tracing::info!(
+                        schema_name = %schema_name,
+                        table = %schema.table_name,
+                        "Using explicit x-table-schema from component"
+                    );
+                    tables.push(schema);
+                    continue;
+                } else {
+                    tracing::warn!(schema_name = %schema_name, "Failed to parse x-table-schema");
+                }
+            }
+
             let mut columns: Vec<ColumnDefinition> = Vec::new();
             let mut indexes: Vec<IndexDefinition> = Vec::new();
 
@@ -781,23 +797,54 @@ impl SchemaGenerator {
 
             // Check for modified columns
             if !needs_recreation {
+                tracing::info!("Current columns: {:?}", current.columns.iter().map(|c| &c.name).collect::<Vec<_>>());
+                tracing::info!("Desired columns: {:?}", desired.columns.iter().map(|c| &c.name).collect::<Vec<_>>());
+
                 for col in &desired.columns {
+                    tracing::info!("Checking column: {}", col.name);
                     if let Some(curr_col) = current.columns.iter().find(|c| c.name == col.name) {
+                        tracing::info!("Found match for: {}", col.name);
                         // Compare attributes relevant for SQLite
                         // Note: SQLite types are loose, but we check if the definition changed
+                        tracing::info!("Column raw type: name={}, type={}", col.name, col.column_type);
                         let desired_type = Self::map_type_to_sqlite(&col.column_type);
                         // Current type comes from PRAGMA table_info, which might be normalized differently.
                         // We do a loose comparison.
                         let curr_type_norm = curr_col.column_type.to_uppercase();
                         let desired_type_norm = desired_type.to_uppercase();
 
-                        if curr_type_norm != desired_type_norm
-                            || curr_col.nullable != col.nullable
+                        tracing::info!(
+                            column = %col.name,
+                            curr_type = %curr_type_norm,
+                            desired_type = %desired_type_norm,
+                            "Comparing column types for migration"
+                        );
+
+                        if curr_type_norm != desired_type_norm {
+                            // Check compatibility before allowing recreation
+                            if !Self::is_type_compatible(&curr_type_norm, &desired_type_norm) {
+                                return Err(format!(
+                                    "Incompatible type change for column '{}': {} -> {}",
+                                    col.name, curr_type_norm, desired_type_norm
+                                ));
+                            }
+                            needs_recreation = true;
+                            // Continue checking other columns for incompatible changes
+                        }
+
+                        if curr_col.nullable != col.nullable
                             || curr_col.primary_key != col.primary_key
                             || curr_col.default_value != col.default_value
                         {
+                            tracing::info!(
+                                "Column attribute mismatch for {}: nullable: {} vs {}, pk: {} vs {}, default: {:?} vs {:?}",
+                                col.name,
+                                curr_col.nullable, col.nullable,
+                                curr_col.primary_key, col.primary_key,
+                                curr_col.default_value, col.default_value
+                            );
                             needs_recreation = true;
-                            break;
+                            // Continue checking other columns for incompatible changes
                         }
                     }
                 }
@@ -829,7 +876,7 @@ impl SchemaGenerator {
                     let new_type = Self::map_type_to_postgres(&col.column_type);
 
                     if curr_type != new_type {
-                        if !Self::is_postgres_type_compatible(&curr_type, &new_type) {
+                        if !Self::is_type_compatible(&curr_type, &new_type) {
                             return Err(format!(
                                 "Incompatible type change for column '{}': {} -> {}",
                                 col.name, curr_type, new_type
@@ -861,7 +908,7 @@ impl SchemaGenerator {
         Ok(sqls)
     }
 
-    fn is_postgres_type_compatible(from: &str, to: &str) -> bool {
+    fn is_type_compatible(from: &str, to: &str) -> bool {
         let from = from.to_uppercase();
         let to = to.to_uppercase();
 
@@ -871,20 +918,24 @@ impl SchemaGenerator {
         }
 
         // Allow widening integers
-        if (from == "INTEGER" || from == "SMALLINT") && to == "BIGINT" {
-            return true;
-        }
-        if from == "SMALLINT" && to == "INTEGER" {
-            return true;
+        if (from == "INTEGER" || from == "SMALLINT" || from == "INT") && (to == "BIGINT" || to == "INTEGER" || to == "INT") {
+             // SQLite uses INTEGER for all ints, so INTEGER -> INTEGER is covered by from==to
+             // But for Postgres SMALLINT -> INTEGER is valid.
+             // Let's be permissive for "Integer-like" to "Integer-like" if target is same or wider.
+             // For simplicity, assume all int-to-int is fine for now, or be specific.
+             // Postgres: SMALLINT (2) -> INTEGER (4) -> BIGINT (8)
+             if from == "SMALLINT" && (to == "INTEGER" || to == "BIGINT") { return true; }
+             if from == "INTEGER" && to == "BIGINT" { return true; }
         }
 
         // Allow anything to TEXT/VARCHAR (assuming no length constraint violation for now)
-        if to == "TEXT" || to.starts_with("VARCHAR") {
+        if to == "TEXT" || to.starts_with("VARCHAR") || to == "STRING" {
             return true;
         }
 
         // Allow float widening
-        if from == "REAL" && to == "DOUBLE PRECISION" {
+        if (from == "REAL" || from == "FLOAT") && (to == "DOUBLE PRECISION" || to == "REAL") {
+            // SQLite uses REAL for all floats.
             return true;
         }
 
