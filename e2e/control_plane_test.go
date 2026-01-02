@@ -41,7 +41,7 @@ var _ = Describe("Control Plane API Operations", func() {
 		body, _ := json.Marshal(datasourceConfig)
 		resp, err := client.Post(env.CPBaseURL+"/_meta/datasources", "application/json", bytes.NewBuffer(body))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		Expect(resp.StatusCode).To(Equal(http.StatusCreated))
 
 		resp, err = client.Get(env.CPBaseURL + "/_meta/datasources")
 		Expect(err).NotTo(HaveOccurred())
@@ -76,7 +76,7 @@ var _ = Describe("Control Plane API Operations", func() {
 		body, _ := json.Marshal(authConfig)
 		resp, err := client.Post(env.CPBaseURL+"/_meta/auth", "application/json", bytes.NewBuffer(body))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		Expect(resp.StatusCode).To(Equal(http.StatusCreated))
 
 		resp, err = client.Get(env.CPBaseURL + "/_meta/auth")
 		Expect(err).NotTo(HaveOccurred())
@@ -123,7 +123,7 @@ var _ = Describe("Control Plane API Operations", func() {
 		body, _ := json.Marshal(listenerConfig)
 		resp, err := client.Post(env.CPBaseURL+"/_meta/listeners", "application/json", bytes.NewBuffer(body))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		Expect(resp.StatusCode).To(Equal(http.StatusCreated))
 
 		resp, err = client.Get(env.CPBaseURL + "/_meta/listeners")
 		Expect(err).NotTo(HaveOccurred())
