@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::database::{DatabaseBackend, DatabaseError, DatabaseRuntimeConfig};
-use crate::schema_generator::{SchemaGenerator, TableSchema, ColumnDefinition};
+use crate::schema_generator::{ColumnDefinition, SchemaGenerator, TableSchema};
 
 #[derive(Debug, Clone)]
 pub struct SqliteBackend {
@@ -36,7 +36,7 @@ impl SqliteBackend {
     async fn do_get_table_schema(&self, table: &str) -> Result<Option<TableSchema>, DatabaseError> {
         // Check if table exists first
         let exists: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name=$1)"
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name=$1)",
         )
         .bind(table)
         .fetch_one(&self.pool)
@@ -66,7 +66,7 @@ impl SqliteBackend {
                 column_type: type_,
                 nullable: notnull == 0,
                 primary_key: pk > 0,
-                unique: false, // TODO: Check unique constraints
+                unique: false,         // TODO: Check unique constraints
                 auto_increment: false, // SQLite handles this implicitly for INTEGER PRIMARY KEY
                 default_value: dflt_value,
                 auto_field: false,
@@ -89,8 +89,9 @@ impl SqliteBackend {
             let current_schema = self.do_get_table_schema(&schema.table_name).await?;
 
             if let Some(current) = current_schema {
-                 // Table exists, migrate
-                let migration_sqls = SchemaGenerator::generate_migration_sql(&current, &schema, "sqlite");
+                // Table exists, migrate
+                let migration_sqls =
+                    SchemaGenerator::generate_migration_sql(&current, &schema, "sqlite");
                 for sql in migration_sqls {
                     tracing::info!(sql = %sql, "Executing migration SQL");
                     sqlx::raw_sql(&sql)
@@ -381,7 +382,11 @@ impl DatabaseBackend for SqliteBackend {
         &'a self,
         table: &'a str,
     ) -> core::pin::Pin<
-        Box<dyn core::future::Future<Output = Result<Option<TableSchema>, DatabaseError>> + Send + 'a>,
+        Box<
+            dyn core::future::Future<Output = Result<Option<TableSchema>, DatabaseError>>
+                + Send
+                + 'a,
+        >,
     > {
         Box::pin(async move { self.do_get_table_schema(table).await })
     }

@@ -233,4 +233,183 @@ components:
 		Expect(p2["name"]).To(Equal("Mouse"))
 		Expect(p2["price"]).To(Equal(29.99))
 	})
+
+	It("should handle schema migration (modify column)", func() {
+		// 1. Define initial spec (V1) - Users with name (string) and age (integer)
+		// We reuse "products-api" because the listener is configured for it.
+		v1 := `
+openapi: 3.0.0
+info:
+  title: Users Mod API
+  version: 1.0.0
+paths:
+  /users:
+    post:
+      summary: Create user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: Created
+    get:
+      summary: List users
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+        age:
+          type: integer
+      x-table-schema:
+        tableName: users_mod
+        columns:
+          - name: id
+            columnType: integer
+            primaryKey: true
+            autoIncrement: true
+          - name: name
+            columnType: text
+            nullable: false
+          - name: age
+            columnType: integer
+            nullable: true
+`
+		// Submit V1 (Overwrites the default products-api spec from BeforeEach)
+		submitSpec("products-api", v1)
+		time.Sleep(2 * time.Second)
+
+		// 2. Create a user (V1)
+		user1 := map[string]interface{}{
+			"name": "Alice",
+			"age":  25,
+		}
+		body, _ := json.Marshal(user1)
+		req, _ := http.NewRequest("POST", baseURL+"/users", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Api-Key", env.APIKey)
+		resp, err := client.Do(req)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(200))
+		resp.Body.Close()
+
+		// 3. Define updated spec (V2) - Change age to string (text)
+		v2 := `
+openapi: 3.0.0
+info:
+  title: Users Mod API
+  version: 1.0.0
+paths:
+  /users:
+    post:
+      summary: Create user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: Created
+    get:
+      summary: List users
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+        age:
+          type: string
+      x-table-schema:
+        tableName: users_mod
+        columns:
+          - name: id
+            columnType: integer
+            primaryKey: true
+            autoIncrement: true
+          - name: name
+            columnType: text
+            nullable: false
+          - name: age
+            columnType: text
+            nullable: true
+`
+		// Submit V2
+		submitSpec("products-api", v2)
+		time.Sleep(3 * time.Second)
+
+		// 4. Create a user (V2) - Age as string
+		user2 := map[string]interface{}{
+			"name": "Bob",
+			"age":  "thirty",
+		}
+		body, _ = json.Marshal(user2)
+		req, _ = http.NewRequest("POST", baseURL+"/users", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Api-Key", env.APIKey)
+		resp, err = client.Do(req)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(200))
+		resp.Body.Close()
+
+		// 5. Verify users
+		req, _ = http.NewRequest("GET", baseURL+"/users", nil)
+		req.Header.Set("X-Api-Key", env.APIKey)
+		resp, err = client.Do(req)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(200))
+
+		var users []map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&users)
+		resp.Body.Close()
+
+		Expect(len(users)).To(Equal(2))
+
+		// Check Alice
+		u1 := users[0]
+		Expect(u1["name"]).To(Equal("Alice"))
+		// SQLite might return "25" (string) or 25 (number) depending on driver behavior when reading TEXT column with numeric content.
+		// Let's handle both.
+		age1 := u1["age"]
+		if ageNum, ok := age1.(float64); ok {
+			Expect(ageNum).To(Equal(25.0))
+		} else {
+			Expect(age1).To(Equal("25"))
+		}
+
+		// Check Bob
+		u2 := users[1]
+		Expect(u2["name"]).To(Equal("Bob"))
+		Expect(u2["age"]).To(Equal("thirty"))
+	})
 })

@@ -44,16 +44,19 @@ pub async fn handle_import_request(
                 // Try update if insert fails (likely due to unique name)
                 // Note: This is a simple retry strategy. Ideally we should check existence first.
                 tracing::warn!("Failed to insert datasource, trying update: {}", e);
-                
+
                 let mut where_clause = HashMap::new();
                 where_clause.insert("name".to_string(), Value::String(name));
-                
+
                 // Remove ID from data to avoid changing it
                 let mut update_data = data;
                 update_data.remove("id");
-                
-                if let Err(e) = db.update("_meta_datasources", update_data, where_clause).await {
-                     tracing::warn!("Failed to update datasource: {}", e);
+
+                if let Err(e) = db
+                    .update("_meta_datasources", update_data, where_clause)
+                    .await
+                {
+                    tracing::warn!("Failed to update datasource: {}", e);
                 }
             }
         }
@@ -147,7 +150,7 @@ pub async fn handle_import_request(
             );
 
             if let Err(e) = db.insert("_meta_listeners", data).await {
-                 tracing::warn!("Failed to import listener: {}", e);
+                tracing::warn!("Failed to import listener: {}", e);
             }
         }
 
@@ -209,17 +212,20 @@ pub async fn handle_import_request(
 
                             if let Err(e) = db.insert("_meta_api_configs", data.clone()).await {
                                 tracing::warn!("Failed to insert API config, trying update: {}", e);
-                                
+
                                 let mut where_clause = HashMap::new();
                                 where_clause.insert("name".to_string(), Value::String(name));
-                                
+
                                 // Remove ID and created_at from update
                                 let mut update_data = data;
                                 update_data.remove("id");
                                 update_data.remove("created_at");
-                                
-                                if let Err(e) = db.update("_meta_api_configs", update_data, where_clause).await {
-                                     tracing::warn!("Failed to update API config: {}", e);
+
+                                if let Err(e) = db
+                                    .update("_meta_api_configs", update_data, where_clause)
+                                    .await
+                                {
+                                    tracing::warn!("Failed to update API config: {}", e);
                                 }
                             }
                         }

@@ -33,7 +33,7 @@ pub enum RelationType {
 }
 
 /// Column definition
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ColumnDefinition {
     pub name: String,
     pub column_type: String,
@@ -47,7 +47,7 @@ pub struct ColumnDefinition {
 }
 
 /// Index definition
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct IndexDefinition {
     pub name: String,
     pub columns: Vec<String>,
@@ -762,6 +762,51 @@ impl SchemaGenerator {
     ) -> Vec<String> {
         let mut sqls = Vec::new();
 
+        if driver == "sqlite" {
+            // Check if we need full table recreation
+            // Recreation is needed if:
+            // 1. Columns are removed
+            // 2. Columns are modified (type, nullability, etc.)
+            // 3. Primary key changes (not supported yet but good to know)
+            
+            let mut needs_recreation = false;
+            
+            // Check for removed columns
+            for curr_col in &current.columns {
+                if !desired.columns.iter().any(|c| c.name == curr_col.name) {
+                    needs_recreation = true;
+                    break;
+                }
+            }
+            
+            // Check for modified columns
+            if !needs_recreation {
+                for col in &desired.columns {
+                    if let Some(curr_col) = current.columns.iter().find(|c| c.name == col.name) {
+                        // Compare attributes relevant for SQLite
+                        // Note: SQLite types are loose, but we check if the definition changed
+                        let desired_type = Self::map_type_to_sqlite(&col.column_type);
+                        // Current type comes from PRAGMA table_info, which might be normalized differently.
+                        // We do a loose comparison.
+                        let curr_type_norm = curr_col.column_type.to_uppercase();
+                        let desired_type_norm = desired_type.to_uppercase();
+                        
+                        if curr_type_norm != desired_type_norm 
+                           || curr_col.nullable != col.nullable 
+                           || curr_col.primary_key != col.primary_key 
+                           || curr_col.default_value != col.default_value {
+                            needs_recreation = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if needs_recreation {
+                return Self::generate_sqlite_recreate_sql(current, desired);
+            }
+        }
+
         // 1. Add missing columns
         for col in &desired.columns {
             if !current.columns.iter().any(|c| c.name == col.name) {
@@ -780,7 +825,7 @@ impl SchemaGenerator {
                 if let Some(curr_col) = current.columns.iter().find(|c| c.name == col.name) {
                     // Check nullability
                     if curr_col.nullable != col.nullable {
-                         let sql = format!(
+                        let sql = format!(
                             "ALTER TABLE {} ALTER COLUMN {} {} NOT NULL",
                             desired.table_name,
                             col.name,
@@ -795,8 +840,45 @@ impl SchemaGenerator {
         sqls
     }
 
+    fn generate_sqlite_recreate_sql(current: &TableSchema, desired: &TableSchema) -> Vec<String> {
+        let mut sqls = Vec::new();
+        let table = &desired.table_name;
+        let temp_table = format!("{}_old_{}", table, uuid::Uuid::new_v4().simple());
+        
+        // 1. Rename current table
+        sqls.push(format!("ALTER TABLE {} RENAME TO {}", table, temp_table));
+        
+        // 2. Create new table
+        sqls.push(Self::generate_create_table_sql_sqlite(desired));
+        
+        // 3. Copy data
+        // Only copy columns that exist in both schemas
+        let common_columns: Vec<String> = desired.columns.iter()
+            .filter(|col| current.columns.iter().any(|c| c.name == col.name))
+            .map(|col| col.name.clone())
+            .collect();
+            
+        if !common_columns.is_empty() {
+            let cols = common_columns.join(", ");
+            sqls.push(format!(
+                "INSERT INTO {} ({}) SELECT {} FROM {}",
+                table, cols, cols, temp_table
+            ));
+        }
+        
+        // 4. Drop old table
+        sqls.push(format!("DROP TABLE {}", temp_table));
+        
+        sqls
+    }
+
     fn generate_add_column_sql_postgres(table: &str, col: &ColumnDefinition) -> String {
-        let mut sql = format!("ALTER TABLE {} ADD COLUMN {} {}", table, col.name, Self::map_type_to_postgres(&col.column_type));
+        let mut sql = format!(
+            "ALTER TABLE {} ADD COLUMN {} {}",
+            table,
+            col.name,
+            Self::map_type_to_postgres(&col.column_type)
+        );
         if !col.nullable {
             sql.push_str(" NOT NULL");
         }
@@ -807,7 +889,12 @@ impl SchemaGenerator {
     }
 
     fn generate_add_column_sql_sqlite(table: &str, col: &ColumnDefinition) -> String {
-        let mut sql = format!("ALTER TABLE {} ADD COLUMN {} {}", table, col.name, Self::map_type_to_sqlite(&col.column_type));
+        let mut sql = format!(
+            "ALTER TABLE {} ADD COLUMN {} {}",
+            table,
+            col.name,
+            Self::map_type_to_sqlite(&col.column_type)
+        );
         if !col.nullable {
             // SQLite ADD COLUMN with NOT NULL requires a DEFAULT value
             if col.default_value.is_some() {

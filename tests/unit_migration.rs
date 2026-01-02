@@ -1,7 +1,7 @@
 use apify::database::{DatabaseManager, DatabaseRuntimeConfig};
-use apify::schema_generator::{TableSchema, ColumnDefinition};
-use std::collections::HashMap;
+use apify::schema_generator::{ColumnDefinition, TableSchema};
 use serde_json::json;
+use std::collections::HashMap;
 
 #[tokio::test]
 async fn test_schema_migration_sqlite() {
@@ -74,16 +74,16 @@ async fn test_schema_migration_sqlite() {
     // email column should exist (value might be null)
     // Note: select returns JSON values. If column is null, it might be Value::Null or omitted depending on implementation.
     // In our implementation, we select *, so it should be there.
-    
+
     // 8. Insert data with new column
     let mut data2 = HashMap::new();
     data2.insert("name".to_string(), json!("Bob"));
     data2.insert("email".to_string(), json!("bob@example.com"));
     db.insert("users", data2).await.unwrap();
-    
+
     let rows = db.select("users", None, None, None, None).await.unwrap();
     assert_eq!(rows.len(), 2);
-    
+
     let bob = rows.iter().find(|r| r["name"] == "Bob").unwrap();
     assert_eq!(bob["email"], "bob@example.com");
 }

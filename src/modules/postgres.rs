@@ -7,7 +7,7 @@ use sqlx::{Column, Postgres, QueryBuilder, Row};
 use std::collections::HashMap;
 
 use crate::database::{DatabaseBackend, DatabaseError, DatabaseRuntimeConfig};
-use crate::schema_generator::{SchemaGenerator, TableSchema, ColumnDefinition};
+use crate::schema_generator::{ColumnDefinition, SchemaGenerator, TableSchema};
 
 #[derive(Debug, Clone)]
 pub struct PostgresBackend {
@@ -328,7 +328,8 @@ impl DatabaseBackend for PostgresBackend {
 
                     if let Some(current) = current_schema {
                         // Table exists, migrate
-                        let migration_sqls = SchemaGenerator::generate_migration_sql(&current, &schema, "postgres");
+                        let migration_sqls =
+                            SchemaGenerator::generate_migration_sql(&current, &schema, "postgres");
                         for sql in migration_sqls {
                             tracing::info!(sql = %sql, "Executing migration SQL");
                             sqlx::raw_sql(&sql)
@@ -414,7 +415,11 @@ impl DatabaseBackend for PostgresBackend {
         &'a self,
         table: &'a str,
     ) -> core::pin::Pin<
-        Box<dyn core::future::Future<Output = Result<Option<TableSchema>, DatabaseError>> + Send + 'a>,
+        Box<
+            dyn core::future::Future<Output = Result<Option<TableSchema>, DatabaseError>>
+                + Send
+                + 'a,
+        >,
     > {
         Box::pin(async move {
             let query = r#"
@@ -459,7 +464,10 @@ impl DatabaseBackend for PostgresBackend {
                     nullable: is_nullable == "YES",
                     primary_key: is_primary_key.unwrap_or(false),
                     unique: false, // TODO: Check unique constraints
-                    auto_increment: column_default.as_ref().map(|d| d.contains("nextval")).unwrap_or(false),
+                    auto_increment: column_default
+                        .as_ref()
+                        .map(|d| d.contains("nextval"))
+                        .unwrap_or(false),
                     default_value: column_default,
                     auto_field: false,
                 });

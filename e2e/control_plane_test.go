@@ -12,8 +12,8 @@ import (
 
 var _ = Describe("Control Plane API Operations", func() {
 	var (
-		env     *TestEnv
-		client  *http.Client
+		env    *TestEnv
+		client *http.Client
 	)
 
 	BeforeEach(func() {
@@ -41,7 +41,7 @@ var _ = Describe("Control Plane API Operations", func() {
 		body, _ := json.Marshal(datasourceConfig)
 		resp, err := client.Post(env.CPBaseURL+"/_meta/datasources", "application/json", bytes.NewBuffer(body))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+		Expect(resp.StatusCode).To(Equal(http.))
 
 		resp, err = client.Get(env.CPBaseURL + "/_meta/datasources")
 		Expect(err).NotTo(HaveOccurred())
@@ -64,19 +64,19 @@ var _ = Describe("Control Plane API Operations", func() {
 
 	It("should create and retrieve an auth config", func() {
 		authConfig := map[string]interface{}{
-			"type": "api-key",
-			"name": "test-auth",
+			"type":    "api-key",
+			"name":    "test-auth",
 			"enabled": true,
 			"config": map[string]interface{}{
-				"source": "header",
-				"key_name": "X-Test-Key",
+				"source":    "header",
+				"key_name":  "X-Test-Key",
 				"consumers": []interface{}{},
 			},
 		}
 		body, _ := json.Marshal(authConfig)
 		resp, err := client.Post(env.CPBaseURL+"/_meta/auth", "application/json", bytes.NewBuffer(body))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 		resp, err = client.Get(env.CPBaseURL + "/_meta/auth")
 		Expect(err).NotTo(HaveOccurred())
@@ -99,7 +99,7 @@ var _ = Describe("Control Plane API Operations", func() {
 			// records are from `_meta_auth_configs`.
 			// In auth.rs POST: data.insert("config".to_string(), Value::String(config_str));
 			// So the GET response will have "config" as a JSON string, not object.
-			
+
 			// We need to parse the config string if it is a string
 			if configStr, ok := a["config"].(string); ok {
 				var configObj map[string]interface{}
@@ -115,15 +115,15 @@ var _ = Describe("Control Plane API Operations", func() {
 
 	It("should create and retrieve a listener", func() {
 		listenerConfig := map[string]interface{}{
-			"name": "test-listener",
-			"port": 9090,
-			"ip": "0.0.0.0",
+			"name":     "test-listener",
+			"port":     9090,
+			"ip":       "0.0.0.0",
 			"protocol": "HTTP",
 		}
 		body, _ := json.Marshal(listenerConfig)
 		resp, err := client.Post(env.CPBaseURL+"/_meta/listeners", "application/json", bytes.NewBuffer(body))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 		resp, err = client.Get(env.CPBaseURL + "/_meta/listeners")
 		Expect(err).NotTo(HaveOccurred())
@@ -153,23 +153,23 @@ var _ = Describe("Control Plane API Operations", func() {
 		spec := map[string]interface{}{
 			"openapi": "3.0.0",
 			"info": map[string]interface{}{
-				"title": "Test API",
+				"title":   "Test API",
 				"version": "1.0.0",
 			},
 			"paths": map[string]interface{}{},
 		}
 
 		apiConfig := map[string]interface{}{
-			"name": "test-api",
-			"version": "1.0.0",
-			"spec": spec,
+			"name":            "test-api",
+			"version":         "1.0.0",
+			"spec":            spec,
 			"datasource_name": "default",
 		}
-		
+
 		body, _ := json.Marshal(apiConfig)
 		resp, err := client.Post(env.CPBaseURL+"/_meta/apis", "application/json", bytes.NewBuffer(body))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 		resp, err = client.Get(env.CPBaseURL + "/_meta/apis")
 		Expect(err).NotTo(HaveOccurred())

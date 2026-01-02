@@ -109,7 +109,8 @@ pub async fn handle_apis_request(
             let spec_value: serde_json::Value = if let Ok(v) = serde_json::from_str(&spec_content) {
                 v
             } else {
-                serde_yaml::from_str(&spec_content).map_err(|e| format!("Failed to parse spec as JSON or YAML: {}", e))?
+                serde_yaml::from_str(&spec_content)
+                    .map_err(|e| format!("Failed to parse spec as JSON or YAML: {}", e))?
             };
 
             let mut data = HashMap::new();
@@ -117,7 +118,10 @@ pub async fn handle_apis_request(
             data.insert("name".to_string(), Value::String(name.to_string()));
             data.insert("version".to_string(), Value::String(version.to_string()));
             // Store normalized JSON spec
-            data.insert("spec".to_string(), Value::String(serde_json::to_string(&spec_value)?));
+            data.insert(
+                "spec".to_string(),
+                Value::String(serde_json::to_string(&spec_value)?),
+            );
             if let Some(ds) = datasource_name {
                 data.insert("datasource_name".to_string(), Value::String(ds.to_string()));
             }
@@ -131,18 +135,19 @@ pub async fn handle_apis_request(
 
             if let Err(e) = db.insert("_meta_api_configs", data.clone()).await {
                 tracing::warn!("Failed to insert API config, trying update: {}", e);
-                
+
                 let mut where_clause = HashMap::new();
                 where_clause.insert("name".to_string(), Value::String(name.to_string()));
-                
+
                 // Remove ID and created_at from update
                 let mut update_data = data;
                 update_data.remove("id");
                 update_data.remove("created_at");
-                
-                db.update("_meta_api_configs", update_data, where_clause).await?;
+
+                db.update("_meta_api_configs", update_data, where_clause)
+                    .await?;
             }
-            
+
             let schemas = crate::schema_generator::SchemaGenerator::extract_schemas_from_openapi(
                 &spec_value,
             )?;
