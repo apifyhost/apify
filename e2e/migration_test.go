@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -99,7 +100,8 @@ components:
 		// Note: StartTestEnv will try to import this. It will fail to read file "products-api",
 		// but the listener will be configured to look for API named "products-api".
 		env = StartTestEnv(map[string]string{
-			"products": specFile,
+			"products":      specFile,
+			"users-inc-api": "api:users-inc-api",
 		})
 		baseURL = env.BaseURL
 		client = &http.Client{
@@ -432,6 +434,17 @@ paths:
       responses:
         '200':
           description: Created
+    get:
+      summary: List users
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserInc'
 components:
   schemas:
     UserInc:
@@ -471,7 +484,7 @@ components:
             default_value: null
 `
 		// Submit V1
-		submitSpec("products-api", v1)
+		submitSpec("users-inc-api", v1)
 		time.Sleep(5 * time.Second)
 
 		// 2. Create a user (V1)
@@ -511,6 +524,17 @@ paths:
       responses:
         '200':
           description: Created
+    get:
+      summary: List users
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserInc'
 components:
   schemas:
     UserInc:
@@ -549,8 +573,28 @@ components:
             unique: false
             default_value: null
 `
-		// Submit V2
-		submitSpec("products-api", v2)
+		// Submit V2 - Expect Failure
+		urlV2 := fmt.Sprintf("%s/_meta/apis", env.CPBaseURL)
+		payload := map[string]string{
+			"name":    "users-inc-api",
+			"version": "1.0.0",
+			"spec":    v2,
+		}
+		bodyV2, _ := json.Marshal(payload)
+		reqV2, errV2 := http.NewRequest("POST", urlV2, bytes.NewBuffer(bodyV2))
+		Expect(errV2).NotTo(HaveOccurred())
+		reqV2.Header.Set("Content-Type", "application/json")
+
+		respV2, errV2 := client.Do(reqV2)
+		Expect(errV2).NotTo(HaveOccurred())
+		defer respV2.Body.Close()
+
+		bodyBytes, _ := io.ReadAll(respV2.Body)
+		bodyString := string(bodyBytes)
+
+		// Expect 500 Internal Server Error due to incompatible migration
+		Expect(respV2.StatusCode).To(Equal(500), "Expected 500, got %d. Body: %s", respV2.StatusCode, bodyString)
+		Expect(bodyString).To(ContainSubstring("Incompatible type change"))
 
 		// Wait for potential migration attempt
 		time.Sleep(3 * time.Second)

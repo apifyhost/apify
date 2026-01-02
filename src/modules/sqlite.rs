@@ -8,9 +8,15 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use once_cell::sync::Lazy;
+use std::sync::Mutex as StdMutex;
 
 use crate::database::{DatabaseBackend, DatabaseError, DatabaseRuntimeConfig};
 use crate::schema_generator::{ColumnDefinition, SchemaGenerator, TableSchema};
+
+static MIGRATION_LOCKS: Lazy<StdMutex<HashMap<String, Arc<Mutex<()>>>>> = Lazy::new(|| {
+    StdMutex::new(HashMap::new())
+});
 
 #[derive(Debug, Clone)]
 pub struct SqliteBackend {
@@ -20,22 +26,31 @@ pub struct SqliteBackend {
 
 impl SqliteBackend {
     pub async fn connect(config: DatabaseRuntimeConfig) -> Result<Self, DatabaseError> {
-        let opts = if config.url == "sqlite::memory:" {
-            SqliteConnectOptions::from_str(&config.url).map_err(DatabaseError::PoolError)?
+        let (opts, filename_key) = if config.url == "sqlite::memory:" {
+            (SqliteConnectOptions::from_str(&config.url).map_err(DatabaseError::PoolError)?, "sqlite::memory:".to_string())
         } else {
             let filename = config.url.strip_prefix("sqlite:").unwrap_or(&config.url);
-            SqliteConnectOptions::new()
+            (SqliteConnectOptions::new()
                 .filename(filename)
-                .create_if_missing(true)
+                .create_if_missing(true), filename.to_string())
         };
         let pool = SqlitePoolOptions::new()
             .max_connections(config.max_size)
             .connect_with(opts)
             .await
             .map_err(DatabaseError::PoolError)?;
+            
+        let migration_lock = {
+            let mut locks = MIGRATION_LOCKS.lock().unwrap();
+            locks
+                .entry(filename_key)
+                .or_insert_with(|| Arc::new(Mutex::new(())))
+                .clone()
+        };
+
         Ok(Self {
             pool,
-            migration_lock: Arc::new(Mutex::new(())),
+            migration_lock,
         })
     }
 
