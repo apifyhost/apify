@@ -41,7 +41,7 @@ var _ = Describe("Control Plane API Operations", func() {
 		body, _ := json.Marshal(datasourceConfig)
 		resp, err := client.Post(env.CPBaseURL+"/_meta/datasources", "application/json", bytes.NewBuffer(body))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.))
+		Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 		resp, err = client.Get(env.CPBaseURL + "/_meta/datasources")
 		Expect(err).NotTo(HaveOccurred())
