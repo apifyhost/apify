@@ -759,7 +759,7 @@ impl SchemaGenerator {
         current: &TableSchema,
         desired: &TableSchema,
         driver: &str,
-    ) -> Vec<String> {
+    ) -> Result<Vec<String>, String> {
         let mut sqls = Vec::new();
 
         if driver == "sqlite" {
@@ -804,7 +804,7 @@ impl SchemaGenerator {
             }
 
             if needs_recreation {
-                return Self::generate_sqlite_recreate_sql(current, desired);
+                return Ok(Self::generate_sqlite_recreate_sql(current, desired));
             }
         }
 
@@ -824,6 +824,26 @@ impl SchemaGenerator {
         if driver == "postgres" {
             for col in &desired.columns {
                 if let Some(curr_col) = current.columns.iter().find(|c| c.name == col.name) {
+                    // Check type compatibility
+                    let curr_type = Self::map_type_to_postgres(&curr_col.column_type);
+                    let new_type = Self::map_type_to_postgres(&col.column_type);
+
+                    if curr_type != new_type {
+                        if !Self::is_postgres_type_compatible(&curr_type, &new_type) {
+                            return Err(format!(
+                                "Incompatible type change for column '{}': {} -> {}",
+                                col.name, curr_type, new_type
+                            ));
+                        }
+
+                        // Generate ALTER COLUMN TYPE
+                        let sql = format!(
+                            "ALTER TABLE {} ALTER COLUMN {} TYPE {} USING {}::{}",
+                            desired.table_name, col.name, new_type, col.name, new_type
+                        );
+                        sqls.push(sql);
+                    }
+
                     // Check nullability
                     if curr_col.nullable != col.nullable {
                         let sql = format!(
@@ -838,7 +858,38 @@ impl SchemaGenerator {
             }
         }
 
-        sqls
+        Ok(sqls)
+    }
+
+    fn is_postgres_type_compatible(from: &str, to: &str) -> bool {
+        let from = from.to_uppercase();
+        let to = to.to_uppercase();
+
+        // Allow same type
+        if from == to {
+            return true;
+        }
+
+        // Allow widening integers
+        if (from == "INTEGER" || from == "SMALLINT") && to == "BIGINT" {
+            return true;
+        }
+        if from == "SMALLINT" && to == "INTEGER" {
+            return true;
+        }
+
+        // Allow anything to TEXT/VARCHAR (assuming no length constraint violation for now)
+        if to == "TEXT" || to.starts_with("VARCHAR") {
+            return true;
+        }
+
+        // Allow float widening
+        if from == "REAL" && to == "DOUBLE PRECISION" {
+            return true;
+        }
+
+        // Disallow others (e.g. TEXT -> INTEGER, INTEGER -> BOOLEAN)
+        false
     }
 
     fn generate_sqlite_recreate_sql(current: &TableSchema, desired: &TableSchema) -> Vec<String> {
@@ -958,6 +1009,84 @@ impl SchemaGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_postgres_migration_compatible() {
+        let current = TableSchema {
+            table_name: "users".to_string(),
+            columns: vec![ColumnDefinition {
+                name: "age".to_string(),
+                column_type: "integer".to_string(),
+                nullable: true,
+                primary_key: false,
+                auto_increment: false,
+                unique: false,
+                default_value: None,
+                auto_field: false,
+            }],
+            indexes: vec![],
+            relations: vec![],
+        };
+
+        let desired = TableSchema {
+            table_name: "users".to_string(),
+            columns: vec![ColumnDefinition {
+                name: "age".to_string(),
+                column_type: "bigint".to_string(), // Compatible widening
+                nullable: true,
+                primary_key: false,
+                auto_increment: false,
+                unique: false,
+                default_value: None,
+                auto_field: false,
+            }],
+            indexes: vec![],
+            relations: vec![],
+        };
+
+        let sqls = SchemaGenerator::generate_migration_sql(&current, &desired, "postgres").unwrap();
+        assert_eq!(sqls.len(), 1);
+        assert!(sqls[0].contains("ALTER COLUMN age TYPE BIGINT"));
+    }
+
+    #[test]
+    fn test_postgres_migration_incompatible() {
+        let current = TableSchema {
+            table_name: "users".to_string(),
+            columns: vec![ColumnDefinition {
+                name: "age".to_string(),
+                column_type: "text".to_string(),
+                nullable: true,
+                primary_key: false,
+                auto_increment: false,
+                unique: false,
+                default_value: None,
+                auto_field: false,
+            }],
+            indexes: vec![],
+            relations: vec![],
+        };
+
+        let desired = TableSchema {
+            table_name: "users".to_string(),
+            columns: vec![ColumnDefinition {
+                name: "age".to_string(),
+                column_type: "integer".to_string(), // Incompatible TEXT -> INTEGER
+                nullable: true,
+                primary_key: false,
+                auto_increment: false,
+                unique: false,
+                default_value: None,
+                auto_field: false,
+            }],
+            indexes: vec![],
+            relations: vec![],
+        };
+
+        let result = SchemaGenerator::generate_migration_sql(&current, &desired, "postgres");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Incompatible type change"));
+    }
 
     #[test]
     fn test_generate_create_table_sql_sqlite() {

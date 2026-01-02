@@ -329,7 +329,8 @@ impl DatabaseBackend for PostgresBackend {
                     if let Some(current) = current_schema {
                         // Table exists, migrate
                         let migration_sqls =
-                            SchemaGenerator::generate_migration_sql(&current, &schema, "postgres");
+                            SchemaGenerator::generate_migration_sql(&current, &schema, "postgres")
+                                .map_err(DatabaseError::ValidationError)?;
                         for sql in migration_sqls {
                             tracing::info!(sql = %sql, "Executing migration SQL");
                             sqlx::raw_sql(&sql)
