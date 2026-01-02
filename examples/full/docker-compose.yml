@@ -3,36 +3,17 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: apify
-      POSTGRES_PASSWORD: apify_test_password
-      POSTGRES_DB: apify_e2e
+      POSTGRES_PASSWORD: apify_password
+      POSTGRES_DB: apify_db
     ports:
       - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U apify -d apify_e2e"]
+      test: ["CMD-SHELL", "pg_isready -U apify -d apify_db"]
       interval: 5s
       timeout: 5s
       retries: 5
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
-  apify-sqlite:
-    image: apifyhost/apify:latest
-    command: ["apify", "--control-plane", "--data-plane", "-c", "/app/config/config.yaml"]
-    ports:
-      - "3001:3000"
-      - "4001:4000"
-      - "9092:9090"
-    volumes:
-      - ./config:/app/config:ro
-      - sqlite_data:/app/data
-    environment:
-      - RUST_LOG=debug,apify=debug,apify::modules::oauth=debug
-      - APIFY_THREADS=2
-      - APIFY_OAUTH_REPLACE_LOCALHOST=true
-      - KEYCLOAK_URL=http://localhost:8080
-      - KEYCLOAK_REALM=apify
-      - KEYCLOAK_CLIENT_ID=apify-test-client
-      - KEYCLOAK_CLIENT_SECRET=apify-test-secret
 
   apify-cp:
     image: apifyhost/apify:latest

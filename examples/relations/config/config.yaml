@@ -1,22 +1,24 @@
-listeners:
-  - port: 3000
+control-plane:
+  listen:
     ip: 0.0.0.0
-    protocol: HTTP
-    apis:
-      - path: ./openapi/orders.yaml
-        datasource: sqlite1
-
-datasource:
-  sqlite1:
-    driver: sqlite
-    database: /app/data/orders.db
-    max_pool_size: 5
+    port: 4000
+  database:
+    driver: postgres
+    host: postgres
+    port: 5432
+    user: apify
+    password: apify_password
+    database: apify_db
 
 log_level: "info"
 
 modules:
+  openapi_docs:
+    enabled: false
+    port: 3001
   tracing:
     enabled: true
+    otlp_endpoint: http://jaeger:4317
   metrics:
     enabled: true
     port: 9090
