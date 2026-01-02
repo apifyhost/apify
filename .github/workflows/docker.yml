@@ -359,7 +359,7 @@ jobs:
         run: |
           echo "Waiting for Apify to start..."
           for i in {1..30}; do
-            if curl -sf http://localhost:9092/metrics > /dev/null 2>&1; then
+            if curl -sf http://localhost:9091/metrics > /dev/null 2>&1; then
               echo "Service is ready!"
               exit 0
             fi
@@ -367,7 +367,7 @@ jobs:
             sleep 2
           done
           echo "Service failed to start within timeout"
-          cd examples/full && docker compose logs apify-sqlite
+          cd examples/full && docker compose logs apify-cp
           exit 1
 
       - name: Run E2E tests (including OAuth)
@@ -388,7 +388,7 @@ jobs:
         if: failure()
         run: |
           echo "=== Apify logs ==="
-          cd examples/full && docker compose logs apify-sqlite
+          cd examples/full && docker compose logs apify-cp
           echo "=== Keycloak logs ==="
           docker logs keycloak
 
