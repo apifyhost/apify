@@ -337,14 +337,22 @@ jobs:
 
       - name: Update config for SQLite
         run: |
-          sed -i 's/datasource: postgres1/datasource: sqlite1/g' ./examples/full/config/config.yaml
+          # Update control-plane database config
+          sed -i 's/driver: postgres/driver: sqlite/g' ./examples/full/config/config.yaml
+          sed -i 's/database: apify_db/database: apify.db/g' ./examples/full/config/config.yaml
+          # Remove Postgres specific fields
+          sed -i '/host: postgres/d' ./examples/full/config/config.yaml
+          sed -i '/port: 5432/d' ./examples/full/config/config.yaml
+          sed -i '/user: apify/d' ./examples/full/config/config.yaml
+          sed -i '/password: apify_password/d' ./examples/full/config/config.yaml
+          
           echo "Updated config.yaml:"
           cat examples/full/config/config.yaml
 
       - name: Start Apify with SQLite using docker compose
         run: |
           cd examples/full
-          docker compose up -d apify-sqlite
+          docker compose up -d apify-cp apify-dp
           docker compose ps
 
       - name: Wait for service to be ready

@@ -15,25 +15,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  apify-sqlite:
-    image: apifyhost/apify:latest
-    command: ["apify", "--control-plane", "--data-plane", "-c", "/app/config/config.yaml"]
-    ports:
-      - "3001:3000"
-      - "4001:4000"
-      - "9092:9090"
-    volumes:
-      - ./config:/app/config:ro
-      - sqlite_data:/app/data
-    environment:
-      - RUST_LOG=debug,apify=debug,apify::modules::oauth=debug
-      - APIFY_THREADS=2
-      - APIFY_OAUTH_REPLACE_LOCALHOST=true
-      - KEYCLOAK_URL=http://localhost:8080
-      - KEYCLOAK_REALM=apify
-      - KEYCLOAK_CLIENT_ID=apify-test-client
-      - KEYCLOAK_CLIENT_SECRET=apify-test-secret
-
   apify-cp:
     image: apifyhost/apify:latest
     ports:
