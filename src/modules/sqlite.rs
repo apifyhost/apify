@@ -1,5 +1,6 @@
 //! SQLite backend implementation for DatabaseBackend
 
+use once_cell::sync::Lazy;
 use serde_json::{Value, json};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions, SqliteRow};
 use sqlx::{Column, Row};
@@ -7,16 +8,14 @@ use sqlx::{QueryBuilder, Sqlite};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
-use tokio::sync::Mutex;
-use once_cell::sync::Lazy;
 use std::sync::Mutex as StdMutex;
+use tokio::sync::Mutex;
 
 use crate::database::{DatabaseBackend, DatabaseError, DatabaseRuntimeConfig};
 use crate::schema_generator::{ColumnDefinition, SchemaGenerator, TableSchema};
 
-static MIGRATION_LOCKS: Lazy<StdMutex<HashMap<String, Arc<Mutex<()>>>>> = Lazy::new(|| {
-    StdMutex::new(HashMap::new())
-});
+static MIGRATION_LOCKS: Lazy<StdMutex<HashMap<String, Arc<Mutex<()>>>>> =
+    Lazy::new(|| StdMutex::new(HashMap::new()));
 
 #[derive(Debug, Clone)]
 pub struct SqliteBackend {
@@ -27,19 +26,25 @@ pub struct SqliteBackend {
 impl SqliteBackend {
     pub async fn connect(config: DatabaseRuntimeConfig) -> Result<Self, DatabaseError> {
         let (opts, filename_key) = if config.url == "sqlite::memory:" {
-            (SqliteConnectOptions::from_str(&config.url).map_err(DatabaseError::PoolError)?, "sqlite::memory:".to_string())
+            (
+                SqliteConnectOptions::from_str(&config.url).map_err(DatabaseError::PoolError)?,
+                "sqlite::memory:".to_string(),
+            )
         } else {
             let filename = config.url.strip_prefix("sqlite:").unwrap_or(&config.url);
-            (SqliteConnectOptions::new()
-                .filename(filename)
-                .create_if_missing(true), filename.to_string())
+            (
+                SqliteConnectOptions::new()
+                    .filename(filename)
+                    .create_if_missing(true),
+                filename.to_string(),
+            )
         };
         let pool = SqlitePoolOptions::new()
             .max_connections(config.max_size)
             .connect_with(opts)
             .await
             .map_err(DatabaseError::PoolError)?;
-            
+
         let migration_lock = {
             let mut locks = MIGRATION_LOCKS.lock().unwrap();
             locks
