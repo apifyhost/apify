@@ -51,7 +51,6 @@ curl -X POST http://localhost:4000/_meta/datasources \
   -H "Content-Type: application/json" \
   -d '{
     "name": "postgres",
-    "type": "postgres",
     "config": {
       "driver": "postgres",
       "host": "postgres",

@@ -4,7 +4,7 @@ control-plane:
     port: 4000
   database:
     driver: postgres
-    host: localhost
+    host: postgres
     port: 5432
     user: apify
     password: apify_password
