@@ -3,12 +3,12 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: apify
-      POSTGRES_PASSWORD: apify_test_password
-      POSTGRES_DB: apify_e2e
+      POSTGRES_PASSWORD: apify_password
+      POSTGRES_DB: apify_db
     ports:
       - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U apify -d apify_e2e"]
+      test: ["CMD-SHELL", "pg_isready -U apify -d apify_db"]
       interval: 5s
       timeout: 5s
       retries: 5
