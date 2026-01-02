@@ -102,6 +102,12 @@ pub trait DatabaseBackend: Send + Sync {
     ) -> core::pin::Pin<
         Box<dyn core::future::Future<Output = Result<u64, DatabaseError>> + Send + 'a>,
     >;
+    fn get_table_schema<'a>(
+        &'a self,
+        table: &'a str,
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<Option<TableSchema>, DatabaseError>> + Send + 'a>,
+    >;
 }
 
 #[derive(Clone)]
@@ -208,5 +214,9 @@ impl DatabaseManager {
         let status = if result.is_ok() { "success" } else { "error" };
         metrics.record(status);
         result
+    }
+
+    pub async fn get_table_schema(&self, table: &str) -> Result<Option<TableSchema>, DatabaseError> {
+        self.backend.get_table_schema(table).await
     }
 }

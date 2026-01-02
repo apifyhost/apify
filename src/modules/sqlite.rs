@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::database::{DatabaseBackend, DatabaseError, DatabaseRuntimeConfig};
-use crate::schema_generator::{SchemaGenerator, TableSchema};
+use crate::schema_generator::{SchemaGenerator, TableSchema, ColumnDefinition};
 
 #[derive(Debug, Clone)]
 pub struct SqliteBackend {
@@ -33,21 +33,83 @@ impl SqliteBackend {
         Ok(Self { pool })
     }
 
+    async fn do_get_table_schema(&self, table: &str) -> Result<Option<TableSchema>, DatabaseError> {
+        // Check if table exists first
+        let exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name=$1)"
+        )
+        .bind(table)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(DatabaseError::QueryError)?;
+
+        if !exists {
+            return Ok(None);
+        }
+
+        let query = format!("PRAGMA table_info({})", table);
+        let rows = sqlx::query(&query)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(DatabaseError::QueryError)?;
+
+        let mut columns = Vec::new();
+        for row in rows {
+            let name: String = row.get("name");
+            let type_: String = row.get("type");
+            let notnull: i32 = row.get("notnull");
+            let dflt_value: Option<String> = row.get("dflt_value");
+            let pk: i32 = row.get("pk");
+
+            columns.push(ColumnDefinition {
+                name,
+                column_type: type_,
+                nullable: notnull == 0,
+                primary_key: pk > 0,
+                unique: false, // TODO: Check unique constraints
+                auto_increment: false, // SQLite handles this implicitly for INTEGER PRIMARY KEY
+                default_value: dflt_value,
+                auto_field: false,
+            });
+        }
+
+        Ok(Some(TableSchema {
+            table_name: table.to_string(),
+            columns,
+            indexes: vec![],
+            relations: vec![],
+        }))
+    }
+
     async fn do_initialize_schema(
         &self,
         table_schemas: Vec<TableSchema>,
     ) -> Result<(), DatabaseError> {
         for schema in table_schemas {
-            let full_sql = SchemaGenerator::generate_create_table_sql_sqlite(&schema);
-            for stmt in full_sql.split(';') {
-                let s = stmt.trim();
-                if s.is_empty() {
-                    continue;
+            let current_schema = self.do_get_table_schema(&schema.table_name).await?;
+
+            if let Some(current) = current_schema {
+                 // Table exists, migrate
+                let migration_sqls = SchemaGenerator::generate_migration_sql(&current, &schema, "sqlite");
+                for sql in migration_sqls {
+                    tracing::info!(sql = %sql, "Executing migration SQL");
+                    sqlx::raw_sql(&sql)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(DatabaseError::QueryError)?;
                 }
-                sqlx::raw_sql(s)
-                    .execute(&self.pool)
-                    .await
-                    .map_err(DatabaseError::QueryError)?;
+            } else {
+                let full_sql = SchemaGenerator::generate_create_table_sql_sqlite(&schema);
+                for stmt in full_sql.split(';') {
+                    let s = stmt.trim();
+                    if s.is_empty() {
+                        continue;
+                    }
+                    sqlx::raw_sql(s)
+                        .execute(&self.pool)
+                        .await
+                        .map_err(DatabaseError::QueryError)?;
+                }
             }
         }
         Ok(())
@@ -313,6 +375,15 @@ impl DatabaseBackend for SqliteBackend {
         Box<dyn core::future::Future<Output = Result<u64, DatabaseError>> + Send + 'a>,
     > {
         Box::pin(async move { self.do_delete(table, where_clause).await })
+    }
+
+    fn get_table_schema<'a>(
+        &'a self,
+        table: &'a str,
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<Option<TableSchema>, DatabaseError>> + Send + 'a>,
+    > {
+        Box::pin(async move { self.do_get_table_schema(table).await })
     }
 }
 

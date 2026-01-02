@@ -754,6 +754,72 @@ impl SchemaGenerator {
         sql
     }
 
+    /// Generate migration SQL statements to update current schema to desired schema
+    pub fn generate_migration_sql(
+        current: &TableSchema,
+        desired: &TableSchema,
+        driver: &str,
+    ) -> Vec<String> {
+        let mut sqls = Vec::new();
+
+        // 1. Add missing columns
+        for col in &desired.columns {
+            if !current.columns.iter().any(|c| c.name == col.name) {
+                let sql = if driver == "postgres" {
+                    Self::generate_add_column_sql_postgres(&desired.table_name, col)
+                } else {
+                    Self::generate_add_column_sql_sqlite(&desired.table_name, col)
+                };
+                sqls.push(sql);
+            }
+        }
+
+        // 2. Modify existing columns (Type changes, Nullability) - Postgres only mostly
+        if driver == "postgres" {
+            for col in &desired.columns {
+                if let Some(curr_col) = current.columns.iter().find(|c| c.name == col.name) {
+                    // Check nullability
+                    if curr_col.nullable != col.nullable {
+                         let sql = format!(
+                            "ALTER TABLE {} ALTER COLUMN {} {} NOT NULL",
+                            desired.table_name,
+                            col.name,
+                            if col.nullable { "DROP" } else { "SET" }
+                        );
+                        sqls.push(sql);
+                    }
+                }
+            }
+        }
+
+        sqls
+    }
+
+    fn generate_add_column_sql_postgres(table: &str, col: &ColumnDefinition) -> String {
+        let mut sql = format!("ALTER TABLE {} ADD COLUMN {} {}", table, col.name, Self::map_type_to_postgres(&col.column_type));
+        if !col.nullable {
+            sql.push_str(" NOT NULL");
+        }
+        if let Some(default) = &col.default_value {
+            sql.push_str(&format!(" DEFAULT {}", default));
+        }
+        sql
+    }
+
+    fn generate_add_column_sql_sqlite(table: &str, col: &ColumnDefinition) -> String {
+        let mut sql = format!("ALTER TABLE {} ADD COLUMN {} {}", table, col.name, Self::map_type_to_sqlite(&col.column_type));
+        if !col.nullable {
+            // SQLite ADD COLUMN with NOT NULL requires a DEFAULT value
+            if col.default_value.is_some() {
+                sql.push_str(" NOT NULL");
+            }
+        }
+        if let Some(default) = &col.default_value {
+            sql.push_str(&format!(" DEFAULT {}", default));
+        }
+        sql
+    }
+
     /// Map generic type to SQLite type
     fn map_type_to_sqlite(type_name: &str) -> &str {
         match type_name.to_lowercase().as_str() {
