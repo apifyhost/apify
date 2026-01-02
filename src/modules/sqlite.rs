@@ -92,7 +92,10 @@ impl SqliteBackend {
         table_schemas: Vec<TableSchema>,
     ) -> Result<(), DatabaseError> {
         let _guard = self.migration_lock.lock().await;
-        tracing::info!("do_initialize_schema called with {} schemas", table_schemas.len());
+        tracing::info!(
+            "do_initialize_schema called with {} schemas",
+            table_schemas.len()
+        );
         for schema in table_schemas {
             tracing::info!("Processing schema for table: {}", schema.table_name);
             let current_schema = self.do_get_table_schema(&schema.table_name).await?;

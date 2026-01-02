@@ -404,7 +404,8 @@ impl SchemaGenerator {
             // Check if x-table-schema is defined in the schema object
             if let Some(table_schema_val) = obj.get("x-table-schema") {
                 tracing::info!("Found x-table-schema: {:?}", table_schema_val);
-                if let Ok(schema) = serde_json::from_value::<TableSchema>(table_schema_val.clone()) {
+                if let Ok(schema) = serde_json::from_value::<TableSchema>(table_schema_val.clone())
+                {
                     tracing::info!(
                         schema_name = %schema_name,
                         table = %schema.table_name,
@@ -797,8 +798,14 @@ impl SchemaGenerator {
 
             // Check for modified columns
             if !needs_recreation {
-                tracing::info!("Current columns: {:?}", current.columns.iter().map(|c| &c.name).collect::<Vec<_>>());
-                tracing::info!("Desired columns: {:?}", desired.columns.iter().map(|c| &c.name).collect::<Vec<_>>());
+                tracing::info!(
+                    "Current columns: {:?}",
+                    current.columns.iter().map(|c| &c.name).collect::<Vec<_>>()
+                );
+                tracing::info!(
+                    "Desired columns: {:?}",
+                    desired.columns.iter().map(|c| &c.name).collect::<Vec<_>>()
+                );
 
                 for col in &desired.columns {
                     tracing::info!("Checking column: {}", col.name);
@@ -806,7 +813,11 @@ impl SchemaGenerator {
                         tracing::info!("Found match for: {}", col.name);
                         // Compare attributes relevant for SQLite
                         // Note: SQLite types are loose, but we check if the definition changed
-                        tracing::info!("Column raw type: name={}, type={}", col.name, col.column_type);
+                        tracing::info!(
+                            "Column raw type: name={}, type={}",
+                            col.name,
+                            col.column_type
+                        );
                         let desired_type = Self::map_type_to_sqlite(&col.column_type);
                         // Current type comes from PRAGMA table_info, which might be normalized differently.
                         // We do a loose comparison.
@@ -839,9 +850,12 @@ impl SchemaGenerator {
                             tracing::info!(
                                 "Column attribute mismatch for {}: nullable: {} vs {}, pk: {} vs {}, default: {:?} vs {:?}",
                                 col.name,
-                                curr_col.nullable, col.nullable,
-                                curr_col.primary_key, col.primary_key,
-                                curr_col.default_value, col.default_value
+                                curr_col.nullable,
+                                col.nullable,
+                                curr_col.primary_key,
+                                col.primary_key,
+                                curr_col.default_value,
+                                col.default_value
                             );
                             needs_recreation = true;
                             // Continue checking other columns for incompatible changes
@@ -918,14 +932,20 @@ impl SchemaGenerator {
         }
 
         // Allow widening integers
-        if (from == "INTEGER" || from == "SMALLINT" || from == "INT") && (to == "BIGINT" || to == "INTEGER" || to == "INT") {
-             // SQLite uses INTEGER for all ints, so INTEGER -> INTEGER is covered by from==to
-             // But for Postgres SMALLINT -> INTEGER is valid.
-             // Let's be permissive for "Integer-like" to "Integer-like" if target is same or wider.
-             // For simplicity, assume all int-to-int is fine for now, or be specific.
-             // Postgres: SMALLINT (2) -> INTEGER (4) -> BIGINT (8)
-             if from == "SMALLINT" && (to == "INTEGER" || to == "BIGINT") { return true; }
-             if from == "INTEGER" && to == "BIGINT" { return true; }
+        if (from == "INTEGER" || from == "SMALLINT" || from == "INT")
+            && (to == "BIGINT" || to == "INTEGER" || to == "INT")
+        {
+            // SQLite uses INTEGER for all ints, so INTEGER -> INTEGER is covered by from==to
+            // But for Postgres SMALLINT -> INTEGER is valid.
+            // Let's be permissive for "Integer-like" to "Integer-like" if target is same or wider.
+            // For simplicity, assume all int-to-int is fine for now, or be specific.
+            // Postgres: SMALLINT (2) -> INTEGER (4) -> BIGINT (8)
+            if from == "SMALLINT" && (to == "INTEGER" || to == "BIGINT") {
+                return true;
+            }
+            if from == "INTEGER" && to == "BIGINT" {
+                return true;
+            }
         }
 
         // Allow anything to TEXT/VARCHAR (assuming no length constraint violation for now)

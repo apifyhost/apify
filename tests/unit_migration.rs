@@ -90,7 +90,7 @@ async fn test_schema_migration_sqlite() {
 
 #[test]
 fn test_postgres_compatibility_check() {
-    use apify::schema_generator::{SchemaGenerator, TableSchema, ColumnDefinition};
+    use apify::schema_generator::{ColumnDefinition, SchemaGenerator, TableSchema};
 
     // Case 1: Compatible (Integer -> BigInt)
     let current = TableSchema {
