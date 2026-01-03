@@ -1,0 +1,643 @@
+package e2e_test
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
+
+var _ = Describe("Schema Migration", func() {
+	var (
+		env      *TestEnv
+		baseURL  string
+		client   *http.Client
+		specFile string
+	)
+
+	// Helper to submit OpenAPI spec via API
+	submitSpec := func(name, content string) {
+		payload := map[string]string{
+			"name":    name,
+			"version": "1.0.0",
+			"spec":    content,
+		}
+		body, _ := json.Marshal(payload)
+		req, _ := http.NewRequest("POST", env.CPBaseURL+"/_meta/apis", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		Expect(err).NotTo(HaveOccurred())
+		if resp.StatusCode != 200 && resp.StatusCode != 201 {
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(resp.Body)
+			fmt.Printf("API Error: %s\n", buf.String())
+		}
+		Expect(resp.StatusCode).To(Or(Equal(200), Equal(201)))
+		resp.Body.Close()
+	}
+
+	BeforeEach(func() {
+		// Use a logical name for the API
+		specFile = "api:products-api"
+
+		// Initial Spec V1
+		v1 := `
+openapi: 3.0.0
+info:
+  title: Products API
+  version: 1.0.0
+paths:
+  /products:
+    post:
+      summary: Create product
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Product'
+      responses:
+        '200':
+          description: Created
+    get:
+      summary: List products
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+      x-table-schema:
+        tableName: products
+        columns:
+          - name: id
+            columnType: integer
+            primaryKey: true
+            autoIncrement: true
+          - name: name
+            columnType: text
+            nullable: false
+`
+		// Start env with listener pointing to "products-api"
+		// Note: StartTestEnv will try to import this. It will fail to read file "products-api",
+		// but the listener will be configured to look for API named "products-api".
+		env = StartTestEnv(map[string]string{
+			"products":      specFile,
+			"users-inc-api": "api:users-inc-api",
+		})
+		baseURL = env.BaseURL
+		client = &http.Client{
+			Timeout: 10 * time.Second,
+		}
+
+		// Now submit the spec via API
+		submitSpec("products-api", v1)
+
+		// Wait for poller to pick it up
+		time.Sleep(2 * time.Second)
+	})
+
+	AfterEach(func() {
+		if env != nil {
+			env.Stop()
+		}
+	})
+
+	It("should migrate schema when adding a column", func() {
+		// 1. Create a product (V1)
+		product := map[string]interface{}{
+			"name": "Laptop",
+		}
+		body, _ := json.Marshal(product)
+		req, _ := http.NewRequest("POST", baseURL+"/products", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Api-Key", env.APIKey)
+
+		resp, err := client.Do(req)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(200))
+		resp.Body.Close()
+
+		// 2. Update Spec to V2 (Add 'price' column)
+		v2 := `
+openapi: 3.0.0
+info:
+  title: Products API
+  version: 1.0.0
+paths:
+  /products:
+    post:
+      summary: Create product
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Product'
+      responses:
+        '200':
+          description: Created
+    get:
+      summary: List products
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+        price:
+          type: number
+      x-table-schema:
+        tableName: products
+        columns:
+          - name: id
+            columnType: integer
+            primaryKey: true
+            autoIncrement: true
+          - name: name
+            columnType: text
+            nullable: false
+          - name: price
+            columnType: real
+            nullable: true
+`
+		// 3. Submit updated spec via API
+		submitSpec("products-api", v2)
+
+		// Wait for reload (poll interval is 1s, give it a bit more)
+		time.Sleep(3 * time.Second)
+
+		// 4. Create a product with new field (V2)
+		product2 := map[string]interface{}{
+			"name":  "Mouse",
+			"price": 29.99,
+		}
+		body, _ = json.Marshal(product2)
+		req, _ = http.NewRequest("POST", baseURL+"/products", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Api-Key", env.APIKey)
+
+		resp, err = client.Do(req)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(200))
+		resp.Body.Close()
+
+		// 5. Verify both products
+		req, _ = http.NewRequest("GET", baseURL+"/products", nil)
+		req.Header.Set("X-Api-Key", env.APIKey)
+		resp, err = client.Do(req)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(200))
+
+		var products []map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&products)
+		resp.Body.Close()
+
+		Expect(len(products)).To(Equal(2))
+
+		// Check first product (should have null price or missing)
+		p1 := products[0]
+		Expect(p1["name"]).To(Equal("Laptop"))
+		// Price might be nil or 0 depending on implementation, but it shouldn't crash
+
+		// Check second product
+		p2 := products[1]
+		Expect(p2["name"]).To(Equal("Mouse"))
+		Expect(p2["price"]).To(Equal(29.99))
+	})
+
+	It("should handle schema migration (modify column)", func() {
+		// 1. Define initial spec (V1) - Users with name (string) and age (integer)
+		// We reuse "products-api" because the listener is configured for it.
+		v1 := `
+openapi: 3.0.0
+info:
+  title: Users Mod API
+  version: 1.0.0
+paths:
+  /users:
+    post:
+      summary: Create user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: Created
+    get:
+      summary: List users
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+        age:
+          type: integer
+      x-table-schema:
+        tableName: users_mod
+        columns:
+          - name: id
+            columnType: integer
+            primaryKey: true
+            autoIncrement: true
+          - name: name
+            columnType: text
+            nullable: false
+          - name: age
+            columnType: integer
+            nullable: true
+`
+		// Submit V1 (Overwrites the default products-api spec from BeforeEach)
+		submitSpec("products-api", v1)
+		time.Sleep(2 * time.Second)
+
+		// 2. Create a user (V1)
+		user1 := map[string]interface{}{
+			"name": "Alice",
+			"age":  25,
+		}
+		body, _ := json.Marshal(user1)
+		req, _ := http.NewRequest("POST", baseURL+"/users", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Api-Key", env.APIKey)
+		resp, err := client.Do(req)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(200))
+		resp.Body.Close()
+
+		// 3. Define updated spec (V2) - Change age to string (text)
+		v2 := `
+openapi: 3.0.0
+info:
+  title: Users Mod API
+  version: 1.0.0
+paths:
+  /users:
+    post:
+      summary: Create user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: Created
+    get:
+      summary: List users
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+        age:
+          type: string
+      x-table-schema:
+        tableName: users_mod
+        columns:
+          - name: id
+            columnType: integer
+            primaryKey: true
+            autoIncrement: true
+          - name: name
+            columnType: text
+            nullable: false
+          - name: age
+            columnType: text
+            nullable: true
+`
+		// Submit V2
+		submitSpec("products-api", v2)
+		time.Sleep(3 * time.Second)
+
+		// 4. Create a user (V2) - Age as string
+		user2 := map[string]interface{}{
+			"name": "Bob",
+			"age":  "thirty",
+		}
+		body, _ = json.Marshal(user2)
+		req, _ = http.NewRequest("POST", baseURL+"/users", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Api-Key", env.APIKey)
+		resp, err = client.Do(req)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(200))
+		resp.Body.Close()
+
+		// 5. Verify users
+		req, _ = http.NewRequest("GET", baseURL+"/users", nil)
+		req.Header.Set("X-Api-Key", env.APIKey)
+		resp, err = client.Do(req)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp.StatusCode).To(Equal(200))
+
+		var users []map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&users)
+		resp.Body.Close()
+
+		Expect(len(users)).To(Equal(2))
+
+		// Check Alice
+		u1 := users[0]
+		Expect(u1["name"]).To(Equal("Alice"))
+		// SQLite might return "25" (string) or 25 (number) depending on driver behavior when reading TEXT column with numeric content.
+		// Let's handle both.
+		age1 := u1["age"]
+		if ageNum, ok := age1.(float64); ok {
+			Expect(ageNum).To(Equal(25.0))
+		} else {
+			Expect(age1).To(Equal("25"))
+		}
+
+		// Check Bob
+		u2 := users[1]
+		Expect(u2["name"]).To(Equal("Bob"))
+		Expect(u2["age"]).To(Equal("thirty"))
+	})
+
+	It("should reject incompatible schema migration (modify column)", func() {
+		// 1. Define initial spec (V1) - Users with name (string) and description (text)
+		v1 := `
+openapi: 3.0.0
+info:
+  title: Users Incompatible API
+  version: 1.0.0
+paths:
+  /users_inc:
+    post:
+      summary: Create user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInc'
+      responses:
+        '200':
+          description: Created
+    get:
+      summary: List users
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserInc'
+components:
+  schemas:
+    UserInc:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+        description:
+          type: string
+      x-table-schema:
+        table_name: users_inc
+        indexes: []
+        columns:
+          - name: id
+            column_type: integer
+            primary_key: true
+            auto_increment: true
+            unique: false
+            default_value: null
+            nullable: false
+          - name: name
+            column_type: text
+            nullable: false
+            primary_key: false
+            auto_increment: false
+            unique: false
+            default_value: null
+          - name: description
+            column_type: text
+            nullable: true
+            primary_key: false
+            auto_increment: false
+            unique: false
+            default_value: null
+`
+		// Submit V1
+		submitSpec("users-inc-api", v1)
+		time.Sleep(5 * time.Second)
+
+		// 2. Create a user (V1)
+		user1 := map[string]interface{}{
+			"name":        "Alice",
+			"description": "Some text description",
+		}
+		body, _ := json.Marshal(user1)
+		req, _ := http.NewRequest("POST", baseURL+"/users_inc", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Api-Key", env.APIKey)
+		resp, err := client.Do(req)
+		Expect(err).NotTo(HaveOccurred())
+		if resp.StatusCode != 200 && resp.StatusCode != 201 {
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(resp.Body)
+			fmt.Printf("Create User Error: %s\n", buf.String())
+		}
+		Expect(resp.StatusCode).To(Or(Equal(200), Equal(201)))
+		resp.Body.Close()
+
+		// 3. Define updated spec (V2) - Change description to integer (Incompatible!)
+		v2 := `
+openapi: 3.0.0
+info:
+  title: Users Incompatible API
+  version: 1.0.0
+paths:
+  /users_inc:
+    post:
+      summary: Create user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInc'
+      responses:
+        '200':
+          description: Created
+    get:
+      summary: List users
+      responses:
+        '200':
+          description: List
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserInc'
+components:
+  schemas:
+    UserInc:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+        description:
+          type: integer
+      x-table-schema:
+        table_name: users_inc
+        indexes: []
+        columns:
+          - name: id
+            column_type: integer
+            primary_key: true
+            auto_increment: true
+            unique: false
+            default_value: null
+            nullable: false
+          - name: name
+            column_type: text
+            nullable: false
+            primary_key: false
+            auto_increment: false
+            unique: false
+            default_value: null
+          - name: description
+            column_type: integer
+            nullable: true
+            primary_key: false
+            auto_increment: false
+            unique: false
+            default_value: null
+`
+		// Submit V2 - Expect Failure
+		urlV2 := fmt.Sprintf("%s/_meta/apis", env.CPBaseURL)
+		payload := map[string]string{
+			"name":    "users-inc-api",
+			"version": "1.0.0",
+			"spec":    v2,
+		}
+		bodyV2, _ := json.Marshal(payload)
+		reqV2, errV2 := http.NewRequest("POST", urlV2, bytes.NewBuffer(bodyV2))
+		Expect(errV2).NotTo(HaveOccurred())
+		reqV2.Header.Set("Content-Type", "application/json")
+
+		respV2, errV2 := client.Do(reqV2)
+		Expect(errV2).NotTo(HaveOccurred())
+		defer respV2.Body.Close()
+
+		bodyBytes, _ := io.ReadAll(respV2.Body)
+		bodyString := string(bodyBytes)
+
+		// Expect 500 Internal Server Error due to incompatible migration
+		Expect(respV2.StatusCode).To(Equal(500), "Expected 500, got %d. Body: %s", respV2.StatusCode, bodyString)
+		Expect(bodyString).To(ContainSubstring("Incompatible type change"))
+
+		// Wait for potential migration attempt
+		time.Sleep(3 * time.Second)
+
+		// 4. Verify that the system is still responsive and the previous data is intact
+		// Since migration should have failed, the table should still be there with old data.
+		// Note: The API definition in memory might have updated to V2 (expecting Int),
+		// but the DB schema should still be V1 (Text).
+
+		// If we try to GET the user, it should still return the string description.
+		// Even if the API expects Integer, the JSON serializer might just pass through what's in DB (if using untyped map).
+		req, _ = http.NewRequest("GET", baseURL+"/users_inc", nil)
+		req.Header.Set("X-Api-Key", env.APIKey)
+		resp, err = client.Do(req)
+
+		if err == nil {
+			// If it connects, it might be 404 or 500 or 503.
+			// Or maybe the OLD AppState is still running?
+			// `server.rs` uses `ArcSwap` for state.
+			// The poller updates the state.
+			// `tokio::spawn(async move { loop { ... } })`
+			// Inside the loop:
+			// `let new_state = AppState::new_with_crud(...)`
+			// If `new_with_crud` fails (due to schema migration error), it logs error and CONTINUES loop.
+			// It does NOT update the `state` ArcSwap.
+			// So the OLD state (V1) should still be active!
+
+			// So `GET /users_inc` should return 200 and the OLD data.
+			Expect(resp.StatusCode).To(Equal(200))
+
+			var users []map[string]interface{}
+			json.NewDecoder(resp.Body).Decode(&users)
+			resp.Body.Close()
+
+			Expect(len(users)).To(Equal(1))
+			u1 := users[0]
+			Expect(u1["name"]).To(Equal("Alice"))
+			Expect(u1["description"]).To(Equal("Some text description"))
+		} else {
+			// If connection failed, it means the server crashed, which is also a sign of "rejection" (though less ideal).
+			// But based on `server.rs` logic (I recall seeing a loop and ArcSwap), it should preserve old state.
+			// Let's fail if we can't connect, because we expect high availability.
+			Expect(err).NotTo(HaveOccurred())
+		}
+	})
+})

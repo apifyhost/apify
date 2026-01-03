@@ -33,7 +33,7 @@ pub enum RelationType {
 }
 
 /// Column definition
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ColumnDefinition {
     pub name: String,
     pub column_type: String,
@@ -47,7 +47,7 @@ pub struct ColumnDefinition {
 }
 
 /// Index definition
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct IndexDefinition {
     pub name: String,
     pub columns: Vec<String>,
@@ -399,6 +399,23 @@ impl SchemaGenerator {
             if !is_object {
                 tracing::warn!(schema_name = %schema_name, "Schema is not an object type or has no properties");
                 continue;
+            }
+
+            // Check if x-table-schema is defined in the schema object
+            if let Some(table_schema_val) = obj.get("x-table-schema") {
+                tracing::info!("Found x-table-schema: {:?}", table_schema_val);
+                if let Ok(schema) = serde_json::from_value::<TableSchema>(table_schema_val.clone())
+                {
+                    tracing::info!(
+                        schema_name = %schema_name,
+                        table = %schema.table_name,
+                        "Using explicit x-table-schema from component"
+                    );
+                    tables.push(schema);
+                    continue;
+                } else {
+                    tracing::warn!(schema_name = %schema_name, "Failed to parse x-table-schema");
+                }
             }
 
             let mut columns: Vec<ColumnDefinition> = Vec::new();
@@ -754,6 +771,267 @@ impl SchemaGenerator {
         sql
     }
 
+    /// Generate migration SQL statements to update current schema to desired schema
+    pub fn generate_migration_sql(
+        current: &TableSchema,
+        desired: &TableSchema,
+        driver: &str,
+    ) -> Result<Vec<String>, String> {
+        let mut sqls = Vec::new();
+
+        if driver == "sqlite" {
+            // Check if we need full table recreation
+            // Recreation is needed if:
+            // 1. Columns are removed
+            // 2. Columns are modified (type, nullability, etc.)
+            // 3. Primary key changes (not supported yet but good to know)
+
+            let mut needs_recreation = false;
+
+            // Check for removed columns
+            for curr_col in &current.columns {
+                if !desired.columns.iter().any(|c| c.name == curr_col.name) {
+                    needs_recreation = true;
+                    break;
+                }
+            }
+
+            // Check for modified columns
+            if !needs_recreation {
+                tracing::info!(
+                    "Current columns: {:?}",
+                    current.columns.iter().map(|c| &c.name).collect::<Vec<_>>()
+                );
+                tracing::info!(
+                    "Desired columns: {:?}",
+                    desired.columns.iter().map(|c| &c.name).collect::<Vec<_>>()
+                );
+
+                for col in &desired.columns {
+                    tracing::info!("Checking column: {}", col.name);
+                    if let Some(curr_col) = current.columns.iter().find(|c| c.name == col.name) {
+                        tracing::info!("Found match for: {}", col.name);
+                        // Compare attributes relevant for SQLite
+                        // Note: SQLite types are loose, but we check if the definition changed
+                        tracing::info!(
+                            "Column raw type: name={}, type={}",
+                            col.name,
+                            col.column_type
+                        );
+                        let desired_type = Self::map_type_to_sqlite(&col.column_type);
+                        // Current type comes from PRAGMA table_info, which might be normalized differently.
+                        // We do a loose comparison.
+                        let curr_type_norm = curr_col.column_type.to_uppercase();
+                        let desired_type_norm = desired_type.to_uppercase();
+
+                        tracing::info!(
+                            column = %col.name,
+                            curr_type = %curr_type_norm,
+                            desired_type = %desired_type_norm,
+                            "Comparing column types for migration"
+                        );
+
+                        if curr_type_norm != desired_type_norm {
+                            // Check compatibility before allowing recreation
+                            if !Self::is_type_compatible(&curr_type_norm, &desired_type_norm) {
+                                return Err(format!(
+                                    "Incompatible type change for column '{}': {} -> {}",
+                                    col.name, curr_type_norm, desired_type_norm
+                                ));
+                            }
+                            needs_recreation = true;
+                            // Continue checking other columns for incompatible changes
+                        }
+
+                        if curr_col.nullable != col.nullable
+                            || curr_col.primary_key != col.primary_key
+                            || curr_col.default_value != col.default_value
+                        {
+                            tracing::info!(
+                                "Column attribute mismatch for {}: nullable: {} vs {}, pk: {} vs {}, default: {:?} vs {:?}",
+                                col.name,
+                                curr_col.nullable,
+                                col.nullable,
+                                curr_col.primary_key,
+                                col.primary_key,
+                                curr_col.default_value,
+                                col.default_value
+                            );
+                            needs_recreation = true;
+                            // Continue checking other columns for incompatible changes
+                        }
+                    }
+                }
+            }
+
+            if needs_recreation {
+                return Ok(Self::generate_sqlite_recreate_sql(current, desired));
+            }
+        }
+
+        // 1. Add missing columns
+        for col in &desired.columns {
+            if !current.columns.iter().any(|c| c.name == col.name) {
+                let sql = if driver == "postgres" {
+                    Self::generate_add_column_sql_postgres(&desired.table_name, col)
+                } else {
+                    Self::generate_add_column_sql_sqlite(&desired.table_name, col)
+                };
+                sqls.push(sql);
+            }
+        }
+
+        // 2. Modify existing columns (Type changes, Nullability) - Postgres only mostly
+        if driver == "postgres" {
+            for col in &desired.columns {
+                if let Some(curr_col) = current.columns.iter().find(|c| c.name == col.name) {
+                    // Check type compatibility
+                    let curr_type = Self::map_type_to_postgres(&curr_col.column_type);
+                    let new_type = Self::map_type_to_postgres(&col.column_type);
+
+                    if curr_type != new_type {
+                        if !Self::is_type_compatible(&curr_type, &new_type) {
+                            return Err(format!(
+                                "Incompatible type change for column '{}': {} -> {}",
+                                col.name, curr_type, new_type
+                            ));
+                        }
+
+                        // Generate ALTER COLUMN TYPE
+                        let sql = format!(
+                            "ALTER TABLE {} ALTER COLUMN {} TYPE {} USING {}::{}",
+                            desired.table_name, col.name, new_type, col.name, new_type
+                        );
+                        sqls.push(sql);
+                    }
+
+                    // Check nullability
+                    if curr_col.nullable != col.nullable {
+                        let sql = format!(
+                            "ALTER TABLE {} ALTER COLUMN {} {} NOT NULL",
+                            desired.table_name,
+                            col.name,
+                            if col.nullable { "DROP" } else { "SET" }
+                        );
+                        sqls.push(sql);
+                    }
+                }
+            }
+        }
+
+        Ok(sqls)
+    }
+
+    fn is_type_compatible(from: &str, to: &str) -> bool {
+        let from = from.to_uppercase();
+        let to = to.to_uppercase();
+
+        // Allow same type
+        if from == to {
+            return true;
+        }
+
+        // Allow widening integers
+        if (from == "INTEGER" || from == "SMALLINT" || from == "INT")
+            && (to == "BIGINT" || to == "INTEGER" || to == "INT")
+        {
+            // SQLite uses INTEGER for all ints, so INTEGER -> INTEGER is covered by from==to
+            // But for Postgres SMALLINT -> INTEGER is valid.
+            // Let's be permissive for "Integer-like" to "Integer-like" if target is same or wider.
+            // For simplicity, assume all int-to-int is fine for now, or be specific.
+            // Postgres: SMALLINT (2) -> INTEGER (4) -> BIGINT (8)
+            if from == "SMALLINT" && (to == "INTEGER" || to == "BIGINT") {
+                return true;
+            }
+            if from == "INTEGER" && to == "BIGINT" {
+                return true;
+            }
+        }
+
+        // Allow anything to TEXT/VARCHAR (assuming no length constraint violation for now)
+        if to == "TEXT" || to.starts_with("VARCHAR") || to == "STRING" {
+            return true;
+        }
+
+        // Allow float widening
+        if (from == "REAL" || from == "FLOAT") && (to == "DOUBLE PRECISION" || to == "REAL") {
+            // SQLite uses REAL for all floats.
+            return true;
+        }
+
+        // Disallow others (e.g. TEXT -> INTEGER, INTEGER -> BOOLEAN)
+        false
+    }
+
+    fn generate_sqlite_recreate_sql(current: &TableSchema, desired: &TableSchema) -> Vec<String> {
+        let mut sqls = Vec::new();
+        let table = &desired.table_name;
+        let temp_table = format!("{}_old_{}", table, uuid::Uuid::new_v4().simple());
+
+        // 1. Rename current table
+        sqls.push(format!("ALTER TABLE {} RENAME TO {}", table, temp_table));
+
+        // 2. Create new table
+        sqls.push(Self::generate_create_table_sql_sqlite(desired));
+
+        // 3. Copy data
+        // Only copy columns that exist in both schemas
+        let common_columns: Vec<String> = desired
+            .columns
+            .iter()
+            .filter(|col| current.columns.iter().any(|c| c.name == col.name))
+            .map(|col| col.name.clone())
+            .collect();
+
+        if !common_columns.is_empty() {
+            let cols = common_columns.join(", ");
+            sqls.push(format!(
+                "INSERT INTO {} ({}) SELECT {} FROM {}",
+                table, cols, cols, temp_table
+            ));
+        }
+
+        // 4. Drop old table
+        sqls.push(format!("DROP TABLE {}", temp_table));
+
+        sqls
+    }
+
+    fn generate_add_column_sql_postgres(table: &str, col: &ColumnDefinition) -> String {
+        let mut sql = format!(
+            "ALTER TABLE {} ADD COLUMN {} {}",
+            table,
+            col.name,
+            Self::map_type_to_postgres(&col.column_type)
+        );
+        if !col.nullable {
+            sql.push_str(" NOT NULL");
+        }
+        if let Some(default) = &col.default_value {
+            sql.push_str(&format!(" DEFAULT {}", default));
+        }
+        sql
+    }
+
+    fn generate_add_column_sql_sqlite(table: &str, col: &ColumnDefinition) -> String {
+        let mut sql = format!(
+            "ALTER TABLE {} ADD COLUMN {} {}",
+            table,
+            col.name,
+            Self::map_type_to_sqlite(&col.column_type)
+        );
+        if !col.nullable {
+            // SQLite ADD COLUMN with NOT NULL requires a DEFAULT value
+            if col.default_value.is_some() {
+                sql.push_str(" NOT NULL");
+            }
+        }
+        if let Some(default) = &col.default_value {
+            sql.push_str(&format!(" DEFAULT {}", default));
+        }
+        sql
+    }
+
     /// Map generic type to SQLite type
     fn map_type_to_sqlite(type_name: &str) -> &str {
         match type_name.to_lowercase().as_str() {
@@ -802,6 +1080,84 @@ impl SchemaGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_postgres_migration_compatible() {
+        let current = TableSchema {
+            table_name: "users".to_string(),
+            columns: vec![ColumnDefinition {
+                name: "age".to_string(),
+                column_type: "integer".to_string(),
+                nullable: true,
+                primary_key: false,
+                auto_increment: false,
+                unique: false,
+                default_value: None,
+                auto_field: false,
+            }],
+            indexes: vec![],
+            relations: vec![],
+        };
+
+        let desired = TableSchema {
+            table_name: "users".to_string(),
+            columns: vec![ColumnDefinition {
+                name: "age".to_string(),
+                column_type: "bigint".to_string(), // Compatible widening
+                nullable: true,
+                primary_key: false,
+                auto_increment: false,
+                unique: false,
+                default_value: None,
+                auto_field: false,
+            }],
+            indexes: vec![],
+            relations: vec![],
+        };
+
+        let sqls = SchemaGenerator::generate_migration_sql(&current, &desired, "postgres").unwrap();
+        assert_eq!(sqls.len(), 1);
+        assert!(sqls[0].contains("ALTER COLUMN age TYPE BIGINT"));
+    }
+
+    #[test]
+    fn test_postgres_migration_incompatible() {
+        let current = TableSchema {
+            table_name: "users".to_string(),
+            columns: vec![ColumnDefinition {
+                name: "age".to_string(),
+                column_type: "text".to_string(),
+                nullable: true,
+                primary_key: false,
+                auto_increment: false,
+                unique: false,
+                default_value: None,
+                auto_field: false,
+            }],
+            indexes: vec![],
+            relations: vec![],
+        };
+
+        let desired = TableSchema {
+            table_name: "users".to_string(),
+            columns: vec![ColumnDefinition {
+                name: "age".to_string(),
+                column_type: "integer".to_string(), // Incompatible TEXT -> INTEGER
+                nullable: true,
+                primary_key: false,
+                auto_increment: false,
+                unique: false,
+                default_value: None,
+                auto_field: false,
+            }],
+            indexes: vec![],
+            relations: vec![],
+        };
+
+        let result = SchemaGenerator::generate_migration_sql(&current, &desired, "postgres");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Incompatible type change"));
+    }
 
     #[test]
     fn test_generate_create_table_sql_sqlite() {

@@ -105,11 +105,23 @@ pub async fn handle_apis_request(
                 .duration_since(std::time::UNIX_EPOCH)?
                 .as_secs() as i64;
 
+            // Extract schemas from spec and initialize them in the DB
+            let spec_value: serde_json::Value = if let Ok(v) = serde_json::from_str(&spec_content) {
+                v
+            } else {
+                serde_yaml::from_str(&spec_content)
+                    .map_err(|e| format!("Failed to parse spec as JSON or YAML: {}", e))?
+            };
+
             let mut data = HashMap::new();
             data.insert("id".to_string(), Value::String(id.clone()));
             data.insert("name".to_string(), Value::String(name.to_string()));
             data.insert("version".to_string(), Value::String(version.to_string()));
-            data.insert("spec".to_string(), Value::String(spec_content.clone()));
+            // Store normalized JSON spec
+            data.insert(
+                "spec".to_string(),
+                Value::String(serde_json::to_string(&spec_value)?),
+            );
             if let Some(ds) = datasource_name {
                 data.insert("datasource_name".to_string(), Value::String(ds.to_string()));
             }
@@ -121,17 +133,28 @@ pub async fn handle_apis_request(
                 Value::Number(serde_json::Number::from(created_at)),
             );
 
-            db.insert("_meta_api_configs", data).await?;
+            if let Err(e) = db.insert("_meta_api_configs", data.clone()).await {
+                tracing::warn!("Failed to insert API config, trying update: {}", e);
 
-            // Extract schemas from spec and initialize them in the DB
-            let spec_value: serde_json::Value = serde_json::from_str(&spec_content)?;
+                let mut where_clause = HashMap::new();
+                where_clause.insert("name".to_string(), Value::String(name.to_string()));
+
+                // Remove ID and created_at from update
+                let mut update_data = data;
+                update_data.remove("id");
+                update_data.remove("created_at");
+
+                db.update("_meta_api_configs", update_data, where_clause)
+                    .await?;
+            }
+
             let schemas = crate::schema_generator::SchemaGenerator::extract_schemas_from_openapi(
                 &spec_value,
             )?;
             db.initialize_schema(schemas).await?;
 
             Ok(Response::builder()
-                .status(StatusCode::CREATED)
+                .status(StatusCode::OK)
                 .header("Content-Type", "application/json")
                 .body(Full::new(Bytes::from(
                     serde_json::json!({"id": id}).to_string(),

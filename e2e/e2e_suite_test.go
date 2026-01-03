@@ -1,17 +1,18 @@
 package e2e_test
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
-	"bytes"
-	"strconv"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -27,7 +28,7 @@ var _ = BeforeSuite(func() {
 	// Build the binary once before running any tests to avoid timeouts due to compilation
 	wd, _ := os.Getwd()
 	projectRoot := filepath.Dir(wd)
-	
+
 	fmt.Println("Building apify binary...")
 	cmd := exec.Command("cargo", "build", "--bin", "apify")
 	cmd.Dir = projectRoot
@@ -39,14 +40,14 @@ var _ = BeforeSuite(func() {
 })
 
 type TestEnv struct {
-	ServerCmd  *exec.Cmd
-	CPCmd      *exec.Cmd
-	TmpDir     string
-	BaseURL    string
-	CPBaseURL  string
-	APIKey     string
-	ConfigFile string
-	DBFile     string
+	ServerCmd   *exec.Cmd
+	CPCmd       *exec.Cmd
+	TmpDir      string
+	BaseURL     string
+	CPBaseURL   string
+	APIKey      string
+	ConfigFile  string
+	DBFile      string
 	MetricsPort string
 }
 
@@ -125,7 +126,7 @@ modules:
 	}
 	env.CPCmd.Dir = projectRoot
 	env.CPCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+env.DBFile)
-	
+
 	var cpStdout, cpStderr bytes.Buffer
 	env.CPCmd.Stdout = &cpStdout
 	env.CPCmd.Stderr = &cpStderr
@@ -184,7 +185,10 @@ modules:
 	var apiPaths []string
 	for _, path := range specFiles {
 		var fullPath string
-		if filepath.IsAbs(path) {
+		// If path starts with "api:", treat it as a logical name, not a file path
+		if strings.HasPrefix(path, "api:") {
+			fullPath = strings.TrimPrefix(path, "api:")
+		} else if filepath.IsAbs(path) {
 			fullPath = path
 		} else {
 			fullPath = filepath.Join(projectRoot, path)
@@ -228,10 +232,10 @@ modules:
 	}
 	env.ServerCmd.Dir = projectRoot
 	env.ServerCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+env.DBFile, "APIFY_CONFIG_POLL_INTERVAL=1")
-	
+
 	var dpStdout, dpStderr bytes.Buffer
-	env.ServerCmd.Stdout = &dpStdout
-	env.ServerCmd.Stderr = &dpStderr
+	env.ServerCmd.Stdout = io.MultiWriter(&dpStdout, GinkgoWriter)
+	env.ServerCmd.Stderr = io.MultiWriter(&dpStderr, GinkgoWriter)
 
 	err = env.ServerCmd.Start()
 	Expect(err).NotTo(HaveOccurred())
@@ -278,4 +282,3 @@ func indent(s string, n int) string {
 	}
 	return strings.Join(lines, "\n")
 }
-

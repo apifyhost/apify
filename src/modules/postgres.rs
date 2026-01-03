@@ -7,7 +7,7 @@ use sqlx::{Column, Postgres, QueryBuilder, Row};
 use std::collections::HashMap;
 
 use crate::database::{DatabaseBackend, DatabaseError, DatabaseRuntimeConfig};
-use crate::schema_generator::{SchemaGenerator, TableSchema};
+use crate::schema_generator::{ColumnDefinition, SchemaGenerator, TableSchema};
 
 #[derive(Debug, Clone)]
 pub struct PostgresBackend {
@@ -323,18 +323,36 @@ impl DatabaseBackend for PostgresBackend {
             // We have the lock, proceed with schema creation
             let result = async {
                 for schema in table_schemas {
-                    let full_sql = SchemaGenerator::generate_create_table_sql_postgres(&schema);
-                    tracing::info!(sql = %full_sql, "Executing schema creation SQL");
-                    for stmt in full_sql.split(';') {
-                        let s = stmt.trim();
-                        if s.is_empty() {
-                            continue;
+                    // Check if table exists
+                    let current_schema = self.get_table_schema(&schema.table_name).await?;
+
+                    if let Some(current) = current_schema {
+                        // Table exists, migrate
+                        let migration_sqls =
+                            SchemaGenerator::generate_migration_sql(&current, &schema, "postgres")
+                                .map_err(DatabaseError::ValidationError)?;
+                        for sql in migration_sqls {
+                            tracing::info!(sql = %sql, "Executing migration SQL");
+                            sqlx::raw_sql(&sql)
+                                .execute(&self.pool)
+                                .await
+                                .map_err(DatabaseError::QueryError)?;
                         }
-                        tracing::info!(statement = %s, "Executing SQL statement");
-                        sqlx::raw_sql(s)
-                            .execute(&self.pool)
-                            .await
-                            .map_err(DatabaseError::QueryError)?;
+                    } else {
+                        // Table does not exist, create
+                        let full_sql = SchemaGenerator::generate_create_table_sql_postgres(&schema);
+                        tracing::info!(sql = %full_sql, "Executing schema creation SQL");
+                        for stmt in full_sql.split(';') {
+                            let s = stmt.trim();
+                            if s.is_empty() {
+                                continue;
+                            }
+                            tracing::info!(statement = %s, "Executing SQL statement");
+                            sqlx::raw_sql(s)
+                                .execute(&self.pool)
+                                .await
+                                .map_err(DatabaseError::QueryError)?;
+                        }
                     }
                 }
                 Ok::<(), DatabaseError>(())
@@ -392,6 +410,77 @@ impl DatabaseBackend for PostgresBackend {
         Box<dyn core::future::Future<Output = Result<u64, DatabaseError>> + Send + 'a>,
     > {
         Box::pin(async move { self.do_delete(table, where_clause).await })
+    }
+
+    fn get_table_schema<'a>(
+        &'a self,
+        table: &'a str,
+    ) -> core::pin::Pin<
+        Box<
+            dyn core::future::Future<Output = Result<Option<TableSchema>, DatabaseError>>
+                + Send
+                + 'a,
+        >,
+    > {
+        Box::pin(async move {
+            let query = r#"
+                SELECT 
+                    c.column_name, 
+                    c.data_type, 
+                    c.is_nullable, 
+                    c.column_default,
+                    CASE WHEN tc.constraint_type = 'PRIMARY KEY' THEN true ELSE false END as is_primary_key
+                FROM information_schema.columns c
+                LEFT JOIN information_schema.key_column_usage kcu 
+                    ON c.table_name = kcu.table_name 
+                    AND c.column_name = kcu.column_name
+                LEFT JOIN information_schema.table_constraints tc 
+                    ON kcu.constraint_name = tc.constraint_name 
+                    AND kcu.table_name = tc.table_name 
+                    AND tc.constraint_type = 'PRIMARY KEY'
+                WHERE c.table_name = $1 AND c.table_schema = current_schema()
+            "#;
+
+            let rows = sqlx::query(query)
+                .bind(table)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(DatabaseError::QueryError)?;
+
+            if rows.is_empty() {
+                return Ok(None);
+            }
+
+            let mut columns = Vec::new();
+            for row in rows {
+                let name: String = row.get("column_name");
+                let data_type: String = row.get("data_type");
+                let is_nullable: String = row.get("is_nullable");
+                let column_default: Option<String> = row.get("column_default");
+                let is_primary_key: Option<bool> = row.get("is_primary_key");
+
+                columns.push(ColumnDefinition {
+                    name,
+                    column_type: data_type,
+                    nullable: is_nullable == "YES",
+                    primary_key: is_primary_key.unwrap_or(false),
+                    unique: false, // TODO: Check unique constraints
+                    auto_increment: column_default
+                        .as_ref()
+                        .map(|d| d.contains("nextval"))
+                        .unwrap_or(false),
+                    default_value: column_default,
+                    auto_field: false,
+                });
+            }
+
+            Ok(Some(TableSchema {
+                table_name: table.to_string(),
+                columns,
+                indexes: vec![],
+                relations: vec![],
+            }))
+        })
     }
 }
 

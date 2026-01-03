@@ -32,7 +32,7 @@ pub async fn handle_import_request(
 
             let mut data = HashMap::new();
             data.insert("id".to_string(), Value::String(id));
-            data.insert("name".to_string(), Value::String(name));
+            data.insert("name".to_string(), Value::String(name.clone()));
             data.insert("type".to_string(), Value::String(ds_config.driver.clone()));
             data.insert("config".to_string(), Value::String(config_str));
             data.insert(
@@ -40,8 +40,24 @@ pub async fn handle_import_request(
                 Value::Number(serde_json::Number::from(updated_at)),
             );
 
-            if let Err(e) = db.insert("_meta_datasources", data).await {
-                tracing::warn!("Failed to import datasource: {}", e);
+            if let Err(e) = db.insert("_meta_datasources", data.clone()).await {
+                // Try update if insert fails (likely due to unique name)
+                // Note: This is a simple retry strategy. Ideally we should check existence first.
+                tracing::warn!("Failed to insert datasource, trying update: {}", e);
+
+                let mut where_clause = HashMap::new();
+                where_clause.insert("name".to_string(), Value::String(name));
+
+                // Remove ID from data to avoid changing it
+                let mut update_data = data;
+                update_data.remove("id");
+
+                if let Err(e) = db
+                    .update("_meta_datasources", update_data, where_clause)
+                    .await
+                {
+                    tracing::warn!("Failed to update datasource: {}", e);
+                }
             }
         }
     }
@@ -174,7 +190,7 @@ pub async fn handle_import_request(
 
                             let mut data = HashMap::new();
                             data.insert("id".to_string(), Value::String(id));
-                            data.insert("name".to_string(), Value::String(name));
+                            data.insert("name".to_string(), Value::String(name.clone()));
                             data.insert("version".to_string(), Value::String(version));
                             data.insert(
                                 "spec".to_string(),
@@ -194,8 +210,23 @@ pub async fn handle_import_request(
                                 Value::Number(serde_json::Number::from(updated_at)),
                             );
 
-                            if let Err(e) = db.insert("_meta_api_configs", data).await {
-                                tracing::warn!("Failed to import API config: {}", e);
+                            if let Err(e) = db.insert("_meta_api_configs", data.clone()).await {
+                                tracing::warn!("Failed to insert API config, trying update: {}", e);
+
+                                let mut where_clause = HashMap::new();
+                                where_clause.insert("name".to_string(), Value::String(name));
+
+                                // Remove ID and created_at from update
+                                let mut update_data = data;
+                                update_data.remove("id");
+                                update_data.remove("created_at");
+
+                                if let Err(e) = db
+                                    .update("_meta_api_configs", update_data, where_clause)
+                                    .await
+                                {
+                                    tracing::warn!("Failed to update API config: {}", e);
+                                }
                             }
                         }
                         Err(e) => {
