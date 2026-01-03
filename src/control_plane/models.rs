@@ -8,6 +8,7 @@ pub struct ApiConfigRecord {
     pub spec: String,
     pub datasource_name: Option<String>,
     pub modules_config: Option<String>,
+    pub listeners: Option<String>, // JSON array of listener names
     pub created_at: i64,
 }
 

@@ -86,46 +86,7 @@ pub async fn handle_import_request(
     }
 
     // Import Listeners
-    // Import Listeners and APIs
-    if let Some(mut listeners) = config.listeners {
-        // Distribute global APIs to listeners
-        if let Some(global_apis) = &config.apis {
-            for api_config in global_apis {
-                let api_ref = crate::config::ApiRef::WithConfig {
-                    path: api_config.path.clone(),
-                    modules: api_config.modules.clone(),
-                    datasource: api_config.datasource.clone(),
-                    access_log: api_config.access_log.clone(),
-                };
-
-                if let Some(target_listeners) = &api_config.listeners {
-                    for listener_name in target_listeners {
-                        let mut found = false;
-                        for listener in listeners.iter_mut() {
-                            if let Some(name) = &listener.name
-                                && name == listener_name
-                            {
-                                if listener.apis.is_none() {
-                                    listener.apis = Some(Vec::new());
-                                }
-                                listener.apis.as_mut().unwrap().push(api_ref.clone());
-                                found = true;
-                            }
-                        }
-                        if !found {
-                            tracing::warn!(
-                                "Listener '{}' not found for API '{}'",
-                                listener_name,
-                                api_config.path
-                            );
-                        }
-                    }
-                } else {
-                    tracing::warn!("Global API {} has no listeners configured", api_config.path);
-                }
-            }
-        }
-
+    if let Some(listeners) = config.listeners {
         for listener in &listeners {
             let id = uuid::Uuid::new_v4().to_string();
             let config_str = serde_json::to_string(listener)?;
@@ -153,86 +114,85 @@ pub async fn handle_import_request(
                 tracing::warn!("Failed to import listener: {}", e);
             }
         }
+    }
 
-        // Import APIs from the modified listeners
-        for listener in listeners {
-            if let Some(apis) = listener.apis {
-                for api_ref in apis {
-                    let (path, modules, datasource, _access_log) = match api_ref {
-                        crate::config::ApiRef::Path(p) => (p, None, None, None),
-                        crate::config::ApiRef::WithConfig {
-                            path,
-                            modules,
-                            datasource,
-                            access_log,
-                        } => (path, modules, datasource, access_log),
+    // Import APIs
+    if let Some(apis) = config.apis {
+        for api_config in apis {
+            let path = api_config.path;
+            let modules = api_config.modules;
+            let datasource = api_config.datasource;
+            let listeners = api_config.listeners;
+
+            match std::fs::read_to_string(&path) {
+                Ok(spec_content) => {
+                    let spec_value = if let Ok(api_config) =
+                        serde_yaml::from_str::<crate::config::OpenAPIConfig>(&spec_content)
+                    {
+                        api_config.openapi.spec
+                    } else if let Ok(val) = serde_yaml::from_str::<Value>(&spec_content) {
+                        val
+                    } else {
+                        tracing::warn!("Failed to parse API spec: {}", path);
+                        continue;
                     };
 
-                    match std::fs::read_to_string(&path) {
-                        Ok(spec_content) => {
-                            let spec_value = if let Ok(api_config) =
-                                serde_yaml::from_str::<crate::config::OpenAPIConfig>(&spec_content)
-                            {
-                                api_config.openapi.spec
-                            } else if let Ok(val) = serde_yaml::from_str::<Value>(&spec_content) {
-                                val
-                            } else {
-                                tracing::warn!("Failed to parse API spec: {}", path);
-                                continue;
-                            };
+                    let name = path.clone();
+                    let version = "1.0.0".to_string();
+                    let id = uuid::Uuid::new_v4().to_string();
+                    let updated_at = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)?
+                        .as_secs() as i64;
 
-                            let name = path.clone();
-                            let version = "1.0.0".to_string();
-                            let id = uuid::Uuid::new_v4().to_string();
-                            let updated_at = std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)?
-                                .as_secs() as i64;
+                    let mut data = HashMap::new();
+                    data.insert("id".to_string(), Value::String(id));
+                    data.insert("name".to_string(), Value::String(name.clone()));
+                    data.insert("version".to_string(), Value::String(version));
+                    data.insert(
+                        "spec".to_string(),
+                        Value::String(serde_json::to_string(&spec_value)?),
+                    );
+                    if let Some(ds) = datasource {
+                        data.insert("datasource_name".to_string(), Value::String(ds));
+                    }
+                    if let Some(m) = modules {
+                        data.insert(
+                            "modules_config".to_string(),
+                            Value::String(serde_json::to_string(&m)?),
+                        );
+                    }
+                    if let Some(l) = listeners {
+                        data.insert(
+                            "listeners".to_string(),
+                            Value::String(serde_json::to_string(&l)?),
+                        );
+                    }
+                    data.insert(
+                        "created_at".to_string(),
+                        Value::Number(serde_json::Number::from(updated_at)),
+                    );
 
-                            let mut data = HashMap::new();
-                            data.insert("id".to_string(), Value::String(id));
-                            data.insert("name".to_string(), Value::String(name.clone()));
-                            data.insert("version".to_string(), Value::String(version));
-                            data.insert(
-                                "spec".to_string(),
-                                Value::String(serde_json::to_string(&spec_value)?),
-                            );
-                            if let Some(ds) = datasource {
-                                data.insert("datasource_name".to_string(), Value::String(ds));
-                            }
-                            if let Some(m) = modules {
-                                data.insert(
-                                    "modules_config".to_string(),
-                                    Value::String(serde_json::to_string(&m)?),
-                                );
-                            }
-                            data.insert(
-                                "created_at".to_string(),
-                                Value::Number(serde_json::Number::from(updated_at)),
-                            );
+                    if let Err(e) = db.insert("_meta_api_configs", data.clone()).await {
+                        tracing::warn!("Failed to insert API config, trying update: {}", e);
 
-                            if let Err(e) = db.insert("_meta_api_configs", data.clone()).await {
-                                tracing::warn!("Failed to insert API config, trying update: {}", e);
+                        let mut where_clause = HashMap::new();
+                        where_clause.insert("name".to_string(), Value::String(name));
 
-                                let mut where_clause = HashMap::new();
-                                where_clause.insert("name".to_string(), Value::String(name));
+                        // Remove ID and created_at from update
+                        let mut update_data = data;
+                        update_data.remove("id");
+                        update_data.remove("created_at");
 
-                                // Remove ID and created_at from update
-                                let mut update_data = data;
-                                update_data.remove("id");
-                                update_data.remove("created_at");
-
-                                if let Err(e) = db
-                                    .update("_meta_api_configs", update_data, where_clause)
-                                    .await
-                                {
-                                    tracing::warn!("Failed to update API config: {}", e);
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            tracing::warn!("Failed to read API spec file {}: {}", path, e);
+                        if let Err(e) = db
+                            .update("_meta_api_configs", update_data, where_clause)
+                            .await
+                        {
+                            tracing::warn!("Failed to update API config: {}", e);
                         }
                     }
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to read API spec file {}: {}", path, e);
                 }
             }
         }
