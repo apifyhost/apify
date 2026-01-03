@@ -17,7 +17,7 @@ Apify is a high-performance, zero-code API gateway that instantly generates REST
 
 ## 📚 Documentation
 
-Full documentation is available at **[https://apifyhost.github.io/apify/](https://apifyhost.github.io/apify/)** (or your configured GitHub Pages URL).
+Full documentation is available at **[https://docs.apify.host/](https://docs.apify.host/)**.
 
 *   [Quick Start](https://apifyhost.github.io/apify//getting-started/quickstart/)
 *   [Installation](https://apifyhost.github.io/apify//getting-started/installation/)
