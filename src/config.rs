@@ -165,7 +165,6 @@ pub struct ListenerConfig {
     pub port: u16,
     pub ip: String,
     pub protocol: String,
-    pub apis: Option<Vec<ApiRef>>, // API file paths or objects with modules
     pub routes: Option<Vec<RouteConfig>>, // Legacy routes support
     pub modules: Option<ModulesConfig>, // Listener-level fallback modules (internal, not OpenAPI)
     pub consumers: Option<Vec<ConsumerConfig>>, // Authentication consumers
@@ -215,18 +214,6 @@ pub struct ApiConfig {
     pub access_log: Option<AccessLogConfig>,
 }
 
-/// API reference in listener: path string or object with path + per-API modules + datasource
-#[derive(Debug, Deserialize, Serialize, Clone)]
-#[serde(untagged)]
-pub enum ApiRef {
-    Path(String),
-    WithConfig {
-        path: String,
-        modules: Option<ModulesConfig>,
-        datasource: Option<String>, // Specify which datasource to use for this API
-        access_log: Option<AccessLogConfig>, // Per-API access log configuration
-    },
-}
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ConsumerConfig {

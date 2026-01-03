@@ -1,7 +1,10 @@
 use super::models::ApiConfigRecord;
+use super::models::DatasourceConfigRecord;
 use crate::app_state::OpenApiStateConfig;
+use crate::config::DatabaseSettings;
 use crate::config::{ModulesConfig, OpenAPIConfig};
 use crate::database::DatabaseManager;
+use crate::database::DatabaseRuntimeConfig;
 use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::{Response, StatusCode};
@@ -34,6 +37,16 @@ pub async fn load_api_configs(
             .datasource_name
             .filter(|ds| !ds.trim().is_empty());
 
+        let listeners = if let Some(l_str) = api_record.listeners {
+            if l_str.trim().is_empty() {
+                None
+            } else {
+                Some(serde_json::from_str::<Vec<String>>(&l_str)?)
+            }
+        } else {
+            None
+        };
+
         configs.insert(
             api_record.name,
             OpenApiStateConfig {
@@ -46,6 +59,7 @@ pub async fn load_api_configs(
                 modules,
                 datasource: datasource_name,
                 access_log: None,
+                listeners,
             },
         );
     }
@@ -100,6 +114,34 @@ pub async fn handle_apis_request(
             let datasource_name = payload.get("datasource_name").and_then(|v| v.as_str());
             let modules_config = payload.get("modules_config");
 
+            // Parse spec to check for embedded listeners configuration
+            let spec_value: Value = serde_yaml::from_str(&spec_content)
+                .or_else(|_| serde_json::from_str(&spec_content))
+                .unwrap_or(Value::Null);
+
+            // Handle listeners association
+            let listeners_from_payload = payload.get("listeners").and_then(|v| v.as_array());
+            let listeners_from_spec = spec_value.get("listeners").and_then(|v| v.as_array());
+
+            let mut target_listeners = Vec::new();
+            if let Some(list) = listeners_from_payload {
+                for l in list {
+                    if let Some(s) = l.as_str() {
+                        target_listeners.push(s.to_string());
+                    }
+                }
+            }
+            if let Some(list) = listeners_from_spec {
+                for l in list {
+                    if let Some(s) = l.as_str() {
+                        target_listeners.push(s.to_string());
+                    }
+                }
+            }
+            // Deduplicate
+            target_listeners.sort();
+            target_listeners.dedup();
+
             let id = uuid::Uuid::new_v4().to_string();
             let created_at = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)?
@@ -128,6 +170,12 @@ pub async fn handle_apis_request(
             if let Some(mc) = modules_config {
                 data.insert("modules_config".to_string(), Value::String(mc.to_string()));
             }
+            if !target_listeners.is_empty() {
+                data.insert(
+                    "listeners".to_string(),
+                    Value::String(serde_json::to_string(&target_listeners)?),
+                );
+            }
             data.insert(
                 "created_at".to_string(),
                 Value::Number(serde_json::Number::from(created_at)),
@@ -151,7 +199,48 @@ pub async fn handle_apis_request(
             let schemas = crate::schema_generator::SchemaGenerator::extract_schemas_from_openapi(
                 &spec_value,
             )?;
-            db.initialize_schema(schemas).await?;
+
+            if let Some(ds_name) = datasource_name {
+                let mut where_clause = HashMap::new();
+                where_clause.insert("name".to_string(), Value::String(ds_name.to_string()));
+                let records = db
+                    .select("_meta_datasources", None, Some(where_clause), None, None)
+                    .await?;
+
+                if let Some(record) = records.first() {
+                    let ds_record: DatasourceConfigRecord = serde_json::from_value(record.clone())?;
+                    let ds_settings: DatabaseSettings = serde_json::from_str(&ds_record.config)?;
+
+                    let url = if ds_settings.driver == "postgres" {
+                        format!(
+                            "postgres://{}:{}@{}:{}/{}",
+                            ds_settings.user.unwrap_or_default(),
+                            ds_settings.password.unwrap_or_default(),
+                            ds_settings.host.unwrap_or("localhost".to_string()),
+                            ds_settings.port.unwrap_or(5432),
+                            ds_settings.database
+                        )
+                    } else {
+                        format!("sqlite:{}", ds_settings.database)
+                    };
+
+                    let config = DatabaseRuntimeConfig {
+                        driver: ds_settings.driver,
+                        url,
+                        max_size: ds_settings.max_pool_size.unwrap_or(10) as u32,
+                    };
+
+                    let target_db = DatabaseManager::new(config).await?;
+                    target_db.initialize_schema(schemas).await?;
+                } else {
+                    tracing::warn!(
+                        "Datasource '{}' not found, skipping schema initialization",
+                        ds_name
+                    );
+                }
+            } else {
+                db.initialize_schema(schemas).await?;
+            }
 
             Ok(Response::builder()
                 .status(StatusCode::OK)

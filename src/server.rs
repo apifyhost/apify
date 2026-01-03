@@ -8,7 +8,6 @@ use super::hyper::service::service_fn;
 use super::tokio::net::TcpListener;
 use super::{Arc, hyper_util::rt::TokioIo, tokio};
 use crate::app_state::AppStateConfig;
-use crate::config::ApiRef;
 use arc_swap::ArcSwap;
 use socket2::{Domain, Socket, Type};
 use std::error::Error;
@@ -169,33 +168,13 @@ pub fn start_listener(
                         }
                     };
 
-                    // 5. Construct OpenApiStateConfig list based on new_listener_config.apis
+                    // 5. Construct OpenApiStateConfig list based on api_configs_map and listener name
                     let mut new_openapi_configs = Vec::new();
-                    for api_ref in new_listener_config.apis.clone().unwrap_or_default() {
-                        match api_ref {
-                            ApiRef::Path(path) => {
-                                if let Some(cfg) = api_configs_map.get(&path) {
+                    for (_path, cfg) in &api_configs_map {
+                        if let Some(target_listeners) = &cfg.listeners {
+                            if let Some(lname) = &new_listener_config.name {
+                                if target_listeners.contains(lname) {
                                     new_openapi_configs.push(cfg.clone());
-                                }
-                            }
-                            ApiRef::WithConfig {
-                                path,
-                                modules,
-                                datasource,
-                                access_log,
-                            } => {
-                                if let Some(cfg) = api_configs_map.get(&path) {
-                                    let mut c = cfg.clone();
-                                    if datasource.is_some() {
-                                        c.datasource = datasource;
-                                    }
-                                    if modules.is_some() {
-                                        c.modules = modules;
-                                    }
-                                    if access_log.is_some() {
-                                        c.access_log = access_log;
-                                    }
-                                    new_openapi_configs.push(c);
                                 }
                             }
                         }
