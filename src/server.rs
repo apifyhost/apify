@@ -170,13 +170,12 @@ pub fn start_listener(
 
                     // 5. Construct OpenApiStateConfig list based on api_configs_map and listener name
                     let mut new_openapi_configs = Vec::new();
-                    for (_path, cfg) in &api_configs_map {
-                        if let Some(target_listeners) = &cfg.listeners {
-                            if let Some(lname) = &new_listener_config.name {
-                                if target_listeners.contains(lname) {
-                                    new_openapi_configs.push(cfg.clone());
-                                }
-                            }
+                    for cfg in api_configs_map.values() {
+                        if let Some(target_listeners) = &cfg.listeners
+                            && let Some(lname) = &new_listener_config.name
+                            && target_listeners.contains(lname)
+                        {
+                            new_openapi_configs.push(cfg.clone());
                         }
                     }
 

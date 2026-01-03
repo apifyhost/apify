@@ -166,7 +166,7 @@ pub struct ListenerConfig {
     pub ip: String,
     pub protocol: String,
     pub routes: Option<Vec<RouteConfig>>, // Legacy routes support
-    pub modules: Option<ModulesConfig>, // Listener-level fallback modules (internal, not OpenAPI)
+    pub modules: Option<ModulesConfig>,   // Listener-level fallback modules (internal, not OpenAPI)
     pub consumers: Option<Vec<ConsumerConfig>>, // Authentication consumers
 }
 
@@ -213,7 +213,6 @@ pub struct ApiConfig {
     pub modules: Option<ModulesConfig>,
     pub access_log: Option<AccessLogConfig>,
 }
-
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ConsumerConfig {

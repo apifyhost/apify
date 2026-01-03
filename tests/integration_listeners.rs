@@ -155,7 +155,7 @@ apis:
 "#,
         db_file.display()
     );
-    
+
     let config_path = dir.join("config.yaml");
     fs::write(&config_path, config)?;
 
@@ -181,7 +181,7 @@ apis:
     // Should NOT have /admin or /orphan
     let resp = client.get(format!("{}/public", base1)).send().await?;
     assert_eq!(resp.status(), 200, "Listener 1 should serve /public");
-    
+
     let resp = client.get(format!("{}/shared", base1)).send().await?;
     assert_eq!(resp.status(), 200, "Listener 1 should serve /shared");
 
