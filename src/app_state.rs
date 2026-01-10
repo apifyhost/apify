@@ -19,6 +19,7 @@ pub struct OpenApiStateConfig {
     pub modules: Option<ModulesConfig>,
     pub datasource: Option<String>,
     pub access_log: Option<crate::config::AccessLogConfig>,
+    pub listeners: Option<Vec<String>>,
 }
 
 /// Configuration for creating AppState

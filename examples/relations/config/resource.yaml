@@ -1,10 +1,13 @@
 listeners:
-  - port: 3000
+  - name: main-http
+    port: 3000
     ip: 0.0.0.0
     protocol: HTTP
-    apis:
-      - path: ./openapi/orders.yaml
-        datasource: sqlite1
+
+apis:
+  - path: ./openapi/orders.yaml
+    datasource: sqlite1
+    listeners: [main-http]
 
 datasource:
   sqlite1:

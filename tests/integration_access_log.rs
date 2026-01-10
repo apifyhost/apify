@@ -87,19 +87,21 @@ datasource:
     database: ":memory:"
 
 listeners:
-  - port: {port}
+  - name: default
+    port: {port}
     ip: "127.0.0.1"
     protocol: "http"
-    apis:
-      - path: "api.yaml"
-        access_log:
-          enabled: true
-          path: "{api_log}"
-          format: "json"
-          headers: ["user-agent", "x-test-header"]
-          query: true
-          body: true
-          cookies: true
+apis:
+  - path: "api.yaml"
+    listeners: [default]
+    access_log:
+      enabled: true
+      path: "{api_log}"
+      format: "json"
+      headers: ["user-agent", "x-test-header"]
+      query: true
+      body: true
+      cookies: true
 
 modules:
   access_log:

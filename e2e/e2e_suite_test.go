@@ -182,7 +182,9 @@ modules:
 		})
 	}
 
-	var apiPaths []string
+	var apiConfigs []map[string]interface{}
+	listenerName := "test-listener"
+
 	for _, path := range specFiles {
 		var fullPath string
 		// If path starts with "api:", treat it as a logical name, not a file path
@@ -193,7 +195,12 @@ modules:
 		} else {
 			fullPath = filepath.Join(projectRoot, path)
 		}
-		apiPaths = append(apiPaths, fullPath)
+
+		apiConfigs = append(apiConfigs, map[string]interface{}{
+			"path":       fullPath,
+			"listeners":  []string{listenerName},
+			"datasource": "default",
+		})
 	}
 
 	dpPortInt, _ := strconv.Atoi(dpPort)
@@ -208,12 +215,13 @@ modules:
 		},
 		"listeners": []map[string]interface{}{
 			{
+				"name":     listenerName,
 				"port":     dpPortInt,
 				"ip":       "127.0.0.1",
 				"protocol": "HTTP",
-				"apis":     apiPaths,
 			},
 		},
+		"apis": apiConfigs,
 	}
 
 	importYaml, err := yaml.Marshal(importConfig)

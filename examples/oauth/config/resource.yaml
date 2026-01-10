@@ -1,10 +1,13 @@
 listeners:
-  - port: 3000
+  - name: main-http
+    port: 3000
     ip: 0.0.0.0
     protocol: HTTP
-    apis:
-      - path: ./openapi/items_oauth.yaml
-        datasource: postgres1
+
+apis:
+  - path: ./openapi/items_oauth.yaml
+    datasource: postgres1
+    listeners: [main-http]
 
 auth:
   - name: default-api-keys

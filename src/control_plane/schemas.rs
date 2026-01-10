@@ -66,6 +66,16 @@ pub fn get_metadata_schemas() -> Vec<TableSchema> {
                     auto_field: false,
                 },
                 ColumnDefinition {
+                    name: "listeners".to_string(),
+                    column_type: "TEXT".to_string(), // JSON string array
+                    nullable: true,
+                    primary_key: false,
+                    unique: false,
+                    auto_increment: false,
+                    default_value: None,
+                    auto_field: false,
+                },
+                ColumnDefinition {
                     name: "created_at".to_string(),
                     column_type: "INTEGER".to_string(), // Timestamp
                     nullable: false,

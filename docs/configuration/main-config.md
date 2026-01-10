@@ -27,12 +27,17 @@ auth:
 
 # HTTP listeners
 listeners:
-  - port: 3000
+  - name: public
+    port: 3000
     ip: 0.0.0.0
     protocol: HTTP
-    apis:
-      - path: openapi/users.yaml
-        datasource: sqlite1
+
+# Global API definitions (mapping APIs to Listeners)
+apis:
+  - path: openapi/users.yaml
+    listeners: 
+      - public
+    datasource: sqlite1
 ```
 
 ## Sections
@@ -44,4 +49,10 @@ Defines database connections available to APIs.
 Configures global authentication providers.
 
 ### Listeners
-Configures HTTP servers and maps APIs to them.
+Configures HTTP servers. Note that each listener must have a unique `name` to be referenced by APIs.
+
+### Apis
+Defines which OpenAPI specifications to load and which listeners they should be attached to.
+*   `path`: Path to the OpenAPI file.
+*   `listeners`: List of listener names that will serve this API.
+*   `datasource`: The default datasource to use for operations in this API.

@@ -73,12 +73,14 @@ consumers:
     keys: [ t-key-001 ]
 
 listeners:
-  - port: {port}
+  - name: default
+    port: {port}
     ip: 127.0.0.1
     protocol: HTTP
-    apis:
-      - path: ./api.yaml
-        datasource: test_db
+apis:
+  - path: ./api.yaml
+    datasource: test_db
+    listeners: [default]
 "#,
         db_file.display()
     );
@@ -170,12 +172,14 @@ async fn test_missing_content_type() -> Result<(), Box<dyn std::error::Error>> {
     max_pool_size: 5
 
 listeners:
-  - port: {port}
+  - name: default
+    port: {port}
     ip: 127.0.0.1
     protocol: HTTP
-    apis:
-      - path: ./api.yaml
-        datasource: test_db
+apis:
+  - path: ./api.yaml
+    datasource: test_db
+    listeners: [default]
 "#,
         db_file.display()
     );
@@ -268,12 +272,14 @@ async fn test_request_logger_output() -> Result<(), Box<dyn std::error::Error>> 
     max_pool_size: 5
 
 listeners:
-  - port: {port}
+  - name: default
+    port: {port}
     ip: 127.0.0.1
     protocol: HTTP
-    apis:
-      - path: ./api.yaml
-        datasource: test_db
+apis:
+  - path: ./api.yaml
+    datasource: test_db
+    listeners: [default]
 "#,
         db_file.display()
     );
@@ -397,12 +403,14 @@ auth:
           keys: [ test-key-999 ]
 
 listeners:
-  - port: {port}
+  - name: default
+    port: {port}
     ip: 127.0.0.1
     protocol: HTTP
-    apis:
-      - path: ./api.yaml
-        datasource: test_db
+apis:
+  - path: ./api.yaml
+    datasource: test_db
+    listeners: [default]
 "#,
         db_file.display()
     );

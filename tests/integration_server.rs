@@ -88,12 +88,14 @@ auth:
             - t-key-001
 
 listeners:
-  - port: {port}
+  - name: default
+    port: {port}
     ip: 127.0.0.1
     protocol: HTTP
-    apis:
-      - path: ./users.yaml
-        datasource: test_db
+apis:
+  - path: ./users.yaml
+    datasource: test_db
+    listeners: [default]
 "#,
         db_file.display()
     );

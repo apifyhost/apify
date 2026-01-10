@@ -2,7 +2,7 @@
 
 use apify::{
     app_state::OpenApiStateConfig,
-    config::{ApiRef, Config, OpenAPIConfig},
+    config::{Config, OpenAPIConfig},
     modules::metrics::init_metrics,
     server::{start_docs_server, start_listener},
     startup::{RuntimeInitData, build_runtime, init_database, setup_logging},
@@ -251,7 +251,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     }
 
-    let mut listeners = if let Some(mut l) = config.listeners {
+    let listeners = if let Some(mut l) = config.listeners {
         if let Some(db_l) = db_listeners {
             l.extend(db_l);
         }
@@ -260,126 +260,47 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         db_listeners
     };
 
-    // Distribute global APIs to listeners
-    if let Some(global_apis) = &config.apis
-        && let Some(listeners_vec) = &mut listeners
-    {
-        for api_config in global_apis {
-            let api_ref = ApiRef::WithConfig {
-                path: api_config.path.clone(),
-                modules: api_config.modules.clone(),
-                datasource: api_config.datasource.clone(),
-                access_log: api_config.access_log.clone(),
-            };
-
-            if let Some(target_listeners) = &api_config.listeners {
-                for listener_name in target_listeners {
-                    let mut found = false;
-                    for listener in listeners_vec.iter_mut() {
-                        if let Some(name) = &listener.name
-                            && name == listener_name
-                        {
-                            if listener.apis.is_none() {
-                                listener.apis = Some(Vec::new());
-                            }
-                            listener.apis.as_mut().unwrap().push(api_ref.clone());
-                            found = true;
-                        }
-                    }
-                    if !found {
-                        tracing::warn!(
-                            "Listener '{}' not found for API '{}'",
-                            listener_name,
-                            api_config.path
-                        );
-                    }
-                }
-            } else {
-                tracing::warn!("Global API {} has no listeners configured", api_config.path);
-            }
-        }
-    }
-
     for (listener_idx, listener_config) in listeners.clone().into_iter().flatten().enumerate() {
         let auth_config_clone = auth_config.clone();
 
         // Load OpenAPI configurations for this listener with datasource info
         let mut openapi_configs = Vec::new();
-        if let Some(api_refs) = &listener_config.apis {
-            for api_ref in api_refs {
-                match api_ref {
-                    ApiRef::Path(p) => {
-                        // Check if in DB first
-                        if let Some(db_config) = db_openapi_configs.get(p) {
-                            tracing::info!(path = %p, "OpenAPI config loaded from DB");
-                            openapi_configs.push(db_config.clone());
-                        } else {
-                            let api_path = config_dir.join(p);
-                            match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
-                                Ok(openapi_config) => {
-                                    tracing::info!(path = %p, "OpenAPI config loaded");
-                                    openapi_configs.push(OpenApiStateConfig {
-                                        config: openapi_config,
-                                        modules: None,
-                                        datasource: None,
-                                        access_log: None,
-                                    });
-                                }
-                                Err(e) => {
-                                    tracing::error!(path = %p, error = %e, "Failed to load OpenAPI config")
-                                }
-                            }
+
+        // 1. Check global APIs from config file
+        if let Some(global_apis) = &config.apis {
+            for api_config in global_apis {
+                if let Some(target_listeners) = &api_config.listeners
+                    && let Some(lname) = &listener_config.name
+                    && target_listeners.contains(lname)
+                {
+                    let api_path = config_dir.join(&api_config.path);
+                    match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
+                        Ok(openapi_config) => {
+                            tracing::info!(path = %api_config.path, "OpenAPI config loaded");
+                            openapi_configs.push(OpenApiStateConfig {
+                                config: openapi_config,
+                                modules: api_config.modules.clone(),
+                                datasource: api_config.datasource.clone(),
+                                access_log: api_config.access_log.clone(),
+                                listeners: Some(target_listeners.clone()),
+                            });
                         }
-                    }
-                    ApiRef::WithConfig {
-                        path,
-                        modules,
-                        datasource,
-                        access_log,
-                    } => {
-                        // Check if in DB first
-                        if let Some(db_config) = db_openapi_configs.get(path) {
-                            tracing::info!(path = %path, "OpenAPI config loaded from DB");
-                            let mut config = db_config.clone();
-                            if datasource.is_some() {
-                                config.datasource = datasource.clone();
-                            }
-                            if modules.is_some() {
-                                config.modules = modules.clone();
-                            }
-                            if access_log.is_some() {
-                                config.access_log = access_log.clone();
-                            }
-                            openapi_configs.push(config);
-                        } else {
-                            let api_path = config_dir.join(path);
-                            match OpenAPIConfig::from_file(&api_path.to_string_lossy()) {
-                                Ok(openapi_config) => {
-                                    let ds_info = if let Some(ds_name) = datasource {
-                                        tracing::info!(
-                                            path = %path,
-                                            datasource = %ds_name,
-                                            "OpenAPI config loaded with datasource"
-                                        );
-                                        Some(ds_name.clone())
-                                    } else {
-                                        tracing::info!(path = %path, "OpenAPI config loaded");
-                                        None
-                                    };
-                                    openapi_configs.push(OpenApiStateConfig {
-                                        config: openapi_config,
-                                        modules: modules.clone(),
-                                        datasource: ds_info,
-                                        access_log: access_log.clone(),
-                                    });
-                                }
-                                Err(e) => {
-                                    tracing::error!(path = %path, error = %e, "Failed to load OpenAPI config")
-                                }
-                            }
+                        Err(e) => {
+                            tracing::error!(path = %api_config.path, error = %e, "Failed to load OpenAPI config")
                         }
                     }
                 }
+            }
+        }
+
+        // 2. Check APIs from DB
+        for (name, db_config) in &db_openapi_configs {
+            if let Some(target_listeners) = &db_config.listeners
+                && let Some(lname) = &listener_config.name
+                && target_listeners.contains(lname)
+            {
+                tracing::info!(path = %name, "OpenAPI config loaded from DB");
+                openapi_configs.push(db_config.clone());
             }
         }
 
@@ -510,62 +431,37 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             });
 
                             let mut openapi_configs = Vec::new();
-                            if let Some(api_refs) = &listener_config.apis {
-                                for api_ref in api_refs {
-                                    match api_ref {
-                                        ApiRef::Path(p) => {
-                                            // Check if in DB first
-                                            if let Some(db_config) = api_configs_map.get(p) {
-                                                openapi_configs.push(db_config.clone());
-                                            } else {
-                                                let api_path = config_dir.join(p);
-                                                if let Ok(openapi_config) = OpenAPIConfig::from_file(
-                                                    &api_path.to_string_lossy(),
-                                                ) {
-                                                    openapi_configs.push(OpenApiStateConfig {
-                                                        config: openapi_config,
-                                                        modules: None,
-                                                        datasource: None,
-                                                        access_log: None,
-                                                    });
-                                                }
-                                            }
-                                        }
-                                        ApiRef::WithConfig {
-                                            path,
-                                            modules,
-                                            datasource,
-                                            access_log,
-                                        } => {
-                                            // Check if in DB first
-                                            if let Some(db_config) = api_configs_map.get(path) {
-                                                let mut config = db_config.clone();
-                                                if datasource.is_some() {
-                                                    config.datasource = datasource.clone();
-                                                }
-                                                if modules.is_some() {
-                                                    config.modules = modules.clone();
-                                                }
-                                                if access_log.is_some() {
-                                                    config.access_log = access_log.clone();
-                                                }
-                                                openapi_configs.push(config);
-                                            } else {
-                                                let api_path = config_dir.join(path);
-                                                if let Ok(openapi_config) = OpenAPIConfig::from_file(
-                                                    &api_path.to_string_lossy(),
-                                                ) {
-                                                    let ds_info = datasource.clone();
-                                                    openapi_configs.push(OpenApiStateConfig {
-                                                        config: openapi_config,
-                                                        modules: modules.clone(),
-                                                        datasource: ds_info,
-                                                        access_log: access_log.clone(),
-                                                    });
-                                                }
-                                            }
+
+                            // 1. Check global APIs from config file
+                            if let Some(global_apis) = &config.apis {
+                                for api_config in global_apis {
+                                    if let Some(target_listeners) = &api_config.listeners
+                                        && let Some(lname) = &listener_config.name
+                                        && target_listeners.contains(lname)
+                                    {
+                                        let api_path = config_dir.join(&api_config.path);
+                                        if let Ok(openapi_config) =
+                                            OpenAPIConfig::from_file(&api_path.to_string_lossy())
+                                        {
+                                            openapi_configs.push(OpenApiStateConfig {
+                                                config: openapi_config,
+                                                modules: api_config.modules.clone(),
+                                                datasource: api_config.datasource.clone(),
+                                                access_log: api_config.access_log.clone(),
+                                                listeners: Some(target_listeners.clone()),
+                                            });
                                         }
                                     }
+                                }
+                            }
+
+                            // 2. Check APIs from DB
+                            for cfg in api_configs_map.values() {
+                                if let Some(target_listeners) = &cfg.listeners
+                                    && let Some(lname) = &listener_config.name
+                                    && target_listeners.contains(lname)
+                                {
+                                    openapi_configs.push(cfg.clone());
                                 }
                             }
 
