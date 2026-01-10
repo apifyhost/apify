@@ -22,10 +22,12 @@ var _ = Describe("Schema Migration", func() {
 
 	// Helper to submit OpenAPI spec via API
 	submitSpec := func(name, content string) {
-		payload := map[string]string{
-			"name":    name,
-			"version": "1.0.0",
-			"spec":    content,
+		payload := map[string]interface{}{
+			"name":            name,
+			"version":         "1.0.0",
+			"spec":            content,
+			"listeners":       []string{"test-listener"},
+			"datasource_name": "default",
 		}
 		body, _ := json.Marshal(payload)
 		req, _ := http.NewRequest("POST", env.CPBaseURL+"/_meta/apis", bytes.NewBuffer(body))
