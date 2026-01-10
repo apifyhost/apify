@@ -44,7 +44,22 @@ This will start:
 
 Apify is fully dynamic. You can configure APIs and Listeners at runtime using the Control Plane API.
 
-**1. Add a Datasource:**
+**1. Create a Listener:**
+
+Expose an HTTP server on port 3000. We give it a name (`main-listener`) to reference it later.
+
+```bash
+curl -X POST http://localhost:4000/_meta/listeners \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "main-listener",
+    "port": 3000,
+    "ip": "0.0.0.0",
+    "protocol": "http"
+  }'
+```
+
+**2. Add a Datasource:**
 
 ```bash
 curl -X POST http://localhost:4000/_meta/datasources \
@@ -62,9 +77,9 @@ curl -X POST http://localhost:4000/_meta/datasources \
   }'
 ```
 
-**2. Create an API Definition:**
+**3. Create an API Definition:**
 
-Register the API by providing the OpenAPI specification directly.
+Register the API, link it to the datasource and the listener.
 
 ```bash
 curl -X POST http://localhost:4000/_meta/apis \
@@ -73,6 +88,7 @@ curl -X POST http://localhost:4000/_meta/apis \
     "name": "users",
     "version": "1.0.0",
     "datasource_name": "postgres",
+    "listeners": ["main-listener"],
     "spec": {
       "openapi": "3.0.0",
       "info": {
@@ -103,22 +119,6 @@ curl -X POST http://localhost:4000/_meta/apis \
         }
       }
     }
-  }'
-```
-
-**3. Create a Listener:**
-
-Expose the API on port 3000.
-
-```bash
-curl -X POST http://localhost:4000/_meta/listeners \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "main-listener",
-    "port": 3000,
-    "ip": "0.0.0.0",
-    "protocol": "http",
-    "apis": ["users"]
   }'
 ```
 
