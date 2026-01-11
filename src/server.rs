@@ -297,7 +297,7 @@ pub fn start_docs_server(
         if let Some(db) = db_for_poller {
             let state_swap = Arc::clone(&state);
             let mut current_listener_name = listener_config.name.clone();
-            
+
             tokio::spawn(async move {
                 use std::time::Duration;
                 let poll_interval = std::env::var("APIFY_CONFIG_POLL_INTERVAL")
@@ -316,9 +316,9 @@ pub fn start_docs_server(
                             continue;
                         }
                     };
-                    
+
                     let listeners_list = listeners.unwrap_or_default();
-                    
+
                     // Determine which listener config to use
                     // If we are currently using "default-docs" (dummy), try to switch to the first real listener
                     // Otherwise, try to find our current listener by name/port
@@ -360,7 +360,7 @@ pub fn start_docs_server(
                             }
                         }
                     };
-                    
+
                     let listener_port = new_listener_config.port;
 
                     // 2. Load Datasources

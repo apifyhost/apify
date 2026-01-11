@@ -82,9 +82,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         .as_ref()
                         .and_then(|m| m.openapi_docs.as_ref());
 
-                    if let Some(docs_c) = docs_config {
-                        if docs_c.enabled.unwrap_or(false) {
-                            if let Some(port) = docs_c.port {
+                    if let Some(docs_c) = docs_config
+                        && docs_c.enabled.unwrap_or(false)
+                            && let Some(port) = docs_c.port {
                                 tracing::info!("Docs server enabled on port {}", port);
 
                                 // 1. Listeners
@@ -179,8 +179,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                     }
                                 });
                             }
-                        }
-                    }
                 } else {
                     tracing::warn!("Control Plane enabled but configuration missing");
                 }

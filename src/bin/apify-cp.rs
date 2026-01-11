@@ -43,113 +43,115 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             .as_ref()
             .and_then(|m| m.openapi_docs.as_ref());
 
-        if let Some(docs_c) = docs_config {
-            if docs_c.enabled.unwrap_or(false) {
-                if let Some(port) = docs_c.port {
-                    tracing::info!("Docs server enabled on port {}", port);
+        if let Some(docs_c) = docs_config
+            && docs_c.enabled.unwrap_or(false)
+            && let Some(port) = docs_c.port
+        {
+            tracing::info!("Docs server enabled on port {}", port);
 
-                    // 1. Listeners
-                    let db_listeners = apify::control_plane::load_listeners(&db).await.ok().flatten();
-                    let mut listeners = config.listeners.clone().unwrap_or_default();
-                    if let Some(dbl) = db_listeners {
-                        listeners.extend(dbl);
-                    }
+            // 1. Listeners
+            let db_listeners = apify::control_plane::load_listeners(&db)
+                .await
+                .ok()
+                .flatten();
+            let mut listeners = config.listeners.clone().unwrap_or_default();
+            if let Some(dbl) = db_listeners {
+                listeners.extend(dbl);
+            }
 
-                    // Use the first listener as reference, OR invoke with a dummy config
-                    let target_listener = listeners.first().cloned().unwrap_or_else(|| {
-                       apify::config::ListenerConfig {
-                           name: Some("default-docs".to_string()),
-                           port: 0, // Not used
-                           ip: "0.0.0.0".to_string(),
-                           protocol: "http".to_string(),
-                           routes: None,
-                           modules: None,
-                           consumers: None,
-                       }
-                    });
+            // Use the first listener as reference, OR invoke with a dummy config
+            let target_listener = listeners.first().cloned().unwrap_or_else(|| {
+                apify::config::ListenerConfig {
+                    name: Some("default-docs".to_string()),
+                    port: 0, // Not used
+                    ip: "0.0.0.0".to_string(),
+                    protocol: "http".to_string(),
+                    routes: None,
+                    modules: None,
+                    consumers: None,
+                }
+            });
 
-                    let target_listener_clone = target_listener.clone();
-                    // 2. OpenAPI Configs
-                    let mut openapi_configs = Vec::new();
+            let target_listener_clone = target_listener.clone();
+            // 2. OpenAPI Configs
+            let mut openapi_configs = Vec::new();
 
-                    // A. Static
-                    if let Some(global_apis) = &config.apis {
-                        for api_config in global_apis {
-                            // If we have a dummy listener, we might miss static configs that are bound to specific names
-                            // But usually, static configs are bound to "main-listener" etc.
-                            // If there are NO listeners, then static APIs bound to a listener won't match anyway.
-                            
-                            if let Some(target_listeners) = &api_config.listeners
-                                && let Some(lname) = &target_listener_clone.name
-                                && target_listeners.contains(lname)
-                            {
-                                let api_path = config_dir.join(&api_config.path);
-                                if let Ok(openapi_config) =
-                                    OpenAPIConfig::from_file(&api_path.to_string_lossy())
-                                {
-                                    openapi_configs.push(OpenApiStateConfig {
-                                        config: openapi_config,
-                                        modules: api_config.modules.clone(),
-                                        datasource: api_config.datasource.clone(),
-                                        access_log: api_config.access_log.clone(),
-                                        listeners: Some(target_listeners.clone()),
-                                    });
-                                }
-                            }
+            // A. Static
+            if let Some(global_apis) = &config.apis {
+                for api_config in global_apis {
+                    // If we have a dummy listener, we might miss static configs that are bound to specific names
+                    // But usually, static configs are bound to "main-listener" etc.
+                    // If there are NO listeners, then static APIs bound to a listener won't match anyway.
+
+                    if let Some(target_listeners) = &api_config.listeners
+                        && let Some(lname) = &target_listener_clone.name
+                        && target_listeners.contains(lname)
+                    {
+                        let api_path = config_dir.join(&api_config.path);
+                        if let Ok(openapi_config) =
+                            OpenAPIConfig::from_file(&api_path.to_string_lossy())
+                        {
+                            openapi_configs.push(OpenApiStateConfig {
+                                config: openapi_config,
+                                modules: api_config.modules.clone(),
+                                datasource: api_config.datasource.clone(),
+                                access_log: api_config.access_log.clone(),
+                                listeners: Some(target_listeners.clone()),
+                            });
                         }
                     }
-
-                    // B. Dynamic (load from DB)
-                    if let Ok(db_apis) = apify::control_plane::load_api_configs(&db).await {
-                         for ctx in db_apis.values() {
-                            // If we are in "dummy listener" mode, we should perhaps include ALL APIs?
-                            // Or just stick to the logic: Docs server reflects what's on a "Target Listener".
-                            // But people usually want "All APIs".
-                            // For now, let's keep strict matching. If user hasn't created a listener, they haven't "deployed" the API.
-                            
-                            if let Some(target_listeners) = &ctx.listeners
-                                && let Some(lname) = &target_listener_clone.name
-                                && target_listeners.contains(lname)
-                            {
-                                openapi_configs.push(ctx.clone());
-                            }
-                        }
-                    }
-
-                    // 3. Datasources
-                    let mut datasources = config.datasource.clone().unwrap_or_default();
-                    if let Ok(Some(db_ds)) = apify::control_plane::load_datasources(&db).await {
-                        datasources.extend(db_ds);
-                    }
-
-                    // 4. Auth
-                    let mut auth_config = config.auth.clone();
-                    if let Ok(Some(db_auth)) = apify::control_plane::load_auth_configs(&db).await {
-                        if let Some(existing) = &mut auth_config {
-                            existing.extend(db_auth);
-                        } else {
-                            auth_config = Some(db_auth);
-                        }
-                    }
-
-                    let access_log = config.modules.as_ref().and_then(|m| m.access_log.clone());
-                    let db_clone = db.clone();
-
-                    let _ = std::thread::spawn(move || {
-                        if let Err(e) = start_docs_server(
-                            port,
-                            target_listener_clone,
-                            Some(datasources),
-                            openapi_configs,
-                            auth_config,
-                            access_log,
-                            Some(db_clone),
-                        ) {
-                            tracing::error!("Docs server failed: {}", e);
-                        }
-                    });
                 }
             }
+
+            // B. Dynamic (load from DB)
+            if let Ok(db_apis) = apify::control_plane::load_api_configs(&db).await {
+                for ctx in db_apis.values() {
+                    // If we are in "dummy listener" mode, we should perhaps include ALL APIs?
+                    // Or just stick to the logic: Docs server reflects what's on a "Target Listener".
+                    // But people usually want "All APIs".
+                    // For now, let's keep strict matching. If user hasn't created a listener, they haven't "deployed" the API.
+
+                    if let Some(target_listeners) = &ctx.listeners
+                        && let Some(lname) = &target_listener_clone.name
+                        && target_listeners.contains(lname)
+                    {
+                        openapi_configs.push(ctx.clone());
+                    }
+                }
+            }
+
+            // 3. Datasources
+            let mut datasources = config.datasource.clone().unwrap_or_default();
+            if let Ok(Some(db_ds)) = apify::control_plane::load_datasources(&db).await {
+                datasources.extend(db_ds);
+            }
+
+            // 4. Auth
+            let mut auth_config = config.auth.clone();
+            if let Ok(Some(db_auth)) = apify::control_plane::load_auth_configs(&db).await {
+                if let Some(existing) = &mut auth_config {
+                    existing.extend(db_auth);
+                } else {
+                    auth_config = Some(db_auth);
+                }
+            }
+
+            let access_log = config.modules.as_ref().and_then(|m| m.access_log.clone());
+            let db_clone = db.clone();
+
+            let _ = std::thread::spawn(move || {
+                if let Err(e) = start_docs_server(
+                    port,
+                    target_listener_clone,
+                    Some(datasources),
+                    openapi_configs,
+                    auth_config,
+                    access_log,
+                    Some(db_clone),
+                ) {
+                    tracing::error!("Docs server failed: {}", e);
+                }
+            });
         }
 
         if let Some(cp_config) = config.control_plane {

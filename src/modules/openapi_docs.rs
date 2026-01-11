@@ -51,7 +51,7 @@ pub async fn handle_docs_request(
                     "schemas": {}
                 }
             });
-            
+
             return Ok(Response::builder()
                 .status(StatusCode::OK)
                 .header("Content-Type", "application/json")
