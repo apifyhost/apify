@@ -118,36 +118,34 @@ impl APIGenerator {
             .and_then(|aj| aj.get("schema"))
             .and_then(|s| s.get("$ref"))
             .and_then(|r| r.as_str())
+            && let Some(name) = Self::lookup_table_name_by_ref(spec, ref_path)
         {
-            if let Some(name) = Self::lookup_table_name_by_ref(spec, ref_path) {
-                return Some(name);
-            }
+            return Some(name);
         }
 
         // 2. Try responses (e.g. 200 OK or 201 Created)
         if let Some(responses) = op_obj.get("responses").and_then(|r| r.as_object()) {
             // Check 200, 201
             for code in ["200", "201", "202"] {
-                if let Some(response) = responses.get(code) {
-                    if let Some(schema) = response
+                if let Some(response) = responses.get(code)
+                    && let Some(schema) = response
                         .get("content")
                         .and_then(|c| c.get("application/json"))
                         .and_then(|aj| aj.get("schema"))
-                    {
-                        // It might be an array or object
-                        let ref_path = if let Some(items) = schema.get("items") {
-                            // Array of items
-                            items.get("$ref").and_then(|r| r.as_str())
-                        } else {
-                            // Direct object
-                            schema.get("$ref").and_then(|r| r.as_str())
-                        };
+                {
+                    // It might be an array or object
+                    let ref_path = if let Some(items) = schema.get("items") {
+                        // Array of items
+                        items.get("$ref").and_then(|r| r.as_str())
+                    } else {
+                        // Direct object
+                        schema.get("$ref").and_then(|r| r.as_str())
+                    };
 
-                        if let Some(rp) = ref_path {
-                            if let Some(name) = Self::lookup_table_name_by_ref(spec, rp) {
-                                return Some(name);
-                            }
-                        }
+                    if let Some(rp) = ref_path
+                        && let Some(name) = Self::lookup_table_name_by_ref(spec, rp)
+                    {
+                        return Some(name);
                     }
                 }
             }

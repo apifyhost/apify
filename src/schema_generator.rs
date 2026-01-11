@@ -21,15 +21,15 @@ pub struct TableSchema {
 #[serde(rename_all = "camelCase")]
 pub struct RelationDefinition {
     #[serde(alias = "field_name")]
-    pub field_name: String,          // Property name in the schema (e.g., "items")
+    pub field_name: String, // Property name in the schema (e.g., "items")
     #[serde(alias = "relation_type")]
     pub relation_type: RelationType, // hasMany, belongsTo, hasOne, belongsToMany
     #[serde(alias = "target_table")]
-    pub target_table: String,        // Related table name
+    pub target_table: String, // Related table name
     #[serde(alias = "foreign_key")]
-    pub foreign_key: String,         // Foreign key column name
+    pub foreign_key: String, // Foreign key column name
     #[serde(alias = "local_key")]
-    pub local_key: Option<String>,   // Local key (default: "id")
+    pub local_key: Option<String>, // Local key (default: "id")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -832,38 +832,15 @@ impl SchemaGenerator {
 
             // Check for modified columns
             if !needs_recreation {
-                tracing::info!(
-                    "Current columns: {:?}",
-                    current.columns.iter().map(|c| &c.name).collect::<Vec<_>>()
-                );
-                tracing::info!(
-                    "Desired columns: {:?}",
-                    desired.columns.iter().map(|c| &c.name).collect::<Vec<_>>()
-                );
-
                 for col in &desired.columns {
-                    tracing::info!("Checking column: {}", col.name);
                     if let Some(curr_col) = current.columns.iter().find(|c| c.name == col.name) {
-                        tracing::info!("Found match for: {}", col.name);
                         // Compare attributes relevant for SQLite
                         // Note: SQLite types are loose, but we check if the definition changed
-                        tracing::info!(
-                            "Column raw type: name={}, type={}",
-                            col.name,
-                            col.column_type
-                        );
                         let desired_type = Self::map_type_to_sqlite(&col.column_type);
                         // Current type comes from PRAGMA table_info, which might be normalized differently.
                         // We do a loose comparison.
                         let curr_type_norm = curr_col.column_type.to_uppercase();
                         let desired_type_norm = desired_type.to_uppercase();
-
-                        tracing::info!(
-                            column = %col.name,
-                            curr_type = %curr_type_norm,
-                            desired_type = %desired_type_norm,
-                            "Comparing column types for migration"
-                        );
 
                         if curr_type_norm != desired_type_norm {
                             // Check compatibility before allowing recreation
@@ -879,7 +856,10 @@ impl SchemaGenerator {
 
                         if curr_col.nullable != col.nullable
                             || curr_col.primary_key != col.primary_key
-                            || curr_col.default_value != col.default_value
+                            || !Self::are_defaults_equal(
+                                &curr_col.default_value,
+                                &col.default_value,
+                            )
                         {
                             tracing::info!(
                                 "Column attribute mismatch for {}: nullable: {} vs {}, pk: {} vs {}, default: {:?} vs {:?}",
@@ -954,6 +934,21 @@ impl SchemaGenerator {
         }
 
         Ok(sqls)
+    }
+
+    fn are_defaults_equal(d1: &Option<String>, d2: &Option<String>) -> bool {
+        match (d1, d2) {
+            (None, None) => true,
+            (Some(v1), Some(v2)) => {
+                // Normalize SQLite defaults
+                // 1. Remove surrounding single quotes
+                // 2. Case insensitive
+                let v1_norm = v1.trim_matches('\'').to_uppercase();
+                let v2_norm = v2.trim_matches('\'').to_uppercase();
+                v1_norm == v2_norm
+            }
+            _ => false,
+        }
     }
 
     fn is_type_compatible(from: &str, to: &str) -> bool {
