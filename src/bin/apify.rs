@@ -69,8 +69,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         .map_err(|e| e.to_string())?;
 
                     let db_clone = db.clone();
+                    let cp_config_for_server = cp_config.clone();
                     tokio::spawn(async move {
-                        if let Err(e) = apify::control_plane::start_control_plane_server(cp_config, db_clone).await {
+                        if let Err(e) = apify::control_plane::start_control_plane_server(cp_config_for_server, db_clone).await {
                             tracing::error!("Control Plane Server failed: {}", e);
                             std::process::exit(1);
                         }
@@ -164,6 +165,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
                                 let access_log = config.modules.as_ref().and_then(|m| m.access_log.clone());
                                 let db_for_docs = db.clone();
+                                let cp_config_for_docs = Some(cp_config.clone());
 
                                 let _ = std::thread::spawn(move || {
                                     if let Err(e) = start_docs_server(
@@ -174,6 +176,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                         auth_config,
                                         access_log,
                                         Some(db_for_docs),
+                                        cp_config_for_docs,
                                     ) {
                                         tracing::error!("Docs server failed: {}", e);
                                     }
@@ -418,6 +421,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             let access_log_config = config.modules.as_ref().and_then(|m| m.access_log.clone());
             let access_log_config_clone = access_log_config.clone();
             let control_plane_db_clone = control_plane_db.clone();
+            let control_plane_config_clone = config.control_plane.clone();
 
             let handle = thread::spawn(
                 move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -435,6 +439,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         auth_config_clone,
                         access_log_config_clone,
                         control_plane_db_clone,
+                        control_plane_config_clone,
                     )?;
                     Ok(())
                 },
@@ -473,6 +478,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             let access_log_config =
                                 config.modules.as_ref().and_then(|m| m.access_log.clone());
                             let control_plane_db_clone = control_plane_db.clone();
+                            let control_plane_config_clone = config.control_plane.clone();
 
                             // Resolve OpenAPI configs for this listener
                             let api_configs_map = rt_init.block_on(async {
@@ -524,11 +530,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 let ac_clone = auth_config_clone.clone();
                                 let al_clone = access_log_config.clone();
                                 let cp_clone = control_plane_db_clone.clone();
+                                let cp_config_clone = control_plane_config_clone.clone();
 
                                 thread::spawn(move || {
                                     let _ = start_listener(
                                         l_clone, thread_id, ds_clone, oa_clone, ac_clone, al_clone,
-                                        cp_clone,
+                                        cp_clone, cp_config_clone,
                                     );
                                 });
                             }

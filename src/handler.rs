@@ -103,11 +103,20 @@ async fn handle_request_inner(
             *headers = ctx.headers.clone();
         }
 
-        return crate::control_plane::handle_control_plane_request(
-            req_builder.body(body_stream)?,
-            db,
-        )
-        .await;
+        if let Some(config) = &state.control_plane_config {
+            return crate::control_plane::handle_control_plane_request(
+                req_builder.body(body_stream)?,
+                db,
+                config,
+            )
+            .await;
+        } else {
+             tracing::error!("Control Plane DB is present but Config is missing in AppState");
+             return Ok(Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Full::new(Bytes::from("Internal Server Error: CP Config Missing")))
+                .unwrap());
+        }
     }
 
     // Try CRUD handler first if available

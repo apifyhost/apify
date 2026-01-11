@@ -9,6 +9,7 @@ control-plane:
     user: apify
     password: apify_password
     database: apify_db
+  admin_key: UZY65Nakvsd3
 
 log_level: "info"
 

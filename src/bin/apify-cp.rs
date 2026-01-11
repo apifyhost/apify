@@ -138,6 +138,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
             let access_log = config.modules.as_ref().and_then(|m| m.access_log.clone());
             let db_clone = db.clone();
+            let cp_config_for_docs = config.control_plane.clone();
 
             let _ = std::thread::spawn(move || {
                 if let Err(e) = start_docs_server(
@@ -148,6 +149,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     auth_config,
                     access_log,
                     Some(db_clone),
+                    cp_config_for_docs,
                 ) {
                     tracing::error!("Docs server failed: {}", e);
                 }

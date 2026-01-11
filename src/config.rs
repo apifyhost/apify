@@ -23,6 +23,7 @@ pub struct Config {
 pub struct ControlPlaneConfig {
     pub listen: ControlPlaneListenConfig,
     pub database: DatabaseSettings,
+    pub admin_key: Option<String>,
 }
 
 /// Control Plane listen configuration

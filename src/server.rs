@@ -55,6 +55,7 @@ pub fn start_listener(
     auth_config: Option<Vec<super::config::Authenticator>>,
     access_log_config: Option<super::config::AccessLogConfig>,
     control_plane_db: Option<super::database::DatabaseManager>,
+    control_plane_config: Option<super::config::ControlPlaneConfig>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Critical: Create single-threaded runtime using new_current_thread
     let rt = tokio::runtime::Builder::new_current_thread() // <-- Restored critical line
@@ -74,6 +75,7 @@ pub fn start_listener(
         let initial_auth = auth_config.clone();
         let initial_access_log = access_log_config.clone();
         let db_for_poller = control_plane_db.clone();
+        let config_for_poller = control_plane_config.clone();
         let port = listener_config.port;
 
         // Create application state
@@ -87,6 +89,7 @@ pub fn start_listener(
             public_url: None,
             access_log_config,
             control_plane_db,
+            control_plane_config,
         })
         .await
         {
@@ -189,6 +192,7 @@ pub fn start_listener(
                         public_url: None,
                         access_log_config: initial_access_log.clone(),
                         control_plane_db: Some(db.clone()),
+                        control_plane_config: config_for_poller.clone(),
                     })
                     .await
                     {
@@ -261,6 +265,7 @@ pub fn start_docs_server(
     auth_config: Option<Vec<super::config::Authenticator>>,
     access_log_config: Option<super::config::AccessLogConfig>,
     control_plane_db: Option<super::database::DatabaseManager>,
+    control_plane_config: Option<super::config::ControlPlaneConfig>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -274,6 +279,7 @@ pub fn start_docs_server(
         let initial_openapi = openapi_configs.clone(); // Static configs
         let initial_access_log = access_log_config.clone();
         let db_for_poller = control_plane_db.clone();
+        let config_for_poller = control_plane_config.clone();
         let listener_port = listener_config.port; // Port of the MAIN listener, not docs port
 
         // Create initial application state
@@ -286,6 +292,7 @@ pub fn start_docs_server(
             public_url: Some(format!("http://localhost:{}", listener_port)),
             access_log_config,
             control_plane_db,
+            control_plane_config,
         })
         .await
         {
@@ -417,6 +424,7 @@ pub fn start_docs_server(
                         public_url: Some(format!("http://localhost:{}", listener_port)),
                         access_log_config: initial_access_log.clone(),
                         control_plane_db: Some(db.clone()),
+                        control_plane_config: config_for_poller.clone(),
                     })
                     .await
                     {
