@@ -75,11 +75,14 @@ impl APIGenerator {
 
                     for (method, operation) in path_obj.iter() {
                         if let Some(op_obj) = operation.as_object() {
-                            // Check for x-table-name in operation, otherwise use default
+                            // Check for x-table-name in operation
+                            // If not found, try to resolve from schema reference (x-table-schema)
+                            // Finally fallback to default extracted from path
                             let table_name = op_obj
                                 .get("x-table-name")
                                 .and_then(|v| v.as_str())
                                 .map(|s| s.to_string())
+                                .or_else(|| Self::resolve_table_name_from_schema(spec, op_obj))
                                 .unwrap_or_else(|| default_table_name.clone());
 
                             let operation_type = Self::determine_operation_type(method, path);
@@ -101,6 +104,78 @@ impl APIGenerator {
         }
 
         Ok(patterns)
+    }
+
+    fn resolve_table_name_from_schema(
+        spec: &Value,
+        op_obj: &serde_json::Map<String, Value>,
+    ) -> Option<String> {
+        // 1. Try requestBody
+        if let Some(ref_path) = op_obj
+            .get("requestBody")
+            .and_then(|rb| rb.get("content"))
+            .and_then(|c| c.get("application/json"))
+            .and_then(|aj| aj.get("schema"))
+            .and_then(|s| s.get("$ref"))
+            .and_then(|r| r.as_str())
+        {
+            if let Some(name) = Self::lookup_table_name_by_ref(spec, ref_path) {
+                return Some(name);
+            }
+        }
+
+        // 2. Try responses (e.g. 200 OK or 201 Created)
+        if let Some(responses) = op_obj.get("responses").and_then(|r| r.as_object()) {
+            // Check 200, 201
+            for code in ["200", "201", "202"] {
+                if let Some(response) = responses.get(code) {
+                    if let Some(schema) = response
+                        .get("content")
+                        .and_then(|c| c.get("application/json"))
+                        .and_then(|aj| aj.get("schema"))
+                    {
+                        // It might be an array or object
+                        let ref_path = if let Some(items) = schema.get("items") {
+                            // Array of items
+                            items.get("$ref").and_then(|r| r.as_str())
+                        } else {
+                            // Direct object
+                            schema.get("$ref").and_then(|r| r.as_str())
+                        };
+
+                        if let Some(rp) = ref_path {
+                            if let Some(name) = Self::lookup_table_name_by_ref(spec, rp) {
+                                return Some(name);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    fn lookup_table_name_by_ref(spec: &Value, ref_path: &str) -> Option<String> {
+        if !ref_path.starts_with("#/components/schemas/") {
+            return None;
+        }
+        let schema_name = ref_path.trim_start_matches("#/components/schemas/");
+
+        let schema = spec
+            .get("components")
+            .and_then(|c| c.get("schemas"))
+            .and_then(|s| s.get(schema_name))?;
+
+        let table_schema = schema.get("x-table-schema")?;
+
+        if let Some(name) = table_schema.get("tableName").and_then(|v| v.as_str()) {
+            return Some(name.to_string());
+        }
+        if let Some(name) = table_schema.get("table_name").and_then(|v| v.as_str()) {
+            return Some(name.to_string());
+        }
+        None
     }
 
     fn extract_table_name(path: &str) -> String {
