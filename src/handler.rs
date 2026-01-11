@@ -111,10 +111,12 @@ async fn handle_request_inner(
             )
             .await;
         } else {
-             tracing::error!("Control Plane DB is present but Config is missing in AppState");
-             return Ok(Response::builder()
+            tracing::error!("Control Plane DB is present but Config is missing in AppState");
+            return Ok(Response::builder()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Full::new(Bytes::from("Internal Server Error: CP Config Missing")))
+                .body(Full::new(Bytes::from(
+                    "Internal Server Error: CP Config Missing",
+                )))
                 .unwrap());
         }
     }

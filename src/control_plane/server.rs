@@ -38,7 +38,7 @@ pub async fn handle_control_plane_request(
             tracing::warn!("Unauthorized access attempt to Control Plane");
             return Ok(hyper::Response::builder()
                 .status(hyper::StatusCode::UNAUTHORIZED)
-                .body(Full::new(Bytes::from("Unauthorized")))?)
+                .body(Full::new(Bytes::from("Unauthorized")))?);
         }
     }
 
