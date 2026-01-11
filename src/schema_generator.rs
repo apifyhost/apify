@@ -5,9 +5,11 @@ use serde_json::Value;
 
 /// Table schema definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TableSchema {
     pub table_name: String,
     pub columns: Vec<ColumnDefinition>,
+    #[serde(default)]
     pub indexes: Vec<IndexDefinition>,
     #[serde(default)]
     pub relations: Vec<RelationDefinition>,
@@ -15,6 +17,7 @@ pub struct TableSchema {
 
 /// Relation definition for nested object support
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RelationDefinition {
     pub field_name: String,          // Property name in the schema (e.g., "items")
     pub relation_type: RelationType, // hasMany, belongsTo, hasOne, belongsToMany
@@ -34,12 +37,17 @@ pub enum RelationType {
 
 /// Column definition
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct ColumnDefinition {
     pub name: String,
     pub column_type: String,
+    #[serde(default)]
     pub nullable: bool,
+    #[serde(default)]
     pub primary_key: bool,
+    #[serde(default)]
     pub unique: bool,
+    #[serde(default)]
     pub auto_increment: bool,
     pub default_value: Option<String>,
     #[serde(default)]
@@ -48,9 +56,11 @@ pub struct ColumnDefinition {
 
 /// Index definition
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct IndexDefinition {
     pub name: String,
     pub columns: Vec<String>,
+    #[serde(default)]
     pub unique: bool,
 }
 
@@ -140,11 +150,24 @@ impl SchemaGenerator {
             if let Some(path_obj) = path_item.as_object() {
                 for (method, operation) in path_obj.iter() {
                     if let Some(op_obj) = operation.as_object() {
-                        // Get table name from operation
-                        let table_name = match op_obj.get("x-table-name").and_then(|v| v.as_str()) {
-                            Some(name) => name.to_string(),
-                            None => continue,
-                        };
+                        // Get table name from operation, or fallback to path extraction
+                        let table_name = op_obj
+                            .get("x-table-name")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| {
+                                // Simple extraction: /users -> users
+                                let segments: Vec<&str> = path_str.split('/').collect();
+                                if segments.len() >= 2 {
+                                    segments[1].to_string()
+                                } else {
+                                    String::new()
+                                }
+                            });
+
+                        if table_name.is_empty() {
+                            continue;
+                        }
 
                         operations_found += 1;
                         tracing::info!(

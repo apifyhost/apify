@@ -81,6 +81,8 @@ curl -X POST http://localhost:4000/_meta/datasources \
 
 Register the API, link it to the datasource and the listener.
 
+> **Note**: Configuration changes may take a few seconds to propagate (default polling interval is 10s).
+
 ```bash
 curl -X POST http://localhost:4000/_meta/apis \
   -H "Content-Type: application/json" \
@@ -98,10 +100,39 @@ curl -X POST http://localhost:4000/_meta/apis \
       "paths": {
         "/users": {
           "get": {
-            "x-table-name": "users"
+            "summary": "List users",
+            "responses": {
+              "200": {
+                "description": "List of users",
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/User"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "post": {
-            "x-table-name": "users"
+            "summary": "Create a user",
+            "requestBody": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/User"
+                  }
+                }
+              }
+            },
+            "responses": {
+              "201": {
+                "description": "User created"
+              }
+            }
           }
         }
       },
@@ -110,7 +141,7 @@ curl -X POST http://localhost:4000/_meta/apis \
           "User": {
             "type": "object",
             "properties": {
-              "id": { "type": "integer", "format": "int64" },
+              "id": { "type": "integer", "format": "int64", "readOnly": true },
               "name": { "type": "string" },
               "email": { "type": "string" }
             },
@@ -124,7 +155,7 @@ curl -X POST http://localhost:4000/_meta/apis \
 
 ### 3. Test the API
 
-Now your API is live!
+Now your API is live! (Please wait up to 10 seconds for the configuration to reload)
 
 ```bash
 # Create a user
