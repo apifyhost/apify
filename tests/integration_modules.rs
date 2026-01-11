@@ -47,10 +47,10 @@ async fn test_request_validator_size_limit() -> Result<(), Box<dyn std::error::E
     openapi: "3.0.0"
     info: { title: "Test API", version: "1.0.0" }
     x-table-schemas:
-      - table_name: "items"
+      - tableName: "items"
         columns:
-          - { name: "id", column_type: "INTEGER", nullable: false, primary_key: true, unique: false, auto_increment: true, default_value: null }
-          - { name: "data", column_type: "TEXT", nullable: false, primary_key: false, unique: false, auto_increment: false, default_value: null }
+          - { name: "id", columnType: "INTEGER", nullable: false, primaryKey: true, unique: false, autoIncrement: true, defaultValue: null }
+          - { name: "data", columnType: "TEXT", nullable: false, primaryKey: false, unique: false, autoIncrement: false, defaultValue: null }
         indexes: []
     paths:
       /items:

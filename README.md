@@ -180,6 +180,27 @@ cd apify
 
 See `examples/` directory for configuration details.
 
+## 📘 Documentation Server (Swagger UI)
+
+Apify includes a built-in Documentation Server that aggregates all your configured APIs into a single OpenAPI specification and serves a Swagger UI.
+
+This service is distinct from your main API listeners.
+
+*   **Swagger UI**: [http://localhost:4001/docs](http://localhost:4001/docs)
+*   **OpenAPI Spec**: [http://localhost:4001/openapi.json](http://localhost:4001/openapi.json)
+
+### Configuration
+
+The documentation server is **disabled by default**. To enable it, you must configure the `modules.openapi_docs` section in your `config.yaml`:
+
+```yaml
+modules:
+  openapi_docs:
+    enabled: true
+    port: 4001
+```
+
+> **Note:** The [Quickstart](#-quick-start) script uses a configuration that enables this feature on port 4001 by default.
 
 ## 🛠️ Build from Source
 

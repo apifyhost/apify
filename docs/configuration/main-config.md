@@ -59,15 +59,26 @@ Defines which OpenAPI specifications to load and which listeners they should be 
 
 ## Modules
 
-You can enable additional modules like OpenAPI documentation, Tracing, and Logging.
+You can enable additional, system-wide modules in the main configuration.
 
 ```yaml
 modules:
   openapi_docs:
     enabled: true
-    port: 4001 # Port to serve /openapi.json and Swagger UI
+    port: 4001
+  metrics:
+    enabled: true
+    port: 9090
 ```
 
-*   `enabled`: Whether to start the module.
-*   `port`: The port where the documentation server will listen.
+### OpenAPI Documentation Server (`openapi_docs`)
+
+The `openapi_docs` module serves the aggregated OpenAPI specification and a Swagger UI to visualize it.
+
+* `enabled`: (Boolean) Enable/Disable the docs server.
+* `port`: (Integer) The port where the Docs Server will listen.
+
+Once enabled, you can access:
+* **Swagger UI:** `http://localhost:<port>/docs` (e.g., `http://localhost:4001/docs`)
+* **Combined OpenAPI Spec:** `http://localhost:<port>/openapi.json`
 

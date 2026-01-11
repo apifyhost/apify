@@ -47,10 +47,10 @@ async fn books_is_open_users_is_protected() -> Result<(), Box<dyn std::error::Er
     openapi: "3.0.0"
     info: { title: "Users", version: "1.0.0" }
     x-table-schemas:
-      - table_name: "users"
+      - tableName: "users"
         columns:
-          - { name: "id", column_type: "INTEGER", nullable: false, primary_key: true, unique: false, auto_increment: true, default_value: null }
-          - { name: "name", column_type: "TEXT", nullable: false, primary_key: false, unique: false, auto_increment: false, default_value: null }
+          - { name: "id", columnType: "INTEGER", nullable: false, primaryKey: true, unique: false, autoIncrement: true, defaultValue: null }
+          - { name: "name", columnType: "TEXT", nullable: false, primaryKey: false, unique: false, autoIncrement: false, defaultValue: null }
         indexes: []
     paths:
       /users:
@@ -68,10 +68,10 @@ async fn books_is_open_users_is_protected() -> Result<(), Box<dyn std::error::Er
     openapi: "3.0.0"
     info: { title: "Books", version: "1.0.0" }
     x-table-schemas:
-      - table_name: "books"
+      - tableName: "books"
         columns:
-          - { name: "id", column_type: "INTEGER", nullable: false, primary_key: true, unique: false, auto_increment: true, default_value: null }
-          - { name: "title", column_type: "TEXT", nullable: false, primary_key: false, unique: false, auto_increment: false, default_value: null }
+          - { name: "id", columnType: "INTEGER", nullable: false, primaryKey: true, unique: false, autoIncrement: true, defaultValue: null }
+          - { name: "title", columnType: "TEXT", nullable: false, primaryKey: false, unique: false, autoIncrement: false, defaultValue: null }
         indexes: []
     paths:
       /books:
