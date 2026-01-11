@@ -7,6 +7,7 @@ use serde_json::Value;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TableSchema {
+    #[serde(alias = "table_name")]
     pub table_name: String,
     pub columns: Vec<ColumnDefinition>,
     #[serde(default)]
@@ -19,10 +20,15 @@ pub struct TableSchema {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RelationDefinition {
+    #[serde(alias = "field_name")]
     pub field_name: String,          // Property name in the schema (e.g., "items")
+    #[serde(alias = "relation_type")]
     pub relation_type: RelationType, // hasMany, belongsTo, hasOne, belongsToMany
+    #[serde(alias = "target_table")]
     pub target_table: String,        // Related table name
+    #[serde(alias = "foreign_key")]
     pub foreign_key: String,         // Foreign key column name
+    #[serde(alias = "local_key")]
     pub local_key: Option<String>,   // Local key (default: "id")
 }
 
@@ -40,17 +46,22 @@ pub enum RelationType {
 #[serde(rename_all = "camelCase")]
 pub struct ColumnDefinition {
     pub name: String,
+    #[serde(alias = "column_type")]
     pub column_type: String,
     #[serde(default)]
     pub nullable: bool,
     #[serde(default)]
+    #[serde(alias = "primary_key")]
     pub primary_key: bool,
     #[serde(default)]
     pub unique: bool,
     #[serde(default)]
+    #[serde(alias = "auto_increment")]
     pub auto_increment: bool,
+    #[serde(alias = "default_value")]
     pub default_value: Option<String>,
     #[serde(default)]
+    #[serde(alias = "auto_field")]
     pub auto_field: bool, // For audit fields like createdBy, updatedBy
 }
 
