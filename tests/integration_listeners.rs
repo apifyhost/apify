@@ -57,9 +57,9 @@ async fn test_api_listener_bindings() -> Result<(), Box<dyn std::error::Error>> 
     openapi: "3.0.0"
     info: { title: "Public API", version: "1.0.0" }
     x-table-schemas:
-      - table_name: "public_items"
+      - tableName: "public_items"
         columns:
-          - { name: "id", column_type: "INTEGER", nullable: false, primary_key: true, unique: false, auto_increment: true, default_value: null }
+          - { name: "id", columnType: "INTEGER", nullable: false, primaryKey: true, unique: false, autoIncrement: true, defaultValue: null }
         indexes: []
     paths:
       /public:
@@ -75,9 +75,9 @@ async fn test_api_listener_bindings() -> Result<(), Box<dyn std::error::Error>> 
     openapi: "3.0.0"
     info: { title: "Admin API", version: "1.0.0" }
     x-table-schemas:
-      - table_name: "admin_items"
+      - tableName: "admin_items"
         columns:
-          - { name: "id", column_type: "INTEGER", nullable: false, primary_key: true, unique: false, auto_increment: true, default_value: null }
+          - { name: "id", columnType: "INTEGER", nullable: false, primaryKey: true, unique: false, autoIncrement: true, defaultValue: null }
         indexes: []
     paths:
       /admin:
@@ -93,9 +93,9 @@ async fn test_api_listener_bindings() -> Result<(), Box<dyn std::error::Error>> 
     openapi: "3.0.0"
     info: { title: "Shared API", version: "1.0.0" }
     x-table-schemas:
-      - table_name: "shared_items"
+      - tableName: "shared_items"
         columns:
-          - { name: "id", column_type: "INTEGER", nullable: false, primary_key: true, unique: false, auto_increment: true, default_value: null }
+          - { name: "id", columnType: "INTEGER", nullable: false, primaryKey: true, unique: false, autoIncrement: true, defaultValue: null }
         indexes: []
     paths:
       /shared:
@@ -111,9 +111,9 @@ async fn test_api_listener_bindings() -> Result<(), Box<dyn std::error::Error>> 
     openapi: "3.0.0"
     info: { title: "Orphan API", version: "1.0.0" }
     x-table-schemas:
-      - table_name: "orphan_items"
+      - tableName: "orphan_items"
         columns:
-          - { name: "id", column_type: "INTEGER", nullable: false, primary_key: true, unique: false, auto_increment: true, default_value: null }
+          - { name: "id", columnType: "INTEGER", nullable: false, primaryKey: true, unique: false, autoIncrement: true, defaultValue: null }
         indexes: []
     paths:
       /orphan:

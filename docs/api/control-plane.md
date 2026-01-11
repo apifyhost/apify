@@ -15,3 +15,9 @@ Triggers a hot reload of the configuration files without restarting the server.
 ### Metrics
 `GET /metrics`
 Exposes Prometheus metrics (if enabled).
+
+### OpenAPI Documentation
+If the `openapi_docs` module is enabled (default port 4001):
+
+*   `GET /docs`: Swagger UI interface.
+*   `GET /openapi.json`: Aggregated OpenAPI 3.0 specification for all configured APIs.

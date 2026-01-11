@@ -211,59 +211,59 @@ openapi:
                       $ref: '#/components/schemas/OrderItem'
 
     x-table-schemas:
-      - table_name: "orders"
+      - tableName: "orders"
         columns:
           - name: "id"
-            column_type: "INTEGER"
-            primary_key: true
-            auto_increment: true
+            columnType: "INTEGER"
+            primaryKey: true
+            autoIncrement: true
             nullable: false
             unique: false
           - name: "customer_name"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: false
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
           - name: "total"
-            column_type: "REAL"
+            columnType: "REAL"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
           - name: "status"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            default_value: "'pending'"
-            primary_key: false
-            auto_increment: false
+            defaultValue: "'pending'"
+            primaryKey: false
+            autoIncrement: false
             unique: false
           - name: "createdBy"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
             auto_field: true
           - name: "updatedBy"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
             auto_field: true
           - name: "createdAt"
-            column_type: "DATETIME"
+            columnType: "DATETIME"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
             auto_field: true
           - name: "updatedAt"
-            column_type: "DATETIME"
+            columnType: "DATETIME"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
             auto_field: true
         indexes: []
@@ -272,70 +272,70 @@ openapi:
             relation_type: "hasMany"
             target_table: "order_items"
             foreign_key: "order_id"
-      - table_name: "order_items"
+      - tableName: "order_items"
         columns:
           - name: "id"
-            column_type: "INTEGER"
-            primary_key: true
-            auto_increment: true
+            columnType: "INTEGER"
+            primaryKey: true
+            autoIncrement: true
             nullable: false
             unique: false
           - name: "order_id"
-            column_type: "INTEGER"
+            columnType: "INTEGER"
             nullable: false
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
           - name: "product_name"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: false
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
           - name: "quantity"
-            column_type: "INTEGER"
+            columnType: "INTEGER"
             nullable: false
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
           - name: "price"
-            column_type: "REAL"
+            columnType: "REAL"
             nullable: false
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
           - name: "subtotal"
-            column_type: "REAL"
+            columnType: "REAL"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
           - name: "createdBy"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
             auto_field: true
           - name: "updatedBy"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
             auto_field: true
           - name: "createdAt"
-            column_type: "DATETIME"
+            columnType: "DATETIME"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
             auto_field: true
           - name: "updatedAt"
-            column_type: "DATETIME"
+            columnType: "DATETIME"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
             auto_field: true
         indexes: []

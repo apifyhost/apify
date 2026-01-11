@@ -38,12 +38,24 @@ pub async fn handle_docs_request(
                 .body(Full::new(Bytes::from(body)))
                 .map_err(|e| format!("Failed to build response: {}", e))?);
         } else {
+            // Return empty/default spec if no APIs are configured
+            let empty_spec = serde_json::json!({
+                "openapi": "3.0.0",
+                "info": {
+                    "title": "Apify API",
+                    "version": "1.0.0",
+                    "description": "No APIs configured yet."
+                },
+                "paths": {},
+                "components": {
+                    "schemas": {}
+                }
+            });
+
             return Ok(Response::builder()
-                .status(StatusCode::NOT_FOUND)
+                .status(StatusCode::OK)
                 .header("Content-Type", "application/json")
-                .body(Full::new(Bytes::from(
-                    r#"{"error": "OpenAPI not available"}"#,
-                )))
+                .body(Full::new(Bytes::from(empty_spec.to_string())))
                 .map_err(|e| format!("Failed to build response: {}", e))?);
         }
     }

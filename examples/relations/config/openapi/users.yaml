@@ -204,52 +204,52 @@ openapi:
                     $ref: '#/components/schemas/UserProfile'
 
     x-table-schemas:
-      - table_name: "users"
+      - tableName: "users"
         columns:
           - name: "id"
-            column_type: "INTEGER"
-            primary_key: true
-            auto_increment: true
+            columnType: "INTEGER"
+            primaryKey: true
+            autoIncrement: true
             nullable: false
             unique: false
           - name: "username"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: false
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
           - name: "email"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: false
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
           - name: "createdBy"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
             auto_field: true
           - name: "updatedBy"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
             auto_field: true
           - name: "createdAt"
-            column_type: "DATETIME"
+            columnType: "DATETIME"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
             auto_field: true
           - name: "updatedAt"
-            column_type: "DATETIME"
+            columnType: "DATETIME"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
             auto_field: true
         indexes: []
@@ -258,64 +258,64 @@ openapi:
             relation_type: "hasOne"
             target_table: "user_profiles"
             foreign_key: "user_id"
-      - table_name: "user_profiles"
+      - tableName: "user_profiles"
         columns:
           - name: "id"
-            column_type: "INTEGER"
-            primary_key: true
-            auto_increment: true
+            columnType: "INTEGER"
+            primaryKey: true
+            autoIncrement: true
             nullable: false
             unique: false
           - name: "user_id"
-            column_type: "INTEGER"
+            columnType: "INTEGER"
             nullable: false
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
           - name: "full_name"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
           - name: "bio"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
           - name: "avatar_url"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
           - name: "createdBy"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
             auto_field: true
           - name: "updatedBy"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
             auto_field: true
           - name: "createdAt"
-            column_type: "DATETIME"
+            columnType: "DATETIME"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
             auto_field: true
           - name: "updatedAt"
-            column_type: "DATETIME"
+            columnType: "DATETIME"
             nullable: true
-            primary_key: false
-            auto_increment: false
+            primaryKey: false
+            autoIncrement: false
             unique: false
             auto_field: true
         indexes: []

@@ -11,3 +11,8 @@ control-plane:
     database: apify_db
 
 log_level: "info"
+
+modules:
+  openapi_docs:
+    enabled: true
+    port: 4001

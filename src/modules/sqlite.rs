@@ -90,7 +90,7 @@ impl SqliteBackend {
             columns.push(ColumnDefinition {
                 name,
                 column_type: type_,
-                nullable: notnull == 0,
+                nullable: notnull == 0 && pk == 0,
                 primary_key: pk > 0,
                 unique: false,         // TODO: Check unique constraints
                 auto_increment: false, // SQLite handles this implicitly for INTEGER PRIMARY KEY

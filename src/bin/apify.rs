@@ -46,6 +46,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Load main configuration from specified file path
     let config = Config::from_file(&cli.config)?;
+    let config_path = Path::new(&cli.config);
+    let config_dir = config_path.parent().unwrap_or_else(|| Path::new("."));
 
     // Setup logging
     let (tracing_enabled, otlp_endpoint, log_level) = setup_logging(&config)?;
@@ -73,6 +75,110 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             std::process::exit(1);
                         }
                     });
+
+                    // Start Docs Server if configured (migrated from Data Plane)
+                    let docs_config = config
+                        .modules
+                        .as_ref()
+                        .and_then(|m| m.openapi_docs.as_ref());
+
+                    if let Some(docs_c) = docs_config
+                        && docs_c.enabled.unwrap_or(false)
+                            && let Some(port) = docs_c.port {
+                                tracing::info!("Docs server enabled on port {}", port);
+
+                                // 1. Listeners
+                                let db_listeners = apify::control_plane::load_listeners(&db).await.ok().flatten();
+                                let mut listeners_cfg = config.listeners.clone().unwrap_or_default();
+                                if let Some(dbl) = db_listeners {
+                                    listeners_cfg.extend(dbl);
+                                }
+
+                                // Use the first listener as reference, OR invoke with a dummy config
+                                let target_listener = listeners_cfg.first().cloned().unwrap_or_else(|| {
+                                   apify::config::ListenerConfig {
+                                       name: Some("default-docs".to_string()),
+                                       port: 0, // Not used
+                                       ip: "0.0.0.0".to_string(),
+                                       protocol: "http".to_string(),
+                                       routes: None,
+                                       modules: None,
+                                       consumers: None,
+                                   }
+                                });
+
+                                let target_listener_clone = target_listener.clone();
+                                // 2. OpenAPI Configs
+                                let mut openapi_configs = Vec::new();
+
+                                // A. Static
+                                if let Some(global_apis) = &config.apis {
+                                    for api_config in global_apis {
+                                        if let Some(target_listeners) = &api_config.listeners
+                                            && let Some(lname) = &target_listener_clone.name
+                                            && target_listeners.contains(lname)
+                                        {
+                                            let api_path = config_dir.join(&api_config.path);
+                                            if let Ok(openapi_config) =
+                                                OpenAPIConfig::from_file(&api_path.to_string_lossy())
+                                            {
+                                                openapi_configs.push(OpenApiStateConfig {
+                                                    config: openapi_config,
+                                                    modules: api_config.modules.clone(),
+                                                    datasource: api_config.datasource.clone(),
+                                                    access_log: api_config.access_log.clone(),
+                                                    listeners: Some(target_listeners.clone()),
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // B. Dynamic (load from DB)
+                                if let Ok(db_apis) = apify::control_plane::load_api_configs(&db).await {
+                                     for ctx in db_apis.values() {
+                                        if let Some(target_listeners) = &ctx.listeners
+                                            && let Some(lname) = &target_listener_clone.name
+                                            && target_listeners.contains(lname)
+                                        {
+                                            openapi_configs.push(ctx.clone());
+                                        }
+                                    }
+                                }
+
+                                // 3. Datasources
+                                let mut datasources = config.datasource.clone().unwrap_or_default();
+                                if let Ok(Some(db_ds)) = apify::control_plane::load_datasources(&db).await {
+                                    datasources.extend(db_ds);
+                                }
+
+                                // 4. Auth
+                                let mut auth_config = config.auth.clone();
+                                if let Ok(Some(db_auth)) = apify::control_plane::load_auth_configs(&db).await {
+                                    if let Some(existing) = &mut auth_config {
+                                        existing.extend(db_auth);
+                                    } else {
+                                        auth_config = Some(db_auth);
+                                    }
+                                }
+
+                                let access_log = config.modules.as_ref().and_then(|m| m.access_log.clone());
+                                let db_for_docs = db.clone();
+
+                                let _ = std::thread::spawn(move || {
+                                    if let Err(e) = start_docs_server(
+                                        port,
+                                        target_listener_clone,
+                                        Some(datasources),
+                                        openapi_configs,
+                                        auth_config,
+                                        access_log,
+                                        Some(db_for_docs),
+                                    ) {
+                                        tracing::error!("Docs server failed: {}", e);
+                                    }
+                                });
+                            }
                 } else {
                     tracing::warn!("Control Plane enabled but configuration missing");
                 }
@@ -330,61 +436,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         access_log_config_clone,
                         control_plane_db_clone,
                     )?;
-                    Ok(())
-                },
-            );
-            handles.push(handle);
-        }
-
-        // Start docs server if configured
-        let docs_config = config
-            .modules
-            .as_ref()
-            .and_then(|m| m.openapi_docs.as_ref());
-        if let Some(docs_port) = docs_config.and_then(|c| {
-            if c.enabled.unwrap_or(false) {
-                c.port
-            } else {
-                None
-            }
-        }) && listener_idx == 0
-        {
-            let listener_config_clone = listener_config.clone();
-            let datasources_clone = datasources.clone();
-            let openapi_configs_clone = openapi_configs.clone();
-            let auth_config_clone = auth_config.clone();
-            let access_log_config = config.modules.as_ref().and_then(|m| m.access_log.clone());
-            let access_log_config_clone = access_log_config.clone();
-
-            let handle = thread::spawn(
-                move || -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-                    tracing::info!(port = docs_port, "Starting docs server");
-
-                    // Create a runtime for AppState creation
-                    let rt = tokio::runtime::Builder::new_current_thread()
-                        .enable_all()
-                        .build()?;
-
-                    let state = rt.block_on(async {
-                        apify::app_state::AppState::new_with_crud(
-                            apify::app_state::AppStateConfig {
-                                routes: listener_config_clone.routes,
-                                datasources: datasources_clone,
-                                openapi_configs: openapi_configs_clone,
-                                listener_modules: listener_config_clone.modules,
-                                auth_config: auth_config_clone,
-                                public_url: Some(format!(
-                                    "http://localhost:{}",
-                                    listener_config_clone.port
-                                )),
-                                access_log_config: access_log_config_clone,
-                                control_plane_db: None,
-                            },
-                        )
-                        .await
-                    })?;
-
-                    start_docs_server(docs_port, std::sync::Arc::new(state))?;
                     Ok(())
                 },
             );
