@@ -64,7 +64,7 @@ RUN mkdir -p /app/config /app/data /app/logs && \
 USER apify
 
 # Expose default port
-EXPOSE 3000 4000
+EXPOSE 3000 4000 4001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

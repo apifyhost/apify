@@ -56,3 +56,18 @@ Defines which OpenAPI specifications to load and which listeners they should be 
 *   `path`: Path to the OpenAPI file.
 *   `listeners`: List of listener names that will serve this API.
 *   `datasource`: The default datasource to use for operations in this API.
+
+## Modules
+
+You can enable additional modules like OpenAPI documentation, Tracing, and Logging.
+
+```yaml
+modules:
+  openapi_docs:
+    enabled: true
+    port: 4001 # Port to serve /openapi.json and Swagger UI
+```
+
+*   `enabled`: Whether to start the module.
+*   `port`: The port where the documentation server will listen.
+
