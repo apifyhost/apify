@@ -18,123 +18,123 @@ openapi:
           bearerFormat: JWT
 
     x-table-schemas:
-      - table_name: "orders"
+      - tableName: "orders"
         columns:
           - name: "id"
-            column_type: "INTEGER"
+            columnType: "INTEGER"
             nullable: false
-            primary_key: true
+            primaryKey: true
             unique: false
-            auto_increment: true
+            autoIncrement: true
           - name: "customer_name"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: false
-            primary_key: false
+            primaryKey: false
             unique: false
-            auto_increment: false
+            autoIncrement: false
           - name: "total"
-            column_type: "REAL"
+            columnType: "REAL"
             nullable: true
-            primary_key: false
+            primaryKey: false
             unique: false
-            auto_increment: false
+            autoIncrement: false
           - name: "status"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            primary_key: false
+            primaryKey: false
             unique: false
-            auto_increment: false
+            autoIncrement: false
           - name: "createdBy"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            primary_key: false
+            primaryKey: false
             unique: false
-            auto_increment: false
+            autoIncrement: false
             auto_field: true
           - name: "updatedBy"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            primary_key: false
+            primaryKey: false
             unique: false
-            auto_increment: false
+            autoIncrement: false
             auto_field: true
           - name: "createdAt"
-            column_type: "DATETIME"
+            columnType: "DATETIME"
             nullable: true
-            primary_key: false
+            primaryKey: false
             unique: false
-            auto_increment: false
-            default_value: "CURRENT_TIMESTAMP"
+            autoIncrement: false
+            defaultValue: "CURRENT_TIMESTAMP"
             auto_field: true
           - name: "updatedAt"
-            column_type: "DATETIME"
+            columnType: "DATETIME"
             nullable: true
-            primary_key: false
+            primaryKey: false
             unique: false
-            auto_increment: false
+            autoIncrement: false
             auto_field: true
         indexes: []
 
-      - table_name: "order_items"
+      - tableName: "order_items"
         columns:
           - name: "id"
-            column_type: "INTEGER"
+            columnType: "INTEGER"
             nullable: false
-            primary_key: true
+            primaryKey: true
             unique: false
-            auto_increment: true
+            autoIncrement: true
           - name: "order_id"
-            column_type: "INTEGER"
+            columnType: "INTEGER"
             nullable: false
-            primary_key: false
+            primaryKey: false
             unique: false
-            auto_increment: false
+            autoIncrement: false
           - name: "product_name"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: false
-            primary_key: false
+            primaryKey: false
             unique: false
-            auto_increment: false
+            autoIncrement: false
           - name: "quantity"
-            column_type: "INTEGER"
+            columnType: "INTEGER"
             nullable: false
-            primary_key: false
+            primaryKey: false
             unique: false
-            auto_increment: false
+            autoIncrement: false
           - name: "price"
-            column_type: "REAL"
+            columnType: "REAL"
             nullable: false
-            primary_key: false
+            primaryKey: false
             unique: false
-            auto_increment: false
+            autoIncrement: false
           - name: "createdBy"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            primary_key: false
+            primaryKey: false
             unique: false
-            auto_increment: false
+            autoIncrement: false
             auto_field: true
           - name: "updatedBy"
-            column_type: "TEXT"
+            columnType: "TEXT"
             nullable: true
-            primary_key: false
+            primaryKey: false
             unique: false
-            auto_increment: false
+            autoIncrement: false
             auto_field: true
           - name: "createdAt"
-            column_type: "DATETIME"
+            columnType: "DATETIME"
             nullable: true
-            primary_key: false
+            primaryKey: false
             unique: false
-            auto_increment: false
-            default_value: "CURRENT_TIMESTAMP"
+            autoIncrement: false
+            defaultValue: "CURRENT_TIMESTAMP"
             auto_field: true
           - name: "updatedAt"
-            column_type: "DATETIME"
+            columnType: "DATETIME"
             nullable: true
-            primary_key: false
+            primaryKey: false
             unique: false
-            auto_increment: false
+            autoIncrement: false
             auto_field: true
         indexes: []
 
