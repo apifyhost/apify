@@ -13,6 +13,16 @@ use socket2::{Domain, Socket, Type};
 use std::error::Error;
 use std::net::{SocketAddr, TcpListener as StdTcpListener};
 
+#[derive(Clone)]
+pub struct ServerContext {
+    pub datasources: Option<std::collections::HashMap<String, super::config::DatabaseSettings>>,
+    pub openapi_configs: Vec<super::app_state::OpenApiStateConfig>,
+    pub auth_config: Option<Vec<super::config::Authenticator>>,
+    pub access_log_config: Option<super::config::AccessLogConfig>,
+    pub control_plane_db: Option<super::database::DatabaseManager>,
+    pub control_plane_config: Option<super::config::ControlPlaneConfig>,
+}
+
 /// Create TCP listener with SO_REUSEPORT support
 pub fn create_reuse_port_socket(
     addr: SocketAddr,
@@ -50,11 +60,7 @@ pub fn create_reuse_port_socket(
 pub fn start_listener(
     listener_config: ListenerConfig,
     thread_id: usize,
-    datasources: Option<std::collections::HashMap<String, super::config::DatabaseSettings>>,
-    openapi_configs: Vec<super::app_state::OpenApiStateConfig>,
-    auth_config: Option<Vec<super::config::Authenticator>>,
-    access_log_config: Option<super::config::AccessLogConfig>,
-    control_plane_db: Option<super::database::DatabaseManager>,
+    mut context: ServerContext,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Critical: Create single-threaded runtime using new_current_thread
     let rt = tokio::runtime::Builder::new_current_thread() // <-- Restored critical line
@@ -70,23 +76,25 @@ pub fn start_listener(
         tracing::info!("Thread {} bound to http://{}", thread_id, addr);
 
         // Clone configs for poller
-        let initial_datasources = datasources.clone();
-        let initial_auth = auth_config.clone();
-        let initial_access_log = access_log_config.clone();
-        let db_for_poller = control_plane_db.clone();
+        let initial_datasources = context.datasources.clone();
+        let initial_auth = context.auth_config.clone();
+        let initial_access_log = context.access_log_config.clone();
+        let db_for_poller = context.control_plane_db.clone();
+        let config_for_poller = context.control_plane_config.clone();
         let port = listener_config.port;
 
         // Create application state
         tracing::info!("Thread {} creating AppState...", thread_id);
         let state = match AppState::new_with_crud(crate::app_state::AppStateConfig {
             routes: listener_config.routes.clone(),
-            datasources,
-            openapi_configs,
+            datasources: context.datasources.take(), // Take ownership
+            openapi_configs: context.openapi_configs,
             listener_modules: listener_config.modules.clone(),
-            auth_config,
+            auth_config: context.auth_config,
             public_url: None,
-            access_log_config,
-            control_plane_db,
+            access_log_config: context.access_log_config,
+            control_plane_db: context.control_plane_db,
+            control_plane_config: context.control_plane_config,
         })
         .await
         {
@@ -189,6 +197,7 @@ pub fn start_listener(
                         public_url: None,
                         access_log_config: initial_access_log.clone(),
                         control_plane_db: Some(db.clone()),
+                        control_plane_config: config_for_poller.clone(),
                     })
                     .await
                     {
@@ -256,11 +265,7 @@ pub fn start_listener(
 pub fn start_docs_server(
     port: u16,
     listener_config: ListenerConfig,
-    datasources: Option<std::collections::HashMap<String, super::config::DatabaseSettings>>,
-    openapi_configs: Vec<super::app_state::OpenApiStateConfig>,
-    auth_config: Option<Vec<super::config::Authenticator>>,
-    access_log_config: Option<super::config::AccessLogConfig>,
-    control_plane_db: Option<super::database::DatabaseManager>,
+    mut context: ServerContext,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -269,23 +274,25 @@ pub fn start_docs_server(
 
     rt.block_on(async move {
         // Clone configs for poller
-        let initial_datasources = datasources.clone();
-        let initial_auth = auth_config.clone();
-        let initial_openapi = openapi_configs.clone(); // Static configs
-        let initial_access_log = access_log_config.clone();
-        let db_for_poller = control_plane_db.clone();
+        let initial_datasources = context.datasources.clone();
+        let initial_auth = context.auth_config.clone();
+        let initial_openapi = context.openapi_configs.clone(); // Static configs
+        let initial_access_log = context.access_log_config.clone();
+        let db_for_poller = context.control_plane_db.clone();
+        let config_for_poller = context.control_plane_config.clone();
         let listener_port = listener_config.port; // Port of the MAIN listener, not docs port
 
         // Create initial application state
         let state = match AppState::new_with_crud(AppStateConfig {
             routes: listener_config.routes.clone(),
-            datasources: datasources.clone(),
-            openapi_configs,
+            datasources: context.datasources.take(),
+            openapi_configs: context.openapi_configs,
             listener_modules: listener_config.modules.clone(),
-            auth_config,
+            auth_config: context.auth_config,
             public_url: Some(format!("http://localhost:{}", listener_port)),
-            access_log_config,
-            control_plane_db,
+            access_log_config: context.access_log_config,
+            control_plane_db: context.control_plane_db,
+            control_plane_config: context.control_plane_config,
         })
         .await
         {
@@ -417,6 +424,7 @@ pub fn start_docs_server(
                         public_url: Some(format!("http://localhost:{}", listener_port)),
                         access_log_config: initial_access_log.clone(),
                         control_plane_db: Some(db.clone()),
+                        control_plane_config: config_for_poller.clone(),
                     })
                     .await
                     {

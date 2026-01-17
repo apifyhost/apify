@@ -138,7 +138,7 @@ modules:
 
 	// Wait for CP to be ready
 	Eventually(func() error {
-		resp, err := client.Get(env.CPBaseURL + "/_meta/apis")
+		resp, err := client.Get(env.CPBaseURL + "/apify/admin/apis")
 		if err != nil {
 			return err
 		}
@@ -159,7 +159,7 @@ modules:
 		"enabled": true,
 		"config": map[string]interface{}{
 			"source":   "header",
-			"key_name": "X-Api-Key",
+			"key_name": "X-API-KEY",
 			"consumers": []map[string]interface{}{
 				{
 					"name": "default",
@@ -227,7 +227,7 @@ modules:
 	importYaml, err := yaml.Marshal(importConfig)
 	Expect(err).NotTo(HaveOccurred())
 
-	resp, err := client.Post(env.CPBaseURL+"/_meta/import", "application/x-yaml", bytes.NewBuffer(importYaml))
+	resp, err := client.Post(env.CPBaseURL+"/apify/admin/import", "application/x-yaml", bytes.NewBuffer(importYaml))
 	Expect(err).NotTo(HaveOccurred())
 	Expect(resp.StatusCode).To(Equal(200))
 	resp.Body.Close()
@@ -278,15 +278,4 @@ func (e *TestEnv) Stop() {
 	if e.TmpDir != "" {
 		os.RemoveAll(e.TmpDir)
 	}
-}
-
-func indent(s string, n int) string {
-	lines := strings.Split(s, "\n")
-	pad := strings.Repeat(" ", n)
-	for i, line := range lines {
-		if line != "" {
-			lines[i] = pad + line
-		}
-	}
-	return strings.Join(lines, "\n")
 }

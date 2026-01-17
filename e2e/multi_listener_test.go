@@ -54,7 +54,7 @@ var _ = Describe("Multi-Listener API Support", func() {
 
 		configFile := filepath.Join(tmpDir, "config.yaml")
 		dbFile := filepath.Join(tmpDir, "test.sqlite")
-		
+
 		// Create empty DB
 		f, err := os.Create(dbFile)
 		Expect(err).NotTo(HaveOccurred())
@@ -100,10 +100,14 @@ modules:
 
 		// Wait for CP
 		Eventually(func() error {
-			resp, err := client.Get(cpBaseURL + "/_meta/apis")
-			if err != nil { return err }
+			resp, err := client.Get(cpBaseURL + "/apify/admin/apis")
+			if err != nil {
+				return err
+			}
 			defer resp.Body.Close()
-			if resp.StatusCode != 200 { return fmt.Errorf("status %d", resp.StatusCode) }
+			if resp.StatusCode != 200 {
+				return fmt.Errorf("status %d", resp.StatusCode)
+			}
 			return nil
 		}, 30*time.Second, 1*time.Second).Should(Succeed(), func() string {
 			return fmt.Sprintf("CP failed to start. Stdout: %s, Stderr: %s", cpStdout.String(), cpStderr.String())
@@ -112,7 +116,7 @@ modules:
 		// Prepare Import Config
 		apiPath := filepath.Join(projectRoot, "examples/basic/config/openapi/items.yaml")
 		apiKey := "test-api-key"
-		
+
 		importConfig := map[string]interface{}{
 			"auth": []map[string]interface{}{
 				{
@@ -121,7 +125,7 @@ modules:
 					"enabled": true,
 					"config": map[string]interface{}{
 						"source":   "header",
-						"key_name": "X-Api-Key",
+						"key_name": "X-API-KEY",
 						"consumers": []map[string]interface{}{
 							{
 								"name": "default",
@@ -164,7 +168,7 @@ modules:
 		importYaml, err := yaml.Marshal(importConfig)
 		Expect(err).NotTo(HaveOccurred())
 
-		resp, err := client.Post(cpBaseURL+"/_meta/import", "application/x-yaml", bytes.NewBuffer(importYaml))
+		resp, err := client.Post(cpBaseURL+"/apify/admin/import", "application/x-yaml", bytes.NewBuffer(importYaml))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.StatusCode).To(Equal(200))
 
@@ -186,21 +190,29 @@ modules:
 		// Since listeners are dynamic, we should check the actual API endpoints
 		Eventually(func() error {
 			// Check listener 1
-			req1, _ := http.NewRequest("GET", dp1BaseURL + "/items", nil)
-			req1.Header.Set("X-Api-Key", apiKey)
+			req1, _ := http.NewRequest("GET", dp1BaseURL+"/items", nil)
+			req1.Header.Set("X-API-KEY", apiKey)
 			resp1, err := client.Do(req1)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			resp1.Body.Close()
-			if resp1.StatusCode != 200 { return fmt.Errorf("listener 1 status %d", resp1.StatusCode) }
+			if resp1.StatusCode != 200 {
+				return fmt.Errorf("listener 1 status %d", resp1.StatusCode)
+			}
 
 			// Check listener 2
-			req2, _ := http.NewRequest("GET", dp2BaseURL + "/items", nil)
-			req2.Header.Set("X-Api-Key", apiKey)
+			req2, _ := http.NewRequest("GET", dp2BaseURL+"/items", nil)
+			req2.Header.Set("X-API-KEY", apiKey)
 			resp2, err := client.Do(req2)
-			if err != nil { return err }
+			if err != nil {
+				return err
+			}
 			resp2.Body.Close()
-			if resp2.StatusCode != 200 { return fmt.Errorf("listener 2 status %d", resp2.StatusCode) }
-			
+			if resp2.StatusCode != 200 {
+				return fmt.Errorf("listener 2 status %d", resp2.StatusCode)
+			}
+
 			return nil
 		}, 30*time.Second, 1*time.Second).Should(Succeed(), func() string {
 			return fmt.Sprintf("DP failed to start. Stdout: %s, Stderr: %s", dpStdout.String(), dpStderr.String())
@@ -223,17 +235,17 @@ modules:
 
 	It("should expose the same API on multiple listeners", func() {
 		apiKey := "test-api-key"
-		
+
 		// Verify Listener 1
-		req1, _ := http.NewRequest("GET", dp1BaseURL + "/items", nil)
-		req1.Header.Set("X-Api-Key", apiKey)
+		req1, _ := http.NewRequest("GET", dp1BaseURL+"/items", nil)
+		req1.Header.Set("X-API-KEY", apiKey)
 		resp1, err := client.Do(req1)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp1.StatusCode).To(Equal(200))
-		
+
 		// Verify Listener 2
-		req2, _ := http.NewRequest("GET", dp2BaseURL + "/items", nil)
-		req2.Header.Set("X-Api-Key", apiKey)
+		req2, _ := http.NewRequest("GET", dp2BaseURL+"/items", nil)
+		req2.Header.Set("X-API-KEY", apiKey)
 		resp2, err := client.Do(req2)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp2.StatusCode).To(Equal(200))

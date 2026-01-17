@@ -21,3 +21,9 @@ If the `openapi_docs` module is enabled (default port 4001):
 
 *   `GET /docs`: Swagger UI interface.
 *   `GET /openapi.json`: Aggregated OpenAPI 3.0 specification for all configured APIs.
+
+## Authentication
+
+If `control_plane.admin_key` is configured in `config.yaml`, all requests to the Control Plane API (typically under `/apify/admin/`) must include the authentication header:
+
+`X-API-KEY: <your-admin-key>`

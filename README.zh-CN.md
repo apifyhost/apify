@@ -136,7 +136,7 @@ openapi:
         ApiKeyAuth:
           type: apiKey
           in: header
-          name: X-Api-Key
+          name: X-API-KEY
     
     # 全局应用安全策略（可在具体操作中覆盖）
     security:
@@ -228,7 +228,7 @@ cargo run --package apify -- -c config/config.yaml
 ```bash
 # 创建用户
 curl -X POST http://localhost:3000/users \
-  -H "X-Api-Key: dev-key-123" \
+  -H "X-API-KEY: dev-key-123" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "张三",
@@ -239,15 +239,15 @@ curl -X POST http://localhost:3000/users \
 
 # 列出所有用户
 curl http://localhost:3000/users \
-  -H "X-Api-Key: dev-key-123"
+  -H "X-API-KEY: dev-key-123"
 
 # 获取特定用户
 curl http://localhost:3000/users/1 \
-  -H "X-Api-Key: dev-key-123"
+  -H "X-API-KEY: dev-key-123"
 
 # 更新用户
 curl -X PUT http://localhost:3000/users/1 \
-  -H "X-Api-Key: dev-key-123" \
+  -H "X-API-KEY: dev-key-123" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "张三丰",
@@ -256,7 +256,7 @@ curl -X PUT http://localhost:3000/users/1 \
 
 # 删除用户
 curl -X DELETE http://localhost:3000/users/1 \
-  -H "X-Api-Key: dev-key-123"
+  -H "X-API-KEY: dev-key-123"
 ```
 
 完成！现在您已经拥有一个功能齐全的 CRUD API，包含认证和数据库持久化。
@@ -269,11 +269,11 @@ curl -X DELETE http://localhost:3000/users/1 \
 
 #### 认证方式
 
-Apify 使用 **API Key 认证**，通过 `X-Api-Key` 请求头传递（当启用 `key_auth` 模块时）：
+Apify 使用 **API Key 认证**，通过 `X-API-KEY` 请求头传递（当启用 `key_auth` 模块时）：
 
 ```bash
 # 在每个请求中包含 API 密钥
-curl -H "X-Api-Key: your-api-key-here" http://localhost:3000/endpoint
+curl -H "X-API-KEY: your-api-key-here" http://localhost:3000/endpoint
 ```
 
 没有认证时，您会收到 401 未授权响应：
@@ -291,7 +291,7 @@ curl http://localhost:3000/users
 ```bash
 # 创建单个用户
 curl -X POST http://localhost:3000/users \
-  -H "X-Api-Key: dev-key-123" \
+  -H "X-API-KEY: dev-key-123" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "张三",
@@ -312,7 +312,7 @@ curl -X POST http://localhost:3000/users \
 **列出所有记录：**
 ```bash
 # 获取所有用户
-curl -H "X-Api-Key: dev-key-123" http://localhost:3000/users
+curl -H "X-API-KEY: dev-key-123" http://localhost:3000/users
 
 # 响应 (200 OK):
 [
@@ -334,7 +334,7 @@ curl -H "X-Api-Key: dev-key-123" http://localhost:3000/users
 **根据 ID 获取单条记录：**
 ```bash
 # 获取 ID 为 1 的用户
-curl -H "X-Api-Key: dev-key-123" http://localhost:3000/users/1
+curl -H "X-API-KEY: dev-key-123" http://localhost:3000/users/1
 
 # 响应 (200 OK):
 {
@@ -355,7 +355,7 @@ curl -H "X-Api-Key: dev-key-123" http://localhost:3000/users/1
 ```bash
 # 更新 ID 为 1 的用户
 curl -X PUT http://localhost:3000/users/1 \
-  -H "X-Api-Key: dev-key-123" \
+  -H "X-API-KEY: dev-key-123" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "张三丰",
@@ -376,13 +376,13 @@ curl -X PUT http://localhost:3000/users/1 \
 ```bash
 # 删除 ID 为 1 的用户
 curl -X DELETE http://localhost:3000/users/1 \
-  -H "X-Api-Key: dev-key-123"
+  -H "X-API-KEY: dev-key-123"
 
 # 响应 (204 No Content)
 # 空响应体，但删除成功
 
 # 尝试获取已删除的用户 (404 Not Found):
-curl -H "X-Api-Key: dev-key-123" http://localhost:3000/users/1
+curl -H "X-API-KEY: dev-key-123" http://localhost:3000/users/1
 ```
 
 #### 查询参数（未来支持）
@@ -391,15 +391,15 @@ curl -H "X-Api-Key: dev-key-123" http://localhost:3000/users/1
 
 ```bash
 # 过滤记录（规划中）
-curl -H "X-Api-Key: dev-key-123" \
+curl -H "X-API-KEY: dev-key-123" \
   "http://localhost:3000/users?email=zhangsan@example.com"
 
 # 分页（规划中）
-curl -H "X-Api-Key: dev-key-123" \
+curl -H "X-API-KEY: dev-key-123" \
   "http://localhost:3000/users?page=1&limit=10"
 
 # 排序（规划中）
-curl -H "X-Api-Key: dev-key-123" \
+curl -H "X-API-KEY: dev-key-123" \
   "http://localhost:3000/users?sort=-created_at"
 ```
 
@@ -411,7 +411,7 @@ curl -H "X-Api-Key: dev-key-123" \
 const response = await fetch('http://localhost:3000/users', {
   method: 'POST',
   headers: {
-    'X-Api-Key': 'dev-key-123',
+    'X-API-KEY': 'dev-key-123',
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
@@ -424,7 +424,7 @@ console.log(user);
 
 // 获取所有用户
 const users = await fetch('http://localhost:3000/users', {
-  headers: { 'X-Api-Key': 'dev-key-123' }
+  headers: { 'X-API-KEY': 'dev-key-123' }
 }).then(r => r.json());
 ```
 
@@ -434,7 +434,7 @@ import requests
 
 API_KEY = 'dev-key-123'
 BASE_URL = 'http://localhost:3000'
-headers = {'X-Api-Key': API_KEY}
+headers = {'X-API-KEY': API_KEY}
 
 # 创建用户
 response = requests.post(
@@ -463,19 +463,19 @@ requests.delete(f'{BASE_URL}/users/1', headers=headers)
 **使用 HTTPie:**
 ```bash
 # 创建
-http POST localhost:3000/users X-Api-Key:dev-key-123 \
+http POST localhost:3000/users X-API-KEY:dev-key-123 \
   name="张三" email="zhangsan@example.com"
 
 # 读取
-http GET localhost:3000/users X-Api-Key:dev-key-123
-http GET localhost:3000/users/1 X-Api-Key:dev-key-123
+http GET localhost:3000/users X-API-KEY:dev-key-123
+http GET localhost:3000/users/1 X-API-KEY:dev-key-123
 
 # 更新
-http PUT localhost:3000/users/1 X-Api-Key:dev-key-123 \
+http PUT localhost:3000/users/1 X-API-KEY:dev-key-123 \
   name="张三丰" email="zhangsanfeng@example.com"
 
 # 删除
-http DELETE localhost:3000/users/1 X-Api-Key:dev-key-123
+http DELETE localhost:3000/users/1 X-API-KEY:dev-key-123
 ```
 
 #### HTTP 状态码
@@ -788,7 +788,7 @@ x-modules:
 
 示例请求：
 ```bash
-curl -H "X-Api-Key: key-123" http://localhost:3000/users
+curl -H "X-API-KEY: key-123" http://localhost:3000/users
 ```
 
 #### BodyParse 阶段模块

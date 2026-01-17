@@ -81,7 +81,7 @@ auth:
     enabled: true
     config:
       source: header
-      key_name: X-Api-Key
+      key_name: X-API-KEY
       consumers:
         - name: test
           keys:
@@ -133,7 +133,7 @@ apis:
     // With key -> 200 (empty list or whatever response)
     let resp_key = client
         .get(&ready_url)
-        .header("X-Api-Key", "t-key-001")
+        .header("X-API-KEY", "t-key-001")
         .send()
         .await?;
     let status_key = resp_key.status().as_u16();

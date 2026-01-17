@@ -94,7 +94,7 @@ auth:
     enabled: true
     config:
       source: header
-      key_name: X-Api-Key
+      key_name: X-API-KEY
       consumers:
         - name: test
           keys: [ t-key-001 ]
@@ -140,7 +140,7 @@ apis:
     // users with key -> 200
     let r = client
         .get(format!("{}/users", base))
-        .header("X-Api-Key", "t-key-001")
+        .header("X-API-KEY", "t-key-001")
         .send()
         .await?;
     assert_eq!(r.status(), 200);

@@ -89,7 +89,7 @@ auth:
     enabled: true
     config:
       source: header
-      key_name: X-Api-Key
+      key_name: X-API-KEY
       consumers:
         - name: test
           keys: [ t-key-001 ]
@@ -121,7 +121,7 @@ apis:
     wait_for_ready("127.0.0.1", port, Duration::from_secs(8)).await?;
     let client = Client::builder().no_proxy().build()?;
     let base = format!("http://127.0.0.1:{}", port);
-    let key = ("X-Api-Key", "t-key-001");
+    let key = ("X-API-KEY", "t-key-001");
 
     // Create
     let r = client

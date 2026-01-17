@@ -19,11 +19,21 @@ auth:
     enabled: true
     config:
       source: header
-      key_name: X-Api-Key
+      key_name: X-API-KEY
       consumers:
         - name: default
           keys:
             - dev-key-123
+
+# Control Plane configuration
+control-plane:
+  listen:
+    ip: 0.0.0.0
+    port: 3001
+  database:
+    driver: sqlite
+    database: ./cp.sqlite
+  auth_token: "my-secret-token"
 
 # HTTP listeners
 listeners:
@@ -56,6 +66,13 @@ Defines which OpenAPI specifications to load and which listeners they should be 
 *   `path`: Path to the OpenAPI file.
 *   `listeners`: List of listener names that will serve this API.
 *   `datasource`: The default datasource to use for operations in this API.
+
+### Control Plane
+Configures the Management API server.
+
+*   `listen`: Binding address and port.
+*   `database`: Metadata storage database (typically SQLite).
+*   `admin_key`: (Optional) If set, requires `X-API-KEY: <key>` header for all `/apify/admin` endpoints.
 
 ## Modules
 

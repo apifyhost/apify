@@ -3,7 +3,7 @@
 use apify::{
     app_state::OpenApiStateConfig,
     config::{Config, OpenAPIConfig},
-    server::start_docs_server,
+    server::{ServerContext, start_docs_server},
     startup::{build_runtime, init_database, setup_logging},
 };
 use clap::Parser;
@@ -138,17 +138,19 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
             let access_log = config.modules.as_ref().and_then(|m| m.access_log.clone());
             let db_clone = db.clone();
+            let cp_config_for_docs = config.control_plane.clone();
 
             let _ = std::thread::spawn(move || {
-                if let Err(e) = start_docs_server(
-                    port,
-                    target_listener_clone,
-                    Some(datasources),
+                let context = ServerContext {
+                    datasources: Some(datasources),
                     openapi_configs,
                     auth_config,
-                    access_log,
-                    Some(db_clone),
-                ) {
+                    access_log_config: access_log,
+                    control_plane_db: Some(db_clone),
+                    control_plane_config: cp_config_for_docs,
+                };
+
+                if let Err(e) = start_docs_server(port, target_listener_clone, context) {
                     tracing::error!("Docs server failed: {}", e);
                 }
             });

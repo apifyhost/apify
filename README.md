@@ -4,6 +4,8 @@
 
 Apify is a high-performance, zero-code API gateway that instantly generates RESTful APIs from your database schema using OpenAPI definitions.
 
+[English](#) | [中文](./README.zh-CN.md)
+
 ---
 
 ## 🚀 Features
@@ -49,7 +51,8 @@ Apify is fully dynamic. You can configure APIs and Listeners at runtime using th
 Expose an HTTP server on port 3000. We give it a name (`main-listener`) to reference it later.
 
 ```bash
-curl -X POST http://localhost:4000/_meta/listeners \
+curl -X POST http://localhost:4000/apify/admin/listeners \
+  -H "X-API-KEY: UZY65Nakvsd3" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "main-listener",
@@ -62,7 +65,8 @@ curl -X POST http://localhost:4000/_meta/listeners \
 **2. Add a Datasource:**
 
 ```bash
-curl -X POST http://localhost:4000/_meta/datasources \
+curl -X POST http://localhost:4000/apify/admin/datasources \
+  -H "X-API-KEY: UZY65Nakvsd3" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "postgres",
@@ -84,7 +88,8 @@ Register the API, link it to the datasource and the listener.
 > **Note**: Configuration changes may take a few seconds to propagate (default polling interval is 10s).
 
 ```bash
-curl -X POST http://localhost:4000/_meta/apis \
+curl -X POST http://localhost:4000/apify/admin/apis \
+  -H "X-API-KEY: UZY65Nakvsd3" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "users",
@@ -160,11 +165,12 @@ Now your API is live! (Please wait up to 10 seconds for the configuration to rel
 ```bash
 # Create a user
 curl -X POST http://localhost:3000/users \
+  -H "X-API-KEY: UZY65Nakvsd3" \
   -H "Content-Type: application/json" \
   -d '{"name": "Alice", "email": "alice@example.com"}'
 
 # List users
-curl http://localhost:3000/users
+curl -H "X-API-KEY: UZY65Nakvsd3" http://localhost:3000/users
 ```
 
 ### 3. Explore Examples

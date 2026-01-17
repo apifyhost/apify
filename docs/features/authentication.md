@@ -17,7 +17,7 @@ components:
     ApiKeyAuth:
       type: apiKey
       in: header
-      name: X-Api-Key
+      name: X-API-KEY
 security:
   - ApiKeyAuth: []
 ```

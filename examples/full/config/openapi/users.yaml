@@ -11,7 +11,7 @@ openapi:
         ApiKeyAuth:
           type: apiKey
           in: header
-          name: X-Api-Key
+          name: X-API-KEY
         BearerAuth:
           type: http
           scheme: bearer

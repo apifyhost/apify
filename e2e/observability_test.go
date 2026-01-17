@@ -14,11 +14,11 @@ import (
 
 var _ = Describe("Observability Features", func() {
 	var (
-		env         *TestEnv
-		baseURL     string
-		metricsURL  string
-		apiKey      string
-		client      *http.Client
+		env        *TestEnv
+		baseURL    string
+		metricsURL string
+		apiKey     string
+		client     *http.Client
 	)
 
 	BeforeEach(func() {
@@ -67,7 +67,7 @@ var _ = Describe("Observability Features", func() {
 			// First make some requests to generate metrics
 			for i := 0; i < 5; i++ {
 				req, _ := http.NewRequest("GET", baseURL+"/healthz", nil)
-				req.Header.Set("X-API-Key", apiKey)
+				req.Header.Set("X-API-KEY", apiKey)
 				resp, err := client.Do(req)
 				Expect(err).NotTo(HaveOccurred())
 				resp.Body.Close()
@@ -108,14 +108,14 @@ var _ = Describe("Observability Features", func() {
 		It("should track request counts by status code", func() {
 			// Make successful request
 			req, _ := http.NewRequest("GET", baseURL+"/healthz", nil)
-			req.Header.Set("X-API-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
 			resp.Body.Close()
 
 			// Make a 404 request
 			req404, _ := http.NewRequest("GET", baseURL+"/nonexistent", nil)
-			req404.Header.Set("X-API-Key", apiKey)
+			req404.Header.Set("X-API-KEY", apiKey)
 			resp404, err := client.Do(req404)
 			Expect(err).NotTo(HaveOccurred())
 			resp404.Body.Close()
@@ -147,16 +147,16 @@ var _ = Describe("Observability Features", func() {
 
 			req, _ := http.NewRequest("POST", baseURL+"/items", strings.NewReader(string(jsonData)))
 			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("X-API-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
-			
+
 			// Extract the created item ID for cleanup (if successful)
 			var createdItem map[string]interface{}
 			json.NewDecoder(resp.Body).Decode(&createdItem)
 			resp.Body.Close()
-			
+
 			// Get item ID if creation was successful
 			var itemID int64
 			if id, ok := createdItem["id"].(float64); ok {
@@ -182,11 +182,11 @@ var _ = Describe("Observability Features", func() {
 			// Should have operation labels
 			Expect(metricsText).To(ContainSubstring(`operation="insert"`))
 			Expect(metricsText).To(ContainSubstring(`table="items"`))
-			
+
 			// Cleanup: Delete the test item if it was created successfully
 			if itemID > 0 {
 				deleteReq, _ := http.NewRequest("DELETE", fmt.Sprintf("%s/items/%d", baseURL, itemID), nil)
-				deleteReq.Header.Set("X-API-Key", apiKey)
+				deleteReq.Header.Set("X-API-KEY", apiKey)
 				deleteResp, err := client.Do(deleteReq)
 				if err == nil {
 					deleteResp.Body.Close()
@@ -266,7 +266,7 @@ var _ = Describe("Observability Features", func() {
 			// Generate load
 			for i := 0; i < 50; i++ {
 				req, _ := http.NewRequest("GET", baseURL+"/healthz", nil)
-				req.Header.Set("X-API-Key", apiKey)
+				req.Header.Set("X-API-KEY", apiKey)
 				resp, err := client.Do(req)
 				if err == nil {
 					resp.Body.Close()
@@ -324,7 +324,7 @@ var _ = Describe("Observability Features", func() {
 		It("should include method labels", func() {
 			// Make requests with different methods
 			getReq, _ := http.NewRequest("GET", baseURL+"/healthz", nil)
-			getReq.Header.Set("X-API-Key", apiKey)
+			getReq.Header.Set("X-API-KEY", apiKey)
 			getResp, _ := client.Do(getReq)
 			if getResp != nil {
 				getResp.Body.Close()

@@ -32,6 +32,7 @@ pub struct AppStateConfig {
     pub public_url: Option<String>,
     pub access_log_config: Option<crate::config::AccessLogConfig>,
     pub control_plane_db: Option<DatabaseManager>,
+    pub control_plane_config: Option<crate::config::ControlPlaneConfig>,
 }
 
 /// Shared application state (route configurations and CRUD handlers)
@@ -48,6 +49,7 @@ pub struct AppState {
     pub oidc_providers: HashMap<String, OidcConfig>, // name -> provider config
     pub auth_config: Option<Vec<Authenticator>>, // Full auth configuration
     pub control_plane_db: Option<DatabaseManager>, // Database for control plane
+    pub control_plane_config: Option<crate::config::ControlPlaneConfig>, // Config for control plane
 }
 
 impl AppState {
@@ -70,6 +72,7 @@ impl AppState {
             oidc_providers: HashMap::new(),
             auth_config: None,
             control_plane_db: None,
+            control_plane_config: None,
         }
     }
 
@@ -427,6 +430,7 @@ impl AppState {
             oidc_providers: oidc_map,
             auth_config,
             control_plane_db: config.control_plane_db,
+            control_plane_config: config.control_plane_config,
         })
     }
 }
