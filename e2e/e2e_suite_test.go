@@ -159,7 +159,7 @@ modules:
 		"enabled": true,
 		"config": map[string]interface{}{
 			"source":   "header",
-			"key_name": "X-Api-Key",
+			"key_name": "X-API-KEY",
 			"consumers": []map[string]interface{}{
 				{
 					"name": "default",
@@ -278,15 +278,4 @@ func (e *TestEnv) Stop() {
 	if e.TmpDir != "" {
 		os.RemoveAll(e.TmpDir)
 	}
-}
-
-func indent(s string, n int) string {
-	lines := strings.Split(s, "\n")
-	pad := strings.Repeat(" ", n)
-	for i, line := range lines {
-		if line != "" {
-			lines[i] = pad + line
-		}
-	}
-	return strings.Join(lines, "\n")
 }

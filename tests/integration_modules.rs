@@ -397,7 +397,7 @@ auth:
     enabled: true
     config:
       source: header
-      key_name: X-Api-Key
+      key_name: X-API-KEY
       consumers:
         - name: testuser
           keys: [ test-key-999 ]
@@ -437,7 +437,7 @@ apis:
     // 2. Access phase: With key should succeed
     let resp = client
         .get(format!("{}/products", base))
-        .header("X-Api-Key", "test-key-999")
+        .header("X-API-KEY", "test-key-999")
         .send()
         .await?;
     assert_eq!(resp.status(), 200, "Should succeed with valid key");
@@ -445,7 +445,7 @@ apis:
     // 3. Full CRUD flow with authentication and logging
     let create_resp = client
         .post(format!("{}/products", base))
-        .header("X-Api-Key", "test-key-999")
+        .header("X-API-KEY", "test-key-999")
         .header("Content-Type", "application/json")
         .json(&serde_json::json!({
             "name": "Test Product",
@@ -462,7 +462,7 @@ apis:
     // 4. List all products to find our created one
     let list_resp = client
         .get(format!("{}/products", base))
-        .header("X-Api-Key", "test-key-999")
+        .header("X-API-KEY", "test-key-999")
         .send()
         .await?;
     assert_eq!(list_resp.status(), 200);
@@ -477,7 +477,7 @@ apis:
     // 5. Retrieve the specific product by ID
     let get_resp = client
         .get(format!("{}/products/{}", base, product_id))
-        .header("X-Api-Key", "test-key-999")
+        .header("X-API-KEY", "test-key-999")
         .send()
         .await?;
     assert_eq!(get_resp.status(), 200);

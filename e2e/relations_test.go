@@ -67,7 +67,7 @@ var _ = Describe("Apify Relations", func() {
 
 			req, err := http.NewRequest("POST", baseURL+"/orders", bytes.NewBuffer(jsonData))
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 			req.Header.Set("Content-Type", "application/json")
 
 			resp, err := client.Do(req)
@@ -80,7 +80,7 @@ var _ = Describe("Apify Relations", func() {
 			err = json.NewDecoder(resp.Body).Decode(&result)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result["id"]).NotTo(BeNil())
-			
+
 			id, ok := result["id"].(float64)
 			Expect(ok).To(BeTrue())
 			orderID = int64(id)
@@ -89,7 +89,7 @@ var _ = Describe("Apify Relations", func() {
 		It("should GET order with auto-loaded items", func() {
 			req, err := http.NewRequest("GET", fmt.Sprintf("%s/orders/%d", baseURL, orderID), nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -122,7 +122,7 @@ var _ = Describe("Apify Relations", func() {
 		It("should LIST orders with auto-loaded items", func() {
 			req, err := http.NewRequest("GET", baseURL+"/orders", nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -176,7 +176,7 @@ var _ = Describe("Apify Relations", func() {
 
 			req, err := http.NewRequest("PUT", fmt.Sprintf("%s/orders/%d", baseURL, orderID), bytes.NewBuffer(jsonData))
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 			req.Header.Set("Content-Type", "application/json")
 
 			resp, err := client.Do(req)
@@ -189,7 +189,7 @@ var _ = Describe("Apify Relations", func() {
 		It("should verify items were replaced", func() {
 			req, err := http.NewRequest("GET", fmt.Sprintf("%s/orders/%d", baseURL, orderID), nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -216,7 +216,7 @@ var _ = Describe("Apify Relations", func() {
 			// Delete the order
 			req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/orders/%d", baseURL, orderID), nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -227,7 +227,7 @@ var _ = Describe("Apify Relations", func() {
 			// Verify order is gone
 			req, err = http.NewRequest("GET", fmt.Sprintf("%s/orders/%d", baseURL, orderID), nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err = client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -238,7 +238,7 @@ var _ = Describe("Apify Relations", func() {
 			// Verify items are also deleted (list should not contain items with this order_id)
 			req, err = http.NewRequest("GET", baseURL+"/order_items", nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err = client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -280,7 +280,7 @@ var _ = Describe("Apify Relations", func() {
 
 			req, err := http.NewRequest("POST", baseURL+"/users", bytes.NewBuffer(jsonData))
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 			req.Header.Set("Content-Type", "application/json")
 
 			resp, err := client.Do(req)
@@ -302,7 +302,7 @@ var _ = Describe("Apify Relations", func() {
 		It("should GET user with auto-loaded profile (hasOne)", func() {
 			req, err := http.NewRequest("GET", fmt.Sprintf("%s/users/%d", baseURL, userID), nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -332,7 +332,7 @@ var _ = Describe("Apify Relations", func() {
 		It("should GET profile with auto-loaded user (belongsTo)", func() {
 			req, err := http.NewRequest("GET", fmt.Sprintf("%s/user_profiles/%d", baseURL, profileID), nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -358,7 +358,7 @@ var _ = Describe("Apify Relations", func() {
 		It("should LIST users with auto-loaded profiles", func() {
 			req, err := http.NewRequest("GET", baseURL+"/users", nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -403,7 +403,7 @@ var _ = Describe("Apify Relations", func() {
 
 			req, err := http.NewRequest("PUT", fmt.Sprintf("%s/users/%d", baseURL, userID), bytes.NewBuffer(jsonData))
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 			req.Header.Set("Content-Type", "application/json")
 
 			resp, err := client.Do(req)
@@ -416,7 +416,7 @@ var _ = Describe("Apify Relations", func() {
 		It("should verify profile was replaced", func() {
 			req, err := http.NewRequest("GET", fmt.Sprintf("%s/users/%d", baseURL, userID), nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -429,7 +429,7 @@ var _ = Describe("Apify Relations", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(user["email"]).To(Equal("newemail@example.com"))
-			
+
 			profile, ok := user["profile"].(map[string]interface{})
 			Expect(ok).To(BeTrue())
 			Expect(profile["full_name"]).To(Equal("Updated User"))
@@ -444,7 +444,7 @@ var _ = Describe("Apify Relations", func() {
 		It("should CASCADE DELETE profile when user is deleted", func() {
 			req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/users/%d", baseURL, userID), nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -455,7 +455,7 @@ var _ = Describe("Apify Relations", func() {
 			// Verify user is gone
 			req, err = http.NewRequest("GET", fmt.Sprintf("%s/users/%d", baseURL, userID), nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err = client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -466,7 +466,7 @@ var _ = Describe("Apify Relations", func() {
 			// Verify profile is also deleted
 			req, err = http.NewRequest("GET", baseURL+"/user_profiles", nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err = client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -508,7 +508,7 @@ var _ = Describe("Apify Relations", func() {
 
 			req, err := http.NewRequest("POST", baseURL+"/orders", bytes.NewBuffer(jsonData))
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 			req.Header.Set("Content-Type", "application/json")
 
 			resp, err := client.Do(req)
@@ -526,7 +526,7 @@ var _ = Describe("Apify Relations", func() {
 			// Get the order with items
 			req, err = http.NewRequest("GET", fmt.Sprintf("%s/orders/%d", baseURL, orderID), nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err = client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -549,7 +549,7 @@ var _ = Describe("Apify Relations", func() {
 			// Clean up
 			req, err = http.NewRequest("DELETE", fmt.Sprintf("%s/orders/%d", baseURL, orderID), nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 			client.Do(req)
 		})
 	})

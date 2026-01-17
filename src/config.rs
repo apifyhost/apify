@@ -55,7 +55,7 @@ pub struct ApiKeyAuthenticator {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ApiKeyConfig {
     pub source: Option<ApiKeySource>, // "header" or "query"
-    pub key_name: Option<String>,     // default "X-Api-Key"
+    pub key_name: Option<String>,     // default "X-API-KEY"
     pub consumers: Vec<ConsumerConfig>,
 }
 

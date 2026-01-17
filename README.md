@@ -4,6 +4,8 @@
 
 Apify is a high-performance, zero-code API gateway that instantly generates RESTful APIs from your database schema using OpenAPI definitions.
 
+[English](#) | [中文](./README.zh-CN.md)
+
 ---
 
 ## 🚀 Features
@@ -50,6 +52,7 @@ Expose an HTTP server on port 3000. We give it a name (`main-listener`) to refer
 
 ```bash
 curl -X POST http://localhost:4000/_meta/listeners \
+  -H "X-API-KEY: UZY65Nakvsd3" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "main-listener",
@@ -63,6 +66,7 @@ curl -X POST http://localhost:4000/_meta/listeners \
 
 ```bash
 curl -X POST http://localhost:4000/_meta/datasources \
+  -H "X-API-KEY: UZY65Nakvsd3" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "postgres",
@@ -85,6 +89,7 @@ Register the API, link it to the datasource and the listener.
 
 ```bash
 curl -X POST http://localhost:4000/_meta/apis \
+  -H "X-API-KEY: UZY65Nakvsd3" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "users",
@@ -160,11 +165,12 @@ Now your API is live! (Please wait up to 10 seconds for the configuration to rel
 ```bash
 # Create a user
 curl -X POST http://localhost:3000/users \
+  -H "X-API-KEY: UZY65Nakvsd3" \
   -H "Content-Type: application/json" \
   -d '{"name": "Alice", "email": "alice@example.com"}'
 
 # List users
-curl http://localhost:3000/users
+curl -H "X-API-KEY: UZY65Nakvsd3" http://localhost:3000/users
 ```
 
 ### 3. Explore Examples

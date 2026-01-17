@@ -40,7 +40,7 @@ var _ = Describe("OpenAPI Security Scheme", func() {
 				// /secure-items is protected by BearerAuth only
 				req, err := http.NewRequest("GET", baseURL+"/secure-items", nil)
 				Expect(err).NotTo(HaveOccurred())
-				req.Header.Set("X-Api-Key", apiKey)
+				req.Header.Set("X-API-KEY", apiKey)
 
 				resp, err := client.Do(req)
 				Expect(err).NotTo(HaveOccurred())
@@ -59,16 +59,16 @@ var _ = Describe("OpenAPI Security Scheme", func() {
 				resp, err := client.Do(req)
 				Expect(err).NotTo(HaveOccurred())
 				defer resp.Body.Close()
-				Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized), 
-					"GET /items without X-Api-Key should return 401")
+				Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized),
+					"GET /items without X-API-KEY should return 401")
 
 				// With valid API key - should succeed
-				req.Header.Set("X-Api-Key", apiKey)
+				req.Header.Set("X-API-KEY", apiKey)
 				resp, err = client.Do(req)
 				Expect(err).NotTo(HaveOccurred())
 				defer resp.Body.Close()
 				Expect(resp.StatusCode).To(Equal(http.StatusOK),
-					"GET /items with valid X-Api-Key should return 200")
+					"GET /items with valid X-API-KEY should return 200")
 			})
 
 			It("should apply global security when operation has no local security", func() {
@@ -90,7 +90,7 @@ var _ = Describe("OpenAPI Security Scheme", func() {
 				// Test with invalid key format
 				req, err := http.NewRequest("GET", baseURL+"/items", nil)
 				Expect(err).NotTo(HaveOccurred())
-				req.Header.Set("X-Api-Key", "wrong-key")
+				req.Header.Set("X-API-KEY", "wrong-key")
 
 				resp, err := client.Do(req)
 				Expect(err).NotTo(HaveOccurred())
@@ -107,7 +107,7 @@ var _ = Describe("OpenAPI Security Scheme", func() {
 				// Both mechanisms (security + x-modules) should work
 				req, err := http.NewRequest("GET", baseURL+"/items", nil)
 				Expect(err).NotTo(HaveOccurred())
-				req.Header.Set("X-Api-Key", apiKey)
+				req.Header.Set("X-API-KEY", apiKey)
 
 				resp, err := client.Do(req)
 				Expect(err).NotTo(HaveOccurred())
@@ -150,7 +150,7 @@ var _ = Describe("OpenAPI Security Scheme", func() {
 
 	Describe("Security Scheme Configuration", func() {
 		It("should reject requests with missing required header", func() {
-			// securityScheme defines "in: header, name: X-Api-Key"
+			// securityScheme defines "in: header, name: X-API-KEY"
 			req, err := http.NewRequest("DELETE", baseURL+"/items/1", nil)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -158,20 +158,20 @@ var _ = Describe("OpenAPI Security Scheme", func() {
 			Expect(err).NotTo(HaveOccurred())
 			defer resp.Body.Close()
 			Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized),
-				"Missing X-Api-Key header should be rejected")
+				"Missing X-API-KEY header should be rejected")
 		})
 
 		It("should accept requests with proper header name", func() {
 			// Verify the exact header name defined in securityScheme
 			req, err := http.NewRequest("GET", baseURL+"/items", nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey) // Must match "name: X-Api-Key"
+			req.Header.Set("X-API-KEY", apiKey) // Must match "name: X-API-KEY"
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
 			defer resp.Body.Close()
 			Expect(resp.StatusCode).To(Equal(http.StatusOK),
-				"Request with correct X-Api-Key header should succeed")
+				"Request with correct X-API-KEY header should succeed")
 		})
 	})
 })

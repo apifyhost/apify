@@ -33,11 +33,11 @@ docker compose up
 curl http://localhost:3000/healthz
 
 # List items (requires API key)
-curl -H "X-Api-Key: demo-key-123" http://localhost:3000/items
+curl -H "X-API-KEY: UZY65Nakvsd3" http://localhost:3000/items
 
 # Create an item
 curl -X POST http://localhost:3000/items \
-  -H "X-Api-Key: demo-key-123" \
+  -H "X-API-KEY: UZY65Nakvsd3" \
   -H "Content-Type: application/json" \
   -d '{"name": "Test Item", "description": "A test item"}'
 ```

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -71,7 +70,7 @@ var _ = Describe("Apify CRUD Operations", func() {
 			It("should return 401 Unauthorized", func() {
 				req, err := http.NewRequest("GET", baseURL+"/items", nil)
 				Expect(err).NotTo(HaveOccurred())
-				req.Header.Set("X-Api-Key", "invalid-key")
+				req.Header.Set("X-API-KEY", "invalid-key")
 
 				resp, err := client.Do(req)
 				Expect(err).NotTo(HaveOccurred())
@@ -85,7 +84,7 @@ var _ = Describe("Apify CRUD Operations", func() {
 			It("should allow access", func() {
 				req, err := http.NewRequest("GET", baseURL+"/items", nil)
 				Expect(err).NotTo(HaveOccurred())
-				req.Header.Set("X-Api-Key", apiKey)
+				req.Header.Set("X-API-KEY", apiKey)
 
 				resp, err := client.Do(req)
 				Expect(err).NotTo(HaveOccurred())
@@ -105,7 +104,7 @@ var _ = Describe("Apify CRUD Operations", func() {
 		It("should list empty items initially", func() {
 			req, err := http.NewRequest("GET", baseURL+"/items", nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -130,7 +129,7 @@ var _ = Describe("Apify CRUD Operations", func() {
 
 			req, err := http.NewRequest("POST", baseURL+"/items", bytes.NewBuffer(jsonData))
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 			req.Header.Set("Content-Type", "application/json")
 
 			resp, err := client.Do(req)
@@ -148,7 +147,7 @@ var _ = Describe("Apify CRUD Operations", func() {
 		It("should list the created item", func() {
 			req, err := http.NewRequest("GET", baseURL+"/items", nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -182,7 +181,7 @@ var _ = Describe("Apify CRUD Operations", func() {
 		It("should get item by ID", func() {
 			req, err := http.NewRequest("GET", fmt.Sprintf("%s/items/%d", baseURL, itemID), nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -212,7 +211,7 @@ var _ = Describe("Apify CRUD Operations", func() {
 
 			req, err := http.NewRequest("PUT", fmt.Sprintf("%s/items/%d", baseURL, itemID), bytes.NewBuffer(jsonData))
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 			req.Header.Set("Content-Type", "application/json")
 
 			resp, err := client.Do(req)
@@ -225,7 +224,7 @@ var _ = Describe("Apify CRUD Operations", func() {
 		It("should verify the update", func() {
 			req, err := http.NewRequest("GET", fmt.Sprintf("%s/items/%d", baseURL, itemID), nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -252,7 +251,7 @@ var _ = Describe("Apify CRUD Operations", func() {
 
 			req, err := http.NewRequest("POST", baseURL+"/items", bytes.NewBuffer(jsonData))
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 			req.Header.Set("Content-Type", "application/json")
 
 			resp, err := client.Do(req)
@@ -265,7 +264,7 @@ var _ = Describe("Apify CRUD Operations", func() {
 		It("should list multiple items", func() {
 			req, err := http.NewRequest("GET", baseURL+"/items", nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -282,7 +281,7 @@ var _ = Describe("Apify CRUD Operations", func() {
 		It("should delete the item", func() {
 			req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/items/%d", baseURL, itemID), nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -294,7 +293,7 @@ var _ = Describe("Apify CRUD Operations", func() {
 		It("should return 404 for deleted item", func() {
 			req, err := http.NewRequest("GET", fmt.Sprintf("%s/items/%d", baseURL, itemID), nil)
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 
 			resp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred())
@@ -325,7 +324,7 @@ var _ = Describe("Apify CRUD Operations", func() {
 
 			req, err := http.NewRequest("POST", baseURL+"/items", bytes.NewBuffer(jsonData))
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 			req.Header.Set("Content-Type", "application/json")
 
 			resp, err := client.Do(req)
@@ -350,7 +349,7 @@ var _ = Describe("Apify CRUD Operations", func() {
 
 			req, err := http.NewRequest("POST", baseURL+"/items", bytes.NewBuffer(jsonData))
 			Expect(err).NotTo(HaveOccurred())
-			req.Header.Set("X-Api-Key", apiKey)
+			req.Header.Set("X-API-KEY", apiKey)
 			req.Header.Set("Content-Type", "application/json")
 
 			resp, err := client.Do(req)
@@ -361,9 +360,3 @@ var _ = Describe("Apify CRUD Operations", func() {
 		})
 	})
 })
-
-// Helper function to read response body
-func readBody(body io.ReadCloser) string {
-	data, _ := io.ReadAll(body)
-	return string(data)
-}

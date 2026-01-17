@@ -23,16 +23,16 @@ type TokenResponse struct {
 
 var _ = Describe("OAuth/OIDC Integration", func() {
 	var (
-		env           *TestEnv
-		baseURL       string
-		keycloakURL   string
-		client        *http.Client
-		accessToken   string
-		clientID      = "apify-test-client"
-		clientSecret  = "apify-test-secret"
-		username      = "testuser"
-		password      = "testpassword"
-		realm         = "apify"
+		env          *TestEnv
+		baseURL      string
+		keycloakURL  string
+		client       *http.Client
+		accessToken  string
+		clientID     = "apify-test-client"
+		clientSecret = "apify-test-secret"
+		username     = "testuser"
+		password     = "testpassword"
+		realm        = "apify"
 	)
 
 	BeforeEach(func() {
@@ -170,7 +170,7 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 			body := `{"name":"` + uniqueName + `","description":"from key","price":1}`
 			createReq, err := http.NewRequest("POST", baseURL+"/items", strings.NewReader(body))
 			Expect(err).NotTo(HaveOccurred())
-			createReq.Header.Set("X-Api-Key", os.Getenv("API_KEY"))
+			createReq.Header.Set("X-API-KEY", os.Getenv("API_KEY"))
 			createReq.Header.Set("Content-Type", "application/json")
 			createResp, err := client.Do(createReq)
 			Expect(err).NotTo(HaveOccurred())
@@ -203,7 +203,7 @@ var _ = Describe("OAuth/OIDC Integration", func() {
 
 			listReq, err := http.NewRequest("GET", baseURL+"/items", nil)
 			Expect(err).NotTo(HaveOccurred())
-			listReq.Header.Set("X-Api-Key", os.Getenv("API_KEY"))
+			listReq.Header.Set("X-API-KEY", os.Getenv("API_KEY"))
 			listResp, err := client.Do(listReq)
 			Expect(err).NotTo(HaveOccurred())
 			defer listResp.Body.Close()

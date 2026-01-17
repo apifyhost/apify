@@ -1,5 +1,5 @@
 //! Key-based authentication module (Access phase)
-//! Uses X-Api-Key header to identify a configured consumer.
+//! Uses X-API-KEY header to identify a configured consumer.
 
 use super::{ConsumerIdentity, Module, ModuleOutcome, error_response};
 use crate::app_state::AppState;
@@ -38,7 +38,7 @@ impl Module for KeyAuthModule {
                         continue;
                     }
 
-                    let key_name = cfg.config.key_name.as_deref().unwrap_or("X-Api-Key");
+                    let key_name = cfg.config.key_name.as_deref().unwrap_or("X-API-KEY");
                     // TODO: Support Query source
                     if let Some(key) = ctx.headers.get(key_name).and_then(|v| v.to_str().ok())
                         && let Some(consumer) = state.lookup_consumer_by_key(key)

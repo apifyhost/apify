@@ -19,7 +19,7 @@ auth:
     enabled: true
     config:
       source: header
-      key_name: X-Api-Key
+      key_name: X-API-KEY
       consumers:
         - name: default
           keys:

@@ -131,7 +131,7 @@ components:
 		body, _ := json.Marshal(product)
 		req, _ := http.NewRequest("POST", baseURL+"/products", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Api-Key", env.APIKey)
+		req.Header.Set("X-API-KEY", env.APIKey)
 
 		resp, err := client.Do(req)
 		Expect(err).NotTo(HaveOccurred())
@@ -207,7 +207,7 @@ components:
 		body, _ = json.Marshal(product2)
 		req, _ = http.NewRequest("POST", baseURL+"/products", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Api-Key", env.APIKey)
+		req.Header.Set("X-API-KEY", env.APIKey)
 
 		resp, err = client.Do(req)
 		Expect(err).NotTo(HaveOccurred())
@@ -216,7 +216,7 @@ components:
 
 		// 5. Verify both products
 		req, _ = http.NewRequest("GET", baseURL+"/products", nil)
-		req.Header.Set("X-Api-Key", env.APIKey)
+		req.Header.Set("X-API-KEY", env.APIKey)
 		resp, err = client.Do(req)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.StatusCode).To(Equal(200))
@@ -307,7 +307,7 @@ components:
 		body, _ := json.Marshal(user1)
 		req, _ := http.NewRequest("POST", baseURL+"/users", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Api-Key", env.APIKey)
+		req.Header.Set("X-API-KEY", env.APIKey)
 		resp, err := client.Do(req)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.StatusCode).To(Equal(200))
@@ -380,7 +380,7 @@ components:
 		body, _ = json.Marshal(user2)
 		req, _ = http.NewRequest("POST", baseURL+"/users", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Api-Key", env.APIKey)
+		req.Header.Set("X-API-KEY", env.APIKey)
 		resp, err = client.Do(req)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.StatusCode).To(Equal(200))
@@ -388,7 +388,7 @@ components:
 
 		// 5. Verify users
 		req, _ = http.NewRequest("GET", baseURL+"/users", nil)
-		req.Header.Set("X-Api-Key", env.APIKey)
+		req.Header.Set("X-API-KEY", env.APIKey)
 		resp, err = client.Do(req)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.StatusCode).To(Equal(200))
@@ -497,7 +497,7 @@ components:
 		body, _ := json.Marshal(user1)
 		req, _ := http.NewRequest("POST", baseURL+"/users_inc", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Api-Key", env.APIKey)
+		req.Header.Set("X-API-KEY", env.APIKey)
 		resp, err := client.Do(req)
 		Expect(err).NotTo(HaveOccurred())
 		if resp.StatusCode != 200 && resp.StatusCode != 201 {
@@ -609,7 +609,7 @@ components:
 		// If we try to GET the user, it should still return the string description.
 		// Even if the API expects Integer, the JSON serializer might just pass through what's in DB (if using untyped map).
 		req, _ = http.NewRequest("GET", baseURL+"/users_inc", nil)
-		req.Header.Set("X-Api-Key", env.APIKey)
+		req.Header.Set("X-API-KEY", env.APIKey)
 		resp, err = client.Do(req)
 
 		if err == nil {

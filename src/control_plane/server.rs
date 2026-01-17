@@ -24,9 +24,9 @@ pub async fn handle_control_plane_request(
 
     // Authentication Check
     if let Some(admin_key) = &config.admin_key {
-        let authorized = if let Some(auth_header) = req.headers().get("Authorization") {
-            if let Ok(auth_str) = auth_header.to_str() {
-                auth_str == format!("Bearer {}", admin_key)
+        let authorized = if let Some(api_key_header) = req.headers().get("X-API-KEY") {
+            if let Ok(api_key) = api_key_header.to_str() {
+                api_key == admin_key
             } else {
                 false
             }
