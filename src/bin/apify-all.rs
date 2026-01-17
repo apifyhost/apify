@@ -50,7 +50,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 let db_clone = db.clone();
                 let cp_config_for_server = cp_config.clone();
                 tokio::spawn(async move {
-                    if let Err(e) = apify::control_plane::start_control_plane_server(cp_config_for_server, db_clone).await {
+                    if let Err(e) = apify::control_plane::start_control_plane_server(
+                        cp_config_for_server,
+                        db_clone,
+                    )
+                    .await
+                    {
                         tracing::error!("Control Plane Server failed: {}", e);
                         std::process::exit(1);
                     }
@@ -69,7 +74,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     tracing::info!("Docs server enabled on port {}", port);
 
                     // 1. Listeners
-                    let db_listeners = apify::control_plane::load_listeners(&db).await.ok().flatten();
+                    let db_listeners = apify::control_plane::load_listeners(&db)
+                        .await
+                        .ok()
+                        .flatten();
                     let mut listeners_cfg = config.listeners.clone().unwrap_or_default();
                     if let Some(dbl) = db_listeners {
                         listeners_cfg.extend(dbl);
@@ -157,11 +165,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             control_plane_config: cp_config_for_docs,
                         };
 
-                        if let Err(e) = start_docs_server(
-                            port,
-                            target_listener_clone,
-                            context,
-                        ) {
+                        if let Err(e) = start_docs_server(port, target_listener_clone, context) {
                             tracing::error!("Docs server failed: {}", e);
                         }
                     });
@@ -174,10 +178,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             // Load configs from DB
             let api_configs = match apify::control_plane::load_api_configs(&db).await {
                 Ok(configs) => {
-                    tracing::info!(
-                        count = configs.len(),
-                        "Loaded API configs from Metadata DB"
-                    );
+                    tracing::info!(count = configs.len(), "Loaded API configs from Metadata DB");
                     configs
                 }
                 Err(e) => {
@@ -276,7 +277,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // If CP is running, keep the process alive (user can Ctrl-C to exit)
         if config.control_plane.is_some() {
             tracing::info!("No Data Plane listeners configured. Running Control Plane only mode");
-            
+
             // Handle signals for graceful shutdown
             let (tx, rx) = std::sync::mpsc::channel();
             ctrlc::set_handler(move || {
@@ -299,15 +300,18 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut handles = vec![];
 
     for (thread_id, listener_config) in listeners.into_iter().enumerate() {
-        let listener_name = listener_config.name.clone().unwrap_or_else(|| format!("listener-{}", thread_id));
-        
+        let listener_name = listener_config
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("listener-{}", thread_id));
+
         // Merge all configs for this listener thread
         let mut openapi_configs = Vec::new();
-        for (_, api_cfg) in &merged_api_configs {
-            if let Some(ref listeners_for_api) = api_cfg.listeners {
-                if listeners_for_api.contains(&listener_name) {
-                    openapi_configs.push(api_cfg.clone());
-                }
+        for api_cfg in merged_api_configs.values() {
+            if let Some(ref listeners_for_api) = api_cfg.listeners
+                && listeners_for_api.contains(&listener_name)
+            {
+                openapi_configs.push(api_cfg.clone());
             }
         }
 
