@@ -18,6 +18,7 @@ COPY Cargo.toml Cargo.lock ./
 RUN mkdir -p src/bin && \
     echo "fn main() {}" > src/bin/apify.rs && \
     echo "fn main() {}" > src/bin/apify-cp.rs && \
+    echo "fn main() {}" > src/bin/apify-all.rs && \
     echo "pub fn dummy() {}" > src/lib.rs
 
 # Build dependencies (this layer will be cached)
