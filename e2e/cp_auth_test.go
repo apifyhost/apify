@@ -97,7 +97,7 @@ modules:
 		// Wait for CP to be ready (we use a loop with auth token to check readiness)
 		Eventually(func() error {
 			req, _ := http.NewRequest("GET", cpBaseURL+"/apify/admin/apis", nil)
-			req.Header.Set("Authorization", "Bearer "+authToken)
+			req.Header.Set("X-API-KEY", authToken)
 			resp, err := client.Do(req)
 			if err != nil {
 				return err
@@ -119,25 +119,25 @@ modules:
 		}
 	})
 
-	It("should reject requests without authorization header", func() {
+	It("should reject requests without api key header", func() {
 		resp, err := client.Get(cpBaseURL + "/apify/admin/apis")
 		Expect(err).NotTo(HaveOccurred())
 		defer resp.Body.Close()
 		Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
 	})
 
-	It("should reject requests with invalid token", func() {
+	It("should reject requests with invalid key", func() {
 		req, _ := http.NewRequest("GET", cpBaseURL+"/apify/admin/apis", nil)
-		req.Header.Set("Authorization", "Bearer invalid-token")
+		req.Header.Set("X-API-KEY", "invalid-key")
 		resp, err := client.Do(req)
 		Expect(err).NotTo(HaveOccurred())
 		defer resp.Body.Close()
 		Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
 	})
 
-	It("should allow requests with valid token", func() {
+	It("should allow requests with valid key", func() {
 		req, _ := http.NewRequest("GET", cpBaseURL+"/apify/admin/apis", nil)
-		req.Header.Set("Authorization", "Bearer "+authToken)
+		req.Header.Set("X-API-KEY", authToken)
 		resp, err := client.Do(req)
 		Expect(err).NotTo(HaveOccurred())
 		defer resp.Body.Close()
