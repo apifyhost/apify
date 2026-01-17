@@ -94,7 +94,7 @@ async fn handle_request_inner(
 
     // Control Plane handling
     if let Some(db) = &state.control_plane_db
-        && ctx.path.starts_with("/_meta/")
+        && ctx.path.starts_with("/apify/admin/")
     {
         let mut req_builder = Request::builder()
             .method(ctx.method.clone())

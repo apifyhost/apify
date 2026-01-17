@@ -30,7 +30,7 @@ var _ = Describe("Schema Migration", func() {
 			"datasource_name": "default",
 		}
 		body, _ := json.Marshal(payload)
-		req, _ := http.NewRequest("POST", env.CPBaseURL+"/_meta/apis", bytes.NewBuffer(body))
+		req, _ := http.NewRequest("POST", env.CPBaseURL+"/apify/admin/apis", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 
 		resp, err := client.Do(req)
@@ -576,7 +576,7 @@ components:
             default_value: null
 `
 		// Submit V2 - Expect Failure
-		urlV2 := fmt.Sprintf("%s/_meta/apis", env.CPBaseURL)
+		urlV2 := fmt.Sprintf("%s/apify/admin/apis", env.CPBaseURL)
 		payload := map[string]string{
 			"name":    "users-inc-api",
 			"version": "1.0.0",

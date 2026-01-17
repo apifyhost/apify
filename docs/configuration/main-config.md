@@ -72,7 +72,7 @@ Configures the Management API server.
 
 *   `listen`: Binding address and port.
 *   `database`: Metadata storage database (typically SQLite).
-*   `admin_key`: (Optional) If set, requires `Authorization: Bearer <key>` for all `/_meta` endpoints.
+*   `admin_key`: (Optional) If set, requires `X-API-KEY: <key>` header for all `/apify/admin` endpoints.
 
 ## Modules
 

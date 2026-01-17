@@ -6,12 +6,12 @@ The Control Plane (CP) is responsible for managing the configuration of the Apif
 
 ### Import API
 
-**Endpoint:** `POST /_meta/apis`
+**Endpoint:** `POST /apify/admin/apis`
 
 Import a single OpenAPI specification.
 
 ```bash
-curl -X POST http://127.0.0.1:4000/_meta/apis \
+curl -X POST http://127.0.0.1:4000/apify/admin/apis \
   -H "Content-Type: application/json" \
   -d '{
     "name": "demo-api",
@@ -22,11 +22,11 @@ curl -X POST http://127.0.0.1:4000/_meta/apis \
 
 ### Bulk Import
 
-**Endpoint:** `POST /_meta/import`
+**Endpoint:** `POST /apify/admin/import`
 
 Import a complete configuration file.
 
 ```bash
-curl -X POST http://127.0.0.1:4000/_meta/import \
+curl -X POST http://127.0.0.1:4000/apify/admin/import \
   --data-binary @config.yaml
 ```

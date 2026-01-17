@@ -24,6 +24,6 @@ If the `openapi_docs` module is enabled (default port 4001):
 
 ## Authentication
 
-If `control_plane.admin_key` is configured in `config.yaml`, all requests to the Control Plane API (typically under `/_meta/`) must include the authentication header:
+If `control_plane.admin_key` is configured in `config.yaml`, all requests to the Control Plane API (typically under `/apify/admin/`) must include the authentication header:
 
-`Authorization: Bearer <your-admin-key>`
+`X-API-KEY: <your-admin-key>`

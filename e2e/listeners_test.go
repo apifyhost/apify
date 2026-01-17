@@ -142,7 +142,7 @@ modules:
 
 		// Wait for CP
 		Eventually(func() error {
-			resp, err := client.Get(env.CPBaseURL + "/_meta/apis")
+			resp, err := client.Get(env.CPBaseURL + "/apify/admin/apis")
 			if err != nil {
 				return err
 			}
@@ -180,7 +180,7 @@ modules:
 		importYaml, err := yaml.Marshal(importConfig)
 		Expect(err).NotTo(HaveOccurred())
 
-		resp, err := client.Post(env.CPBaseURL+"/_meta/import", "application/x-yaml", bytes.NewBuffer(importYaml))
+		resp, err := client.Post(env.CPBaseURL+"/apify/admin/import", "application/x-yaml", bytes.NewBuffer(importYaml))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.StatusCode).To(Equal(200))
 		resp.Body.Close()

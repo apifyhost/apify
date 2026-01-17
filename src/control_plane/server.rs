@@ -42,19 +42,19 @@ pub async fn handle_control_plane_request(
         }
     }
 
-    if path == "/_meta/apis" {
+    if path == "/apify/admin/apis" {
         let res = handle_apis_request(req, db).await;
         if let Ok(ref r) = res {
             tracing::info!("API Request handled, status: {}", r.status());
         }
         res
-    } else if path == "/_meta/listeners" {
+    } else if path == "/apify/admin/listeners" {
         handle_listeners_request(req, db).await
-    } else if path == "/_meta/datasources" {
+    } else if path == "/apify/admin/datasources" {
         handle_datasources_request(req, db).await
-    } else if path == "/_meta/auth" {
+    } else if path == "/apify/admin/auth" {
         handle_auth_request(req, db).await
-    } else if path == "/_meta/import" {
+    } else if path == "/apify/admin/import" {
         handle_import_request(req, db).await
     } else {
         Ok(hyper::Response::builder()
