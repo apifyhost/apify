@@ -204,7 +204,11 @@ pub async fn handle_apis_request(
             // Only attempt schema initialization when we have schemas; this avoids
             // failing updates for APIs that don't define tables.
             if !schemas.is_empty() {
-                tracing::info!("Initializing schemas for API '{}' version '{}'", name, version);
+                tracing::info!(
+                    "Initializing schemas for API '{}' version '{}'",
+                    name,
+                    version
+                );
                 // Validate schema initialization before replacing the old API
                 if let Some(ds_name) = datasource_name {
                     let mut where_clause = HashMap::new();
@@ -243,7 +247,11 @@ pub async fn handle_apis_request(
                             let msg = e.to_string();
                             // If tables already exist for this API, treat it as a no-op for updates.
                             if !msg.contains("exists") {
-                                tracing::error!("Schema initialization failed for API '{}': {}", name, e);
+                                tracing::error!(
+                                    "Schema initialization failed for API '{}': {}",
+                                    name,
+                                    e
+                                );
                                 return Err(Box::new(e));
                             }
                             tracing::info!("Tables already exist for API '{}', continuing", name);
@@ -254,29 +262,40 @@ pub async fn handle_apis_request(
                             ds_name
                         );
                     }
-                } else {
-                    if let Err(e) = db.initialize_schema(schemas.clone()).await {
-                        let msg = e.to_string();
-                        if !msg.contains("exists") {
-                            tracing::error!("Schema initialization failed for API '{}': {}", name, e);
-                            return Err(Box::new(e));
-                        }
-                        tracing::info!("Tables already exist for API '{}', continuing", name);
+                } else if let Err(e) = db.initialize_schema(schemas.clone()).await {
+                    let msg = e.to_string();
+                    if !msg.contains("exists") {
+                        tracing::error!("Schema initialization failed for API '{}': {}", name, e);
+                        return Err(Box::new(e));
                     }
+                    tracing::info!("Tables already exist for API '{}', continuing", name);
                 }
             } else {
-                tracing::info!("No schemas to initialize for API '{}' version '{}'", name, version);
+                tracing::info!(
+                    "No schemas to initialize for API '{}' version '{}'",
+                    name,
+                    version
+                );
             }
 
             // Schema initialization succeeded, now delete old API and insert new one
             if let Some(old_api) = existing_api_record {
-                tracing::info!("Deleting old API '{}' version '{}' (id: {})", name, version, old_api.id);
+                tracing::info!(
+                    "Deleting old API '{}' version '{}' (id: {})",
+                    name,
+                    version,
+                    old_api.id
+                );
                 let mut where_clause = HashMap::new();
                 where_clause.insert("id".to_string(), Value::String(old_api.id));
                 let _ = db.delete("_meta_api_configs", where_clause).await;
             }
 
-            tracing::info!("Inserting API '{}' version '{}' into metadata", name, version);
+            tracing::info!(
+                "Inserting API '{}' version '{}' into metadata",
+                name,
+                version
+            );
             db.insert("_meta_api_configs", data.clone()).await?;
 
             Ok(Response::builder()
