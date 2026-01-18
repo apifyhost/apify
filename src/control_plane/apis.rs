@@ -262,19 +262,13 @@ pub async fn handle_apis_request(
                             ds_name
                         );
                     }
-                } else {
-                    if let Err(e) = db.initialize_schema(schemas.clone()).await {
-                        let msg = e.to_string();
-                        if !msg.contains("exists") {
-                            tracing::error!(
-                                "Schema initialization failed for API '{}': {}",
-                                name,
-                                e
-                            );
-                            return Err(Box::new(e));
-                        }
-                        tracing::info!("Tables already exist for API '{}', continuing", name);
+                } else if let Err(e) = db.initialize_schema(schemas.clone()).await {
+                    let msg = e.to_string();
+                    if !msg.contains("exists") {
+                        tracing::error!("Schema initialization failed for API '{}': {}", name, e);
+                        return Err(Box::new(e));
                     }
+                    tracing::info!("Tables already exist for API '{}', continuing", name);
                 }
             } else {
                 tracing::info!(
