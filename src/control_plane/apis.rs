@@ -147,21 +147,19 @@ pub async fn handle_apis_request(
                 .duration_since(std::time::UNIX_EPOCH)?
                 .as_secs() as i64;
 
-            // Check if API with same name and version already exists and delete it
-            // (allows updating/redeploying an API spec)
+            // Check if API with same name and version already exists
             let records = db
                 .select("_meta_api_configs", None, None, None, None)
                 .await?;
 
+            let mut existing_api_record: Option<ApiConfigRecord> = None;
             for record in records {
                 if let Ok(api_record) = serde_json::from_value::<ApiConfigRecord>(record)
                     && api_record.name == name
                     && api_record.version == version
                 {
-                    // Delete the existing API to allow replacement
-                    let mut where_clause = HashMap::new();
-                    where_clause.insert("id".to_string(), Value::String(api_record.id));
-                    let _ = db.delete("_meta_api_configs", where_clause).await;
+                    existing_api_record = Some(api_record);
+                    break;
                 }
             }
 
@@ -199,12 +197,11 @@ pub async fn handle_apis_request(
                 Value::Number(serde_json::Number::from(created_at)),
             );
 
-            db.insert("_meta_api_configs", data.clone()).await?;
-
             let schemas = crate::schema_generator::SchemaGenerator::extract_schemas_from_openapi(
                 &spec_value,
             )?;
 
+            // Validate schema initialization before replacing the old API
             if let Some(ds_name) = datasource_name {
                 let mut where_clause = HashMap::new();
                 where_clause.insert("name".to_string(), Value::String(ds_name.to_string()));
@@ -236,7 +233,7 @@ pub async fn handle_apis_request(
                     };
 
                     let target_db = DatabaseManager::new(config).await?;
-                    target_db.initialize_schema(schemas).await?;
+                    target_db.initialize_schema(schemas.clone()).await?;
                 } else {
                     tracing::warn!(
                         "Datasource '{}' not found, skipping schema initialization",
@@ -244,11 +241,20 @@ pub async fn handle_apis_request(
                     );
                 }
             } else {
-                db.initialize_schema(schemas).await?;
+                db.initialize_schema(schemas.clone()).await?;
             }
 
+            // Schema initialization succeeded, now delete old API and insert new one
+            if let Some(old_api) = existing_api_record {
+                let mut where_clause = HashMap::new();
+                where_clause.insert("id".to_string(), Value::String(old_api.id));
+                let _ = db.delete("_meta_api_configs", where_clause).await;
+            }
+
+            db.insert("_meta_api_configs", data.clone()).await?;
+
             Ok(Response::builder()
-                .status(StatusCode::OK)
+                .status(StatusCode::CREATED)
                 .header("Content-Type", "application/json")
                 .body(Full::new(Bytes::from(
                     serde_json::json!({"id": id}).to_string(),
