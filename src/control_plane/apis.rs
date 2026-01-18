@@ -238,7 +238,13 @@ pub async fn handle_apis_request(
                         };
 
                         let target_db = DatabaseManager::new(config).await?;
-                        target_db.initialize_schema(schemas.clone()).await?;
+                        if let Err(e) = target_db.initialize_schema(schemas.clone()).await {
+                            let msg = e.to_string();
+                            // If tables already exist for this API, treat it as a no-op for updates.
+                            if !msg.contains("exists") {
+                                return Err(Box::new(e));
+                            }
+                        }
                     } else {
                         tracing::warn!(
                             "Datasource '{}' not found, skipping schema initialization",
@@ -246,7 +252,12 @@ pub async fn handle_apis_request(
                         );
                     }
                 } else {
-                    db.initialize_schema(schemas.clone()).await?;
+                    if let Err(e) = db.initialize_schema(schemas.clone()).await {
+                        let msg = e.to_string();
+                        if !msg.contains("exists") {
+                            return Err(Box::new(e));
+                        }
+                    }
                 }
             }
 
