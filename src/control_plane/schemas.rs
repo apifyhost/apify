@@ -1,4 +1,4 @@
-use crate::schema_generator::{ColumnDefinition, TableSchema};
+use crate::schema_generator::{ColumnDefinition, IndexDefinition, TableSchema};
 
 pub fn get_metadata_schemas() -> Vec<TableSchema> {
     vec![
@@ -86,13 +86,11 @@ pub fn get_metadata_schemas() -> Vec<TableSchema> {
                     auto_field: false,
                 },
             ],
-            indexes: vec![
-                IndexDefinition {
-                    name: "idx_api_name_version".to_string(),
-                    columns: vec!["name".to_string(), "version".to_string()],
-                    unique: true,
-                }
-            ],
+            indexes: vec![IndexDefinition {
+                name: "idx_api_name_version".to_string(),
+                columns: vec!["name".to_string(), "version".to_string()],
+                unique: true,
+            }],
             relations: vec![],
         },
         TableSchema {
