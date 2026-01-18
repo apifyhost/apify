@@ -251,12 +251,10 @@ pub async fn handle_apis_request(
                             ds_name
                         );
                     }
-                } else {
-                    if let Err(e) = db.initialize_schema(schemas.clone()).await {
-                        let msg = e.to_string();
-                        if !msg.contains("exists") {
-                            return Err(Box::new(e));
-                        }
+                } else if let Err(e) = db.initialize_schema(schemas.clone()).await {
+                    let msg = e.to_string();
+                    if !msg.contains("exists") {
+                        return Err(Box::new(e));
                     }
                 }
             }
