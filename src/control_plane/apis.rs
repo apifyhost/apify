@@ -201,47 +201,53 @@ pub async fn handle_apis_request(
                 &spec_value,
             )?;
 
-            // Validate schema initialization before replacing the old API
-            if let Some(ds_name) = datasource_name {
-                let mut where_clause = HashMap::new();
-                where_clause.insert("name".to_string(), Value::String(ds_name.to_string()));
-                let records = db
-                    .select("_meta_datasources", None, Some(where_clause), None, None)
-                    .await?;
+            // Only attempt schema initialization when we have schemas; this avoids
+            // failing updates for APIs that don't define tables.
+            if !schemas.is_empty() {
+                // Validate schema initialization before replacing the old API
+                if let Some(ds_name) = datasource_name {
+                    let mut where_clause = HashMap::new();
+                    where_clause.insert("name".to_string(), Value::String(ds_name.to_string()));
+                    let records = db
+                        .select("_meta_datasources", None, Some(where_clause), None, None)
+                        .await?;
 
-                if let Some(record) = records.first() {
-                    let ds_record: DatasourceConfigRecord = serde_json::from_value(record.clone())?;
-                    let ds_settings: DatabaseSettings = serde_json::from_str(&ds_record.config)?;
+                    if let Some(record) = records.first() {
+                        let ds_record: DatasourceConfigRecord =
+                            serde_json::from_value(record.clone())?;
+                        let ds_settings: DatabaseSettings =
+                            serde_json::from_str(&ds_record.config)?;
 
-                    let url = if ds_settings.driver == "postgres" {
-                        format!(
-                            "postgres://{}:{}@{}:{}/{}",
-                            ds_settings.user.unwrap_or_default(),
-                            ds_settings.password.unwrap_or_default(),
-                            ds_settings.host.unwrap_or("localhost".to_string()),
-                            ds_settings.port.unwrap_or(5432),
-                            ds_settings.database
-                        )
+                        let url = if ds_settings.driver == "postgres" {
+                            format!(
+                                "postgres://{}:{}@{}:{}/{}",
+                                ds_settings.user.unwrap_or_default(),
+                                ds_settings.password.unwrap_or_default(),
+                                ds_settings.host.unwrap_or("localhost".to_string()),
+                                ds_settings.port.unwrap_or(5432),
+                                ds_settings.database
+                            )
+                        } else {
+                            format!("sqlite:{}", ds_settings.database)
+                        };
+
+                        let config = DatabaseRuntimeConfig {
+                            driver: ds_settings.driver,
+                            url,
+                            max_size: ds_settings.max_pool_size.unwrap_or(10) as u32,
+                        };
+
+                        let target_db = DatabaseManager::new(config).await?;
+                        target_db.initialize_schema(schemas.clone()).await?;
                     } else {
-                        format!("sqlite:{}", ds_settings.database)
-                    };
-
-                    let config = DatabaseRuntimeConfig {
-                        driver: ds_settings.driver,
-                        url,
-                        max_size: ds_settings.max_pool_size.unwrap_or(10) as u32,
-                    };
-
-                    let target_db = DatabaseManager::new(config).await?;
-                    target_db.initialize_schema(schemas.clone()).await?;
+                        tracing::warn!(
+                            "Datasource '{}' not found, skipping schema initialization",
+                            ds_name
+                        );
+                    }
                 } else {
-                    tracing::warn!(
-                        "Datasource '{}' not found, skipping schema initialization",
-                        ds_name
-                    );
+                    db.initialize_schema(schemas.clone()).await?;
                 }
-            } else {
-                db.initialize_schema(schemas.clone()).await?;
             }
 
             // Schema initialization succeeded, now delete old API and insert new one

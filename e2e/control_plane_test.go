@@ -169,7 +169,7 @@ var _ = Describe("Control Plane API Operations", func() {
 		body, _ := json.Marshal(apiConfig)
 		resp, err := client.Post(env.CPBaseURL+"/apify/admin/apis", "application/json", bytes.NewBuffer(body))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.StatusOK))
+		Expect(resp.StatusCode).To(Equal(http.StatusCreated))
 
 		resp, err = client.Get(env.CPBaseURL + "/apify/admin/apis")
 		Expect(err).NotTo(HaveOccurred())
