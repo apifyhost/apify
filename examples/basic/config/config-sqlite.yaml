@@ -1,0 +1,15 @@
+control-plane:
+  listen:
+    ip: 0.0.0.0
+    port: 4000
+  database:
+    driver: sqlite
+    database: ./apify_db.sqlite
+  admin_key: UZY65Nakvsd3
+
+log_level: "info"
+
+modules:
+  openapi_docs:
+    enabled: true
+    port: 4001
