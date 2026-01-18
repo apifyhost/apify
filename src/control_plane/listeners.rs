@@ -64,26 +64,26 @@ pub async fn handle_listeners_request(
 
             if !existing.is_empty() {
                 for record in existing {
-                    if let Some(config_str) = record.get("config").and_then(|v| v.as_str()) {
-                        if let Ok(existing_config) =
+                    if let Some(config_str) = record.get("config").and_then(|v| v.as_str())
+                        && let Ok(existing_config) =
                             serde_json::from_str::<crate::config::ListenerConfig>(config_str)
-                        {
-                            // Check for conflicts
-                            let conflict = if config.ip == "0.0.0.0" {
-                                // New listener wants to bind to all interfaces on this port
-                                // This conflicts with ANY existing listener on this port
-                                true
-                            } else if existing_config.ip == "0.0.0.0" {
-                                // Existing listener is bound to all interfaces
-                                // This conflicts with any specific IP on this port
-                                true
-                            } else {
-                                // Both are specific IPs, only conflict if IPs match
-                                existing_config.ip == config.ip
-                            };
+                    {
+                        // Check for conflicts
+                        let conflict = if config.ip == "0.0.0.0" {
+                            // New listener wants to bind to all interfaces on this port
+                            // This conflicts with ANY existing listener on this port
+                            true
+                        } else if existing_config.ip == "0.0.0.0" {
+                            // Existing listener is bound to all interfaces
+                            // This conflicts with any specific IP on this port
+                            true
+                        } else {
+                            // Both are specific IPs, only conflict if IPs match
+                            existing_config.ip == config.ip
+                        };
 
-                            if conflict {
-                                return Ok(Response::builder()
+                        if conflict {
+                            return Ok(Response::builder()
                                     .status(StatusCode::CONFLICT)
                                     .header("Content-Type", "application/json")
                                     .body(Full::new(Bytes::from(
@@ -94,7 +94,6 @@ pub async fn handle_listeners_request(
                                             )
                                         }).to_string(),
                                     )))?);
-                            }
                         }
                     }
                 }

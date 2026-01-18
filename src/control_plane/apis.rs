@@ -153,9 +153,11 @@ pub async fn handle_apis_request(
                 .await?;
 
             for record in records {
-                if let Ok(api_record) = serde_json::from_value::<ApiConfigRecord>(record) {
-                    if api_record.name == name && api_record.version == version {
-                        return Ok(Response::builder()
+                if let Ok(api_record) = serde_json::from_value::<ApiConfigRecord>(record)
+                    && api_record.name == name
+                    && api_record.version == version
+                {
+                    return Ok(Response::builder()
                             .status(StatusCode::CONFLICT)
                             .header("Content-Type", "application/json")
                             .body(Full::new(Bytes::from(
@@ -163,7 +165,6 @@ pub async fn handle_apis_request(
                                     "error": format!("API with name '{}' and version '{}' already exists", name, version)
                                 }).to_string(),
                             )))?);
-                    }
                 }
             }
 

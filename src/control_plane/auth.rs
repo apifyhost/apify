@@ -64,17 +64,16 @@ pub async fn handle_auth_request(
 
             for record in records {
                 if let Ok(existing_auth_record) = serde_json::from_value::<AuthConfigRecord>(record)
-                {
-                    if let Ok(existing_auth) =
+                    && let Ok(existing_auth) =
                         serde_json::from_str::<Authenticator>(&existing_auth_record.config)
-                    {
-                        let existing_name = match &existing_auth {
-                            Authenticator::ApiKey(config) => &config.name,
-                            Authenticator::Oidc(config) => &config.name,
-                        };
+                {
+                    let existing_name = match &existing_auth {
+                        Authenticator::ApiKey(config) => &config.name,
+                        Authenticator::Oidc(config) => &config.name,
+                    };
 
-                        if existing_name == auth_name {
-                            return Ok(Response::builder()
+                    if existing_name == auth_name {
+                        return Ok(Response::builder()
                                 .status(StatusCode::CONFLICT)
                                 .header("Content-Type", "application/json")
                                 .body(Full::new(Bytes::from(
@@ -82,7 +81,6 @@ pub async fn handle_auth_request(
                                         "error": format!("Auth config with name '{}' already exists", auth_name)
                                     }).to_string(),
                                 )))?);
-                        }
                     }
                 }
             }
