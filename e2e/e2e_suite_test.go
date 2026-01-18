@@ -128,8 +128,8 @@ modules:
 	env.CPCmd.Env = append(os.Environ(), "APIFY_DB_URL=sqlite://"+env.DBFile)
 
 	var cpStdout, cpStderr bytes.Buffer
-	env.CPCmd.Stdout = &cpStdout
-	env.CPCmd.Stderr = &cpStderr
+	env.CPCmd.Stdout = io.MultiWriter(&cpStdout, GinkgoWriter)
+	env.CPCmd.Stderr = io.MultiWriter(&cpStderr, GinkgoWriter)
 
 	err = env.CPCmd.Start()
 	Expect(err).NotTo(HaveOccurred())

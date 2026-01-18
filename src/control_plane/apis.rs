@@ -73,6 +73,8 @@ pub async fn handle_apis_request(
     let (parts, body) = req.into_parts();
     let method = parts.method;
 
+    tracing::info!("Received {} request to /apify/admin/apis", method);
+
     match method {
         hyper::Method::GET => {
             let records = db
@@ -85,6 +87,7 @@ pub async fn handle_apis_request(
                 .body(Full::new(Bytes::from(json)))?)
         }
         hyper::Method::POST => {
+            tracing::info!("Processing API creation/update request");
             let body_bytes = http_body_util::BodyExt::collect(body).await?.to_bytes();
             let payload: Value = serde_json::from_slice(&body_bytes)?;
 
