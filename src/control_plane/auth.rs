@@ -50,6 +50,41 @@ pub async fn handle_auth_request(
             let body_bytes = http_body_util::BodyExt::collect(body).await?.to_bytes();
             // Validate that it parses as Authenticator
             let auth_config: Authenticator = serde_json::from_slice(&body_bytes)?;
+
+            // Extract name from auth config
+            let auth_name = match &auth_config {
+                Authenticator::ApiKey(config) => &config.name,
+                Authenticator::Oidc(config) => &config.name,
+            };
+
+            // Check if auth config with same name already exists
+            let records = db
+                .select("_meta_auth_configs", None, None, None, None)
+                .await?;
+
+            for record in records {
+                if let Ok(existing_auth_record) = serde_json::from_value::<AuthConfigRecord>(record)
+                    && let Ok(existing_auth) =
+                        serde_json::from_str::<Authenticator>(&existing_auth_record.config)
+                {
+                    let existing_name = match &existing_auth {
+                        Authenticator::ApiKey(config) => &config.name,
+                        Authenticator::Oidc(config) => &config.name,
+                    };
+
+                    if existing_name == auth_name {
+                        return Ok(Response::builder()
+                                .status(StatusCode::CONFLICT)
+                                .header("Content-Type", "application/json")
+                                .body(Full::new(Bytes::from(
+                                    serde_json::json!({
+                                        "error": format!("Auth config with name '{}' already exists", auth_name)
+                                    }).to_string(),
+                                )))?);
+                    }
+                }
+            }
+
             // Store as string
             let config_str = serde_json::to_string(&auth_config)?;
 

@@ -73,6 +73,8 @@ pub async fn handle_apis_request(
     let (parts, body) = req.into_parts();
     let method = parts.method;
 
+    tracing::info!("Received {} request to /apify/admin/apis", method);
+
     match method {
         hyper::Method::GET => {
             let records = db
@@ -85,6 +87,7 @@ pub async fn handle_apis_request(
                 .body(Full::new(Bytes::from(json)))?)
         }
         hyper::Method::POST => {
+            tracing::info!("Processing API creation/update request");
             let body_bytes = http_body_util::BodyExt::collect(body).await?.to_bytes();
             let payload: Value = serde_json::from_slice(&body_bytes)?;
 
@@ -147,6 +150,22 @@ pub async fn handle_apis_request(
                 .duration_since(std::time::UNIX_EPOCH)?
                 .as_secs() as i64;
 
+            // Check if API with same name and version already exists
+            let records = db
+                .select("_meta_api_configs", None, None, None, None)
+                .await?;
+
+            let mut existing_api_record: Option<ApiConfigRecord> = None;
+            for record in records {
+                if let Ok(api_record) = serde_json::from_value::<ApiConfigRecord>(record)
+                    && api_record.name == name
+                    && api_record.version == version
+                {
+                    existing_api_record = Some(api_record);
+                    break;
+                }
+            }
+
             // Extract schemas from spec and initialize them in the DB
             let spec_value: serde_json::Value = if let Ok(v) = serde_json::from_str(&spec_content) {
                 v
@@ -181,69 +200,109 @@ pub async fn handle_apis_request(
                 Value::Number(serde_json::Number::from(created_at)),
             );
 
-            if let Err(e) = db.insert("_meta_api_configs", data.clone()).await {
-                tracing::warn!("Failed to insert API config, trying update: {}", e);
-
-                let mut where_clause = HashMap::new();
-                where_clause.insert("name".to_string(), Value::String(name.to_string()));
-
-                // Remove ID and created_at from update
-                let mut update_data = data;
-                update_data.remove("id");
-                update_data.remove("created_at");
-
-                db.update("_meta_api_configs", update_data, where_clause)
-                    .await?;
-            }
-
             let schemas = crate::schema_generator::SchemaGenerator::extract_schemas_from_openapi(
                 &spec_value,
             )?;
 
-            if let Some(ds_name) = datasource_name {
-                let mut where_clause = HashMap::new();
-                where_clause.insert("name".to_string(), Value::String(ds_name.to_string()));
-                let records = db
-                    .select("_meta_datasources", None, Some(where_clause), None, None)
-                    .await?;
+            // Only attempt schema initialization when we have schemas; this avoids
+            // failing updates for APIs that don't define tables.
+            if !schemas.is_empty() {
+                tracing::info!(
+                    "Initializing schemas for API '{}' version '{}'",
+                    name,
+                    version
+                );
+                // Validate schema initialization before replacing the old API
+                if let Some(ds_name) = datasource_name {
+                    let mut where_clause = HashMap::new();
+                    where_clause.insert("name".to_string(), Value::String(ds_name.to_string()));
+                    let records = db
+                        .select("_meta_datasources", None, Some(where_clause), None, None)
+                        .await?;
 
-                if let Some(record) = records.first() {
-                    let ds_record: DatasourceConfigRecord = serde_json::from_value(record.clone())?;
-                    let ds_settings: DatabaseSettings = serde_json::from_str(&ds_record.config)?;
+                    if let Some(record) = records.first() {
+                        let ds_record: DatasourceConfigRecord =
+                            serde_json::from_value(record.clone())?;
+                        let ds_settings: DatabaseSettings =
+                            serde_json::from_str(&ds_record.config)?;
 
-                    let url = if ds_settings.driver == "postgres" {
-                        format!(
-                            "postgres://{}:{}@{}:{}/{}",
-                            ds_settings.user.unwrap_or_default(),
-                            ds_settings.password.unwrap_or_default(),
-                            ds_settings.host.unwrap_or("localhost".to_string()),
-                            ds_settings.port.unwrap_or(5432),
-                            ds_settings.database
-                        )
+                        let url = if ds_settings.driver == "postgres" {
+                            format!(
+                                "postgres://{}:{}@{}:{}/{}",
+                                ds_settings.user.unwrap_or_default(),
+                                ds_settings.password.unwrap_or_default(),
+                                ds_settings.host.unwrap_or("localhost".to_string()),
+                                ds_settings.port.unwrap_or(5432),
+                                ds_settings.database
+                            )
+                        } else {
+                            format!("sqlite:{}", ds_settings.database)
+                        };
+
+                        let config = DatabaseRuntimeConfig {
+                            driver: ds_settings.driver,
+                            url,
+                            max_size: ds_settings.max_pool_size.unwrap_or(10) as u32,
+                        };
+
+                        let target_db = DatabaseManager::new(config).await?;
+                        if let Err(e) = target_db.initialize_schema(schemas.clone()).await {
+                            let msg = e.to_string();
+                            // If tables already exist for this API, treat it as a no-op for updates.
+                            if !msg.contains("exists") {
+                                tracing::error!(
+                                    "Schema initialization failed for API '{}': {}",
+                                    name,
+                                    e
+                                );
+                                return Err(Box::new(e));
+                            }
+                            tracing::info!("Tables already exist for API '{}', continuing", name);
+                        }
                     } else {
-                        format!("sqlite:{}", ds_settings.database)
-                    };
-
-                    let config = DatabaseRuntimeConfig {
-                        driver: ds_settings.driver,
-                        url,
-                        max_size: ds_settings.max_pool_size.unwrap_or(10) as u32,
-                    };
-
-                    let target_db = DatabaseManager::new(config).await?;
-                    target_db.initialize_schema(schemas).await?;
-                } else {
-                    tracing::warn!(
-                        "Datasource '{}' not found, skipping schema initialization",
-                        ds_name
-                    );
+                        tracing::warn!(
+                            "Datasource '{}' not found, skipping schema initialization",
+                            ds_name
+                        );
+                    }
+                } else if let Err(e) = db.initialize_schema(schemas.clone()).await {
+                    let msg = e.to_string();
+                    if !msg.contains("exists") {
+                        tracing::error!("Schema initialization failed for API '{}': {}", name, e);
+                        return Err(Box::new(e));
+                    }
+                    tracing::info!("Tables already exist for API '{}', continuing", name);
                 }
             } else {
-                db.initialize_schema(schemas).await?;
+                tracing::info!(
+                    "No schemas to initialize for API '{}' version '{}'",
+                    name,
+                    version
+                );
             }
 
+            // Schema initialization succeeded, now delete old API and insert new one
+            if let Some(old_api) = existing_api_record {
+                tracing::info!(
+                    "Deleting old API '{}' version '{}' (id: {})",
+                    name,
+                    version,
+                    old_api.id
+                );
+                let mut where_clause = HashMap::new();
+                where_clause.insert("id".to_string(), Value::String(old_api.id));
+                let _ = db.delete("_meta_api_configs", where_clause).await;
+            }
+
+            tracing::info!(
+                "Inserting API '{}' version '{}' into metadata",
+                name,
+                version
+            );
+            db.insert("_meta_api_configs", data.clone()).await?;
+
             Ok(Response::builder()
-                .status(StatusCode::OK)
+                .status(StatusCode::CREATED)
                 .header("Content-Type", "application/json")
                 .body(Full::new(Bytes::from(
                     serde_json::json!({"id": id}).to_string(),
