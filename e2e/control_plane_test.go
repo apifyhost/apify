@@ -303,8 +303,9 @@ var _ = Describe("Control Plane API Operations", func() {
 
 	It("should allow updating API with same name and version", func() {
 		apiConfig := map[string]interface{}{
-			"name":    "update-api",
-			"version": "1.0.0",
+			"name":            "update-api",
+			"version":         "1.0.0",
+			"datasource_name": "default",
 			"spec": map[string]interface{}{
 				"openapi": "3.0.0",
 				"info": map[string]interface{}{
