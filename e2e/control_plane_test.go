@@ -301,14 +301,14 @@ var _ = Describe("Control Plane API Operations", func() {
 		resp.Body.Close()
 	})
 
-	It("should reject duplicate API names with same version", func() {
+	It("should allow updating API with same name and version", func() {
 		apiConfig := map[string]interface{}{
-			"name":    "dup-api",
+			"name":    "update-api",
 			"version": "1.0.0",
 			"spec": map[string]interface{}{
 				"openapi": "3.0.0",
 				"info": map[string]interface{}{
-					"title":   "Duplicate API",
+					"title":   "Update API",
 					"version": "1.0.0",
 				},
 				"paths": map[string]interface{}{},
@@ -322,14 +322,14 @@ var _ = Describe("Control Plane API Operations", func() {
 		Expect(resp.StatusCode).To(Equal(http.StatusCreated))
 		resp.Body.Close()
 
-		// Second creation with same name and version should fail
+		// Second creation with same name and version should succeed (update)
 		body, _ = json.Marshal(apiConfig)
 		resp, err = client.Post(env.CPBaseURL+"/apify/admin/apis", "application/json", bytes.NewBuffer(body))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(resp.StatusCode).To(Equal(http.StatusConflict))
+		Expect(resp.StatusCode).To(Equal(http.StatusCreated))
 		resp.Body.Close()
 
-		// But same name with different version should succeed
+		// Same name with different version should also succeed
 		apiConfig["version"] = "2.0.0"
 		body, _ = json.Marshal(apiConfig)
 		resp, err = client.Post(env.CPBaseURL+"/apify/admin/apis", "application/json", bytes.NewBuffer(body))

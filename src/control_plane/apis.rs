@@ -147,7 +147,8 @@ pub async fn handle_apis_request(
                 .duration_since(std::time::UNIX_EPOCH)?
                 .as_secs() as i64;
 
-            // Check if API with same name and version already exists
+            // Check if API with same name and version already exists and delete it
+            // (allows updating/redeploying an API spec)
             let records = db
                 .select("_meta_api_configs", None, None, None, None)
                 .await?;
@@ -157,14 +158,10 @@ pub async fn handle_apis_request(
                     && api_record.name == name
                     && api_record.version == version
                 {
-                    return Ok(Response::builder()
-                            .status(StatusCode::CONFLICT)
-                            .header("Content-Type", "application/json")
-                            .body(Full::new(Bytes::from(
-                                serde_json::json!({
-                                    "error": format!("API with name '{}' and version '{}' already exists", name, version)
-                                }).to_string(),
-                            )))?);
+                    // Delete the existing API to allow replacement
+                    let mut where_clause = HashMap::new();
+                    where_clause.insert("id".to_string(), Value::String(api_record.id));
+                    let _ = db.delete("_meta_api_configs", where_clause).await;
                 }
             }
 
