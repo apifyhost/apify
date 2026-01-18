@@ -56,6 +56,26 @@ pub async fn handle_datasources_request(
                 .ok_or("Missing name")?;
             let config = payload.get("config").ok_or("Missing config")?;
 
+            // Check if datasource with same name already exists
+            let mut where_clause = HashMap::new();
+            where_clause.insert("name".to_string(), Value::String(name.to_string()));
+
+            let existing = db
+                .select("_meta_datasources", None, Some(where_clause), None, None)
+                .await?;
+
+            if !existing.is_empty() {
+                return Ok(Response::builder()
+                    .status(StatusCode::CONFLICT)
+                    .header("Content-Type", "application/json")
+                    .body(Full::new(Bytes::from(
+                        serde_json::json!({
+                            "error": format!("Datasource with name '{}' already exists", name)
+                        })
+                        .to_string(),
+                    )))?);
+            }
+
             // Validate config
             let ds_config: DatabaseSettings = serde_json::from_value(config.clone())?;
             let config_str = serde_json::to_string(config)?;
