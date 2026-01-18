@@ -47,6 +47,59 @@ pub async fn handle_listeners_request(
             let body_bytes = http_body_util::BodyExt::collect(body).await?.to_bytes();
             // Validate that it parses as ListenerConfig
             let config: crate::config::ListenerConfig = serde_json::from_slice(&body_bytes)?;
+
+            // Check if a listener with conflicting IP and port already exists
+            // Rules:
+            // 1. If new listener is 0.0.0.0:port, check if ANY IP is using this port
+            // 2. If new listener is specific IP:port, check if 0.0.0.0:port OR same IP:port exists
+            let mut where_clause = HashMap::new();
+            where_clause.insert(
+                "port".to_string(),
+                Value::Number(serde_json::Number::from(config.port)),
+            );
+
+            let existing = db
+                .select("_meta_listeners", None, Some(where_clause), None, None)
+                .await?;
+
+            if !existing.is_empty() {
+                for record in existing {
+                    if let Some(config_str) = record.get("config").and_then(|v| v.as_str()) {
+                        if let Ok(existing_config) =
+                            serde_json::from_str::<crate::config::ListenerConfig>(config_str)
+                        {
+                            // Check for conflicts
+                            let conflict = if config.ip == "0.0.0.0" {
+                                // New listener wants to bind to all interfaces on this port
+                                // This conflicts with ANY existing listener on this port
+                                true
+                            } else if existing_config.ip == "0.0.0.0" {
+                                // Existing listener is bound to all interfaces
+                                // This conflicts with any specific IP on this port
+                                true
+                            } else {
+                                // Both are specific IPs, only conflict if IPs match
+                                existing_config.ip == config.ip
+                            };
+
+                            if conflict {
+                                return Ok(Response::builder()
+                                    .status(StatusCode::CONFLICT)
+                                    .header("Content-Type", "application/json")
+                                    .body(Full::new(Bytes::from(
+                                        serde_json::json!({
+                                            "error": format!(
+                                                "Listener port {} conflicts with existing listener {}:{}",
+                                                config.port, existing_config.ip, existing_config.port
+                                            )
+                                        }).to_string(),
+                                    )))?);
+                            }
+                        }
+                    }
+                }
+            }
+
             let config_str = serde_json::to_string(&config)?;
 
             let id = uuid::Uuid::new_v4().to_string();

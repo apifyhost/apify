@@ -147,6 +147,26 @@ pub async fn handle_apis_request(
                 .duration_since(std::time::UNIX_EPOCH)?
                 .as_secs() as i64;
 
+            // Check if API with same name and version already exists
+            let records = db
+                .select("_meta_api_configs", None, None, None, None)
+                .await?;
+
+            for record in records {
+                if let Ok(api_record) = serde_json::from_value::<ApiConfigRecord>(record) {
+                    if api_record.name == name && api_record.version == version {
+                        return Ok(Response::builder()
+                            .status(StatusCode::CONFLICT)
+                            .header("Content-Type", "application/json")
+                            .body(Full::new(Bytes::from(
+                                serde_json::json!({
+                                    "error": format!("API with name '{}' and version '{}' already exists", name, version)
+                                }).to_string(),
+                            )))?);
+                    }
+                }
+            }
+
             // Extract schemas from spec and initialize them in the DB
             let spec_value: serde_json::Value = if let Ok(v) = serde_json::from_str(&spec_content) {
                 v
@@ -181,20 +201,7 @@ pub async fn handle_apis_request(
                 Value::Number(serde_json::Number::from(created_at)),
             );
 
-            if let Err(e) = db.insert("_meta_api_configs", data.clone()).await {
-                tracing::warn!("Failed to insert API config, trying update: {}", e);
-
-                let mut where_clause = HashMap::new();
-                where_clause.insert("name".to_string(), Value::String(name.to_string()));
-
-                // Remove ID and created_at from update
-                let mut update_data = data;
-                update_data.remove("id");
-                update_data.remove("created_at");
-
-                db.update("_meta_api_configs", update_data, where_clause)
-                    .await?;
-            }
+            db.insert("_meta_api_configs", data.clone()).await?;
 
             let schemas = crate::schema_generator::SchemaGenerator::extract_schemas_from_openapi(
                 &spec_value,
