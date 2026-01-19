@@ -5,8 +5,8 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper_util::rt::TokioIo;
 use std::net::SocketAddr;
-use std::sync::Arc;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::net::TcpListener;
 
 use super::apis::handle_apis_request;
@@ -93,24 +93,24 @@ pub async fn handle_control_plane_request(
     }
 
     // Authentication Check for API endpoints only
-    if path.starts_with("/apify/admin/") {
-        if let Some(admin_key) = &config.admin_key {
-            let authorized = if let Some(api_key_header) = req.headers().get("X-API-KEY") {
-                if let Ok(api_key) = api_key_header.to_str() {
-                    api_key == admin_key
-                } else {
-                    false
-                }
+    if path.starts_with("/apify/admin/")
+        && let Some(admin_key) = &config.admin_key
+    {
+        let authorized = if let Some(api_key_header) = req.headers().get("X-API-KEY") {
+            if let Ok(api_key) = api_key_header.to_str() {
+                api_key == admin_key
             } else {
                 false
-            };
-
-            if !authorized {
-                tracing::warn!("Unauthorized access attempt to Control Plane");
-                return Ok(hyper::Response::builder()
-                    .status(hyper::StatusCode::UNAUTHORIZED)
-                    .body(Full::new(Bytes::from("Unauthorized")))?);
             }
+        } else {
+            false
+        };
+
+        if !authorized {
+            tracing::warn!("Unauthorized access attempt to Control Plane");
+            return Ok(hyper::Response::builder()
+                .status(hyper::StatusCode::UNAUTHORIZED)
+                .body(Full::new(Bytes::from("Unauthorized")))?);
         }
     }
 
