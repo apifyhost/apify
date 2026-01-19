@@ -79,8 +79,16 @@ pub async fn handle_control_plane_request(
     let path = req.uri().path().to_string();
     tracing::info!("Control Plane Request: {} {}", req.method(), path);
 
+    // Redirect root to /admin/
+    if path == "/" {
+        return Ok(hyper::Response::builder()
+            .status(hyper::StatusCode::MOVED_PERMANENTLY)
+            .header("Location", "/admin/")
+            .body(Full::new(Bytes::from("")))?);
+    }
+
     // Serve admin dashboard static files
-    if path.starts_with("/admin") || path == "/" {
+    if path.starts_with("/admin") {
         return serve_static_file(&path).await;
     }
 

@@ -3,7 +3,7 @@ import { Application } from './core/Application';
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/admin">
       <Application />
     </BrowserRouter>
   );

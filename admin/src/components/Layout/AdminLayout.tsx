@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Layout, Menu, Avatar, Dropdown, theme, Space } from 'antd';
 import {
   DashboardOutlined,
@@ -14,12 +14,13 @@ import {
 } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useAppDispatch, useAppSelector } from '@/core/store/hooks';
-import { toggleSidebar } from '@/core/store/appSlice';
+import { toggleSidebar, logout } from '@/core/store/appSlice';
 
 const { Header, Sider, Content } = Layout;
 
 export const AdminLayout = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { sidebarCollapsed, currentUser } = useAppSelector((state) => state.app);
   const {
@@ -53,6 +54,13 @@ export const AdminLayout = () => {
       label: <Link to="/schemas">表结构</Link>,
     },
   ];
+
+  const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
+    if (key === 'logout') {
+      dispatch(logout());
+      navigate('/login');
+    }
+  };
 
   const userMenuItems: MenuProps['items'] = [
     {
@@ -136,7 +144,7 @@ export const AdminLayout = () => {
               />
             )}
           </Space>
-          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+          <Dropdown menu={{ items: userMenuItems, onClick: handleMenuClick }} placement="bottomRight">
             <Space style={{ cursor: 'pointer' }}>
               <Avatar icon={<UserOutlined />} />
               <span>{currentUser?.name || 'Admin'}</span>

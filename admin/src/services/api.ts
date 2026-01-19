@@ -32,8 +32,11 @@ export const apiSlice = createApi({
   baseQuery: fetchBaseQuery({
     baseUrl: '/apify/admin',
     prepareHeaders: (headers) => {
-      // API key will be read from config or environment
-      headers.set('X-API-KEY', 'UZY65Nakvsd3'); // TODO: move to env
+      // Get API key from localStorage
+      const apiKey = localStorage.getItem('apiKey');
+      if (apiKey) {
+        headers.set('X-API-KEY', apiKey);
+      }
       return headers;
     },
   }),
