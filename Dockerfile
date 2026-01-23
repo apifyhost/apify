@@ -1,5 +1,22 @@
 # Multi-stage build for minimal image size
-# Stage 1: Build stage
+# Stage 1: Build frontend
+FROM node:20-slim AS frontend-builder
+
+WORKDIR /app/admin
+
+# Copy frontend package files
+COPY admin/package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy frontend source
+COPY admin/ ./
+
+# Build frontend for Docker (outputs to dist/)
+RUN npm run build:docker
+
+# Stage 2: Build Rust backend
 FROM rust:slim-trixie AS builder
 
 # Install build dependencies
@@ -33,10 +50,13 @@ RUN rm -rf target/release/.fingerprint/apify-* \
 # Copy actual source code
 COPY src ./src
 
+# Copy built frontend from frontend-builder
+COPY --from=frontend-builder /app/admin/dist ./target/admin
+
 # Build the actual application
 RUN cargo build --release
 
-# Stage 2: Runtime stage with minimal Ubuntu
+# Stage 3: Runtime stage with minimal Ubuntu
 FROM ubuntu:24.04
 
 # Install runtime dependencies only
@@ -55,6 +75,9 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /app/target/release/apify /usr/local/bin/apify
 COPY --from=builder /app/target/release/apify-cp /usr/local/bin/apify-cp
+
+# Copy admin dashboard static files
+COPY --from=builder /app/target/admin /app/target/admin
 
 # Copy default config directory structure
 RUN mkdir -p /app/config /app/data /app/logs && \

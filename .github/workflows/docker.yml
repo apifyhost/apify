@@ -51,8 +51,12 @@ jobs:
           load: true
           tags: apifyhost/apify:latest
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha,scope=build-admin
+            type=gha,scope=build-rust
+          cache-to: |
+            type=gha,mode=max,scope=build-admin
+            type=gha,mode=max,scope=build-rust
 
       - name: Save Docker image
         run: |
@@ -172,6 +176,14 @@ jobs:
         run: |
           docker load < apify-image.tar.gz
 
+      - name: Verify admin dashboard files in image
+        run: |
+          echo "Verifying admin dashboard files are included..."
+          docker run --rm --entrypoint ls apifyhost/apify:latest -la /app/target/admin/ || echo "Admin directory check failed"
+          docker run --rm --entrypoint ls apifyhost/apify:latest -la /app/target/admin/assets/ || echo "Admin assets check failed"
+          docker run --rm --entrypoint cat apifyhost/apify:latest /app/target/admin/index.html | head -20 || echo "index.html check failed"
+          echo "✅ Admin dashboard verification completed"
+
       - name: Start Apify with Postgres using docker compose
         run: |
           cd examples/full
@@ -192,6 +204,24 @@ jobs:
           echo "Service failed to start within timeout"
           cd examples/full && docker compose logs apify-cp apify-dp
           exit 1
+
+      - name: Test admin dashboard accessibility
+        run: |
+          echo "Testing admin dashboard..."
+          # Test root redirect
+          curl -sL -o /dev/null -w "%{http_code}" http://localhost:4000/ | grep -E "200|301|302" || {
+            echo "❌ Root path failed"
+            exit 1
+          }
+          # Test admin dashboard HTML
+          curl -sf http://localhost:4000/admin/ > /tmp/admin.html && grep -q "Apify Admin" /tmp/admin.html || {
+            echo "❌ Admin dashboard HTML check failed"
+            cat /tmp/admin.html
+            exit 1
+          }
+          # Test admin static assets
+          curl -sf http://localhost:4000/admin/assets/ > /dev/null || echo "⚠️ Assets directory not accessible (expected)"
+          echo "✅ Admin dashboard is accessible"
 
       - name: Run E2E tests (including OAuth)
         working-directory: e2e
@@ -335,6 +365,14 @@ jobs:
         run: |
           docker load < apify-image.tar.gz
 
+      - name: Verify admin dashboard files in image
+        run: |
+          echo "Verifying admin dashboard files are included..."
+          docker run --rm --entrypoint ls apifyhost/apify:latest -la /app/target/admin/ || echo "Admin directory check failed"
+          docker run --rm --entrypoint ls apifyhost/apify:latest -la /app/target/admin/assets/ || echo "Admin assets check failed"
+          docker run --rm --entrypoint cat apifyhost/apify:latest /app/target/admin/index.html | head -20 || echo "index.html check failed"
+          echo "✅ Admin dashboard verification completed"
+
       - name: Update config for SQLite
         run: |
           # Update control-plane database config
@@ -369,6 +407,24 @@ jobs:
           echo "Service failed to start within timeout"
           cd examples/full && docker compose logs apify-cp
           exit 1
+
+      - name: Test admin dashboard accessibility
+        run: |
+          echo "Testing admin dashboard..."
+          # Test root redirect
+          curl -sL -o /dev/null -w "%{http_code}" http://localhost:4000/ | grep -E "200|301|302" || {
+            echo "❌ Root path failed"
+            exit 1
+          }
+          # Test admin dashboard HTML
+          curl -sf http://localhost:4000/admin/ > /tmp/admin.html && grep -q "Apify Admin" /tmp/admin.html || {
+            echo "❌ Admin dashboard HTML check failed"
+            cat /tmp/admin.html
+            exit 1
+          }
+          # Test admin static assets
+          curl -sf http://localhost:4000/admin/assets/ > /dev/null || echo "⚠️ Assets directory not accessible (expected)"
+          echo "✅ Admin dashboard is accessible"
 
       - name: Run E2E tests (including OAuth)
         working-directory: e2e
@@ -524,8 +580,12 @@ jobs:
           tags: |
             apifyhost/apify:${{ steps.reltag.outputs.TAG }}
             apifyhost/apify:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha,scope=build-admin
+            type=gha,scope=build-rust
+          cache-to: |
+            type=gha,mode=max,scope=build-admin
+            type=gha,mode=max,scope=build-rust
 
   publish-quickstart:
     name: Package and Upload Quickstart Bundle
