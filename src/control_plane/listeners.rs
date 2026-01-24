@@ -53,11 +53,11 @@ pub async fn handle_listeners_request(
                 // Get specific listener by ID
                 let mut where_clause = HashMap::new();
                 where_clause.insert("id".to_string(), Value::String(id.clone()));
-                
+
                 let records = db
                     .select("_meta_listeners", None, Some(where_clause), None, None)
                     .await?;
-                
+
                 if records.is_empty() {
                     Ok(Response::builder()
                         .status(StatusCode::NOT_FOUND)
@@ -88,11 +88,17 @@ pub async fn handle_listeners_request(
                 // Check if listener exists
                 let mut where_clause = HashMap::new();
                 where_clause.insert("id".to_string(), Value::String(id.clone()));
-                
+
                 let existing = db
-                    .select("_meta_listeners", None, Some(where_clause.clone()), None, None)
+                    .select(
+                        "_meta_listeners",
+                        None,
+                        Some(where_clause.clone()),
+                        None,
+                        None,
+                    )
                     .await?;
-                
+
                 if existing.is_empty() {
                     return Ok(Response::builder()
                         .status(StatusCode::NOT_FOUND)
@@ -111,22 +117,18 @@ pub async fn handle_listeners_request(
                     .await?;
 
                 for record in port_records {
-                    if let Some(record_id) = record.get("id").and_then(|v| v.as_str()) {
-                        if record_id != id {
-                            if let Some(config_str) = record.get("config").and_then(|v| v.as_str())
-                                && let Ok(existing_config) =
-                                    serde_json::from_str::<crate::config::ListenerConfig>(config_str)
-                            {
-                                let conflict = if config.ip == "0.0.0.0" {
-                                    true
-                                } else if existing_config.ip == "0.0.0.0" {
-                                    true
-                                } else {
-                                    existing_config.ip == config.ip
-                                };
+                    if let Some(record_id) = record.get("id").and_then(|v| v.as_str())
+                        && record_id != id
+                        && let Some(config_str) = record.get("config").and_then(|v| v.as_str())
+                        && let Ok(existing_config) =
+                            serde_json::from_str::<crate::config::ListenerConfig>(config_str)
+                    {
+                        let conflict = config.ip == "0.0.0.0"
+                            || existing_config.ip == "0.0.0.0"
+                            || existing_config.ip == config.ip;
 
-                                if conflict {
-                                    return Ok(Response::builder()
+                        if conflict {
+                            return Ok(Response::builder()
                                         .status(StatusCode::CONFLICT)
                                         .header("Content-Type", "application/json")
                                         .body(Full::new(Bytes::from(
@@ -137,8 +139,6 @@ pub async fn handle_listeners_request(
                                                 )
                                             }).to_string(),
                                         )))?);
-                                }
-                            }
                         }
                     }
                 }
@@ -178,11 +178,17 @@ pub async fn handle_listeners_request(
                 // Delete specific listener by ID
                 let mut where_clause = HashMap::new();
                 where_clause.insert("id".to_string(), Value::String(id.clone()));
-                
+
                 let existing = db
-                    .select("_meta_listeners", None, Some(where_clause.clone()), None, None)
+                    .select(
+                        "_meta_listeners",
+                        None,
+                        Some(where_clause.clone()),
+                        None,
+                        None,
+                    )
                     .await?;
-                
+
                 if existing.is_empty() {
                     return Ok(Response::builder()
                         .status(StatusCode::NOT_FOUND)

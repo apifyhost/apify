@@ -94,11 +94,11 @@ pub async fn handle_apis_request(
                 // Get specific API by ID
                 let mut where_clause = HashMap::new();
                 where_clause.insert("id".to_string(), Value::String(id.clone()));
-                
+
                 let records = db
                     .select("_meta_api_configs", None, Some(where_clause), None, None)
                     .await?;
-                
+
                 if records.is_empty() {
                     Ok(Response::builder()
                         .status(StatusCode::NOT_FOUND)
@@ -126,15 +126,21 @@ pub async fn handle_apis_request(
             if let Some(id) = id {
                 // Update specific API by ID
                 tracing::info!("Processing API update request for ID: {}", id);
-                
+
                 // Check if API exists
                 let mut where_clause = HashMap::new();
                 where_clause.insert("id".to_string(), Value::String(id.clone()));
-                
+
                 let existing = db
-                    .select("_meta_api_configs", None, Some(where_clause.clone()), None, None)
+                    .select(
+                        "_meta_api_configs",
+                        None,
+                        Some(where_clause.clone()),
+                        None,
+                        None,
+                    )
                     .await?;
-                
+
                 if existing.is_empty() {
                     return Ok(Response::builder()
                         .status(StatusCode::NOT_FOUND)
@@ -202,12 +208,13 @@ pub async fn handle_apis_request(
                     .duration_since(std::time::UNIX_EPOCH)?
                     .as_secs() as i64;
 
-                let spec_value: serde_json::Value = if let Ok(v) = serde_json::from_str(&spec_content) {
-                    v
-                } else {
-                    serde_yaml::from_str(&spec_content)
-                        .map_err(|e| format!("Failed to parse spec as JSON or YAML: {}", e))?
-                };
+                let spec_value: serde_json::Value =
+                    if let Ok(v) = serde_json::from_str(&spec_content) {
+                        v
+                    } else {
+                        serde_yaml::from_str(&spec_content)
+                            .map_err(|e| format!("Failed to parse spec as JSON or YAML: {}", e))?
+                    };
 
                 let mut data = HashMap::new();
                 data.insert("name".to_string(), Value::String(name.to_string()));
@@ -252,11 +259,17 @@ pub async fn handle_apis_request(
                 // Delete specific API by ID
                 let mut where_clause = HashMap::new();
                 where_clause.insert("id".to_string(), Value::String(id.clone()));
-                
+
                 let existing = db
-                    .select("_meta_api_configs", None, Some(where_clause.clone()), None, None)
+                    .select(
+                        "_meta_api_configs",
+                        None,
+                        Some(where_clause.clone()),
+                        None,
+                        None,
+                    )
                     .await?;
-                
+
                 if existing.is_empty() {
                     return Ok(Response::builder()
                         .status(StatusCode::NOT_FOUND)

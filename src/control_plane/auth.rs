@@ -54,11 +54,11 @@ pub async fn handle_auth_request(
                 // Get specific auth config by ID
                 let mut where_clause = HashMap::new();
                 where_clause.insert("id".to_string(), Value::String(id.clone()));
-                
+
                 let records = db
                     .select("_meta_auth_configs", None, Some(where_clause), None, None)
                     .await?;
-                
+
                 if records.is_empty() {
                     Ok(Response::builder()
                         .status(StatusCode::NOT_FOUND)
@@ -97,11 +97,17 @@ pub async fn handle_auth_request(
                 // Check if auth config exists
                 let mut where_clause = HashMap::new();
                 where_clause.insert("id".to_string(), Value::String(id.clone()));
-                
+
                 let existing = db
-                    .select("_meta_auth_configs", None, Some(where_clause.clone()), None, None)
+                    .select(
+                        "_meta_auth_configs",
+                        None,
+                        Some(where_clause.clone()),
+                        None,
+                        None,
+                    )
                     .await?;
-                
+
                 if existing.is_empty() {
                     return Ok(Response::builder()
                         .status(StatusCode::NOT_FOUND)
@@ -114,27 +120,27 @@ pub async fn handle_auth_request(
                     .await?;
 
                 for record in records {
-                    if let Some(record_id) = record.get("id").and_then(|v| v.as_str()) {
-                        if record_id != id {
-                            if let Ok(existing_auth_record) = serde_json::from_value::<AuthConfigRecord>(record)
-                                && let Ok(existing_auth) =
-                                    serde_json::from_str::<Authenticator>(&existing_auth_record.config)
-                            {
-                                let existing_name = match &existing_auth {
-                                    Authenticator::ApiKey(config) => &config.name,
-                                    Authenticator::Oidc(config) => &config.name,
-                                };
+                    if let Some(record_id) = record.get("id").and_then(|v| v.as_str())
+                        && record_id != id
+                        && let Ok(existing_auth_record) =
+                            serde_json::from_value::<AuthConfigRecord>(record)
+                        && let Ok(existing_auth) =
+                            serde_json::from_str::<Authenticator>(&existing_auth_record.config)
+                    {
+                        let existing_name = match &existing_auth {
+                            Authenticator::ApiKey(config) => &config.name,
+                            Authenticator::Oidc(config) => &config.name,
+                        };
 
-                                if existing_name == auth_name {
-                                    return Ok(Response::builder()
+                        if existing_name == auth_name {
+                            return Ok(Response::builder()
                                         .status(StatusCode::CONFLICT)
                                         .header("Content-Type", "application/json")
                                         .body(Full::new(Bytes::from(
                                             serde_json::json!({
                                                 "error": format!("Auth config with name '{}' already exists", auth_name)
                                             }).to_string(),
-                                        )))?);                                }
-                            }
+                                        )))?);
                         }
                     }
                 }
@@ -170,11 +176,17 @@ pub async fn handle_auth_request(
                 // Delete specific auth config by ID
                 let mut where_clause = HashMap::new();
                 where_clause.insert("id".to_string(), Value::String(id.clone()));
-                
+
                 let existing = db
-                    .select("_meta_auth_configs", None, Some(where_clause.clone()), None, None)
+                    .select(
+                        "_meta_auth_configs",
+                        None,
+                        Some(where_clause.clone()),
+                        None,
+                        None,
+                    )
                     .await?;
-                
+
                 if existing.is_empty() {
                     return Ok(Response::builder()
                         .status(StatusCode::NOT_FOUND)

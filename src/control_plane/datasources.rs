@@ -54,11 +54,11 @@ pub async fn handle_datasources_request(
                 // Get specific datasource by ID
                 let mut where_clause = HashMap::new();
                 where_clause.insert("id".to_string(), Value::String(id.clone()));
-                
+
                 let records = db
                     .select("_meta_datasources", None, Some(where_clause), None, None)
                     .await?;
-                
+
                 if records.is_empty() {
                     Ok(Response::builder()
                         .status(StatusCode::NOT_FOUND)
@@ -97,11 +97,17 @@ pub async fn handle_datasources_request(
                 // Check if datasource exists
                 let mut where_clause = HashMap::new();
                 where_clause.insert("id".to_string(), Value::String(id.clone()));
-                
+
                 let existing = db
-                    .select("_meta_datasources", None, Some(where_clause.clone()), None, None)
+                    .select(
+                        "_meta_datasources",
+                        None,
+                        Some(where_clause.clone()),
+                        None,
+                        None,
+                    )
                     .await?;
-                
+
                 if existing.is_empty() {
                     return Ok(Response::builder()
                         .status(StatusCode::NOT_FOUND)
@@ -111,15 +117,16 @@ pub async fn handle_datasources_request(
                 // Check if another datasource with the same name exists (excluding current)
                 let mut name_where = HashMap::new();
                 name_where.insert("name".to_string(), Value::String(name.to_string()));
-                
+
                 let name_records = db
                     .select("_meta_datasources", None, Some(name_where), None, None)
                     .await?;
-                
+
                 for record in name_records {
-                    if let Some(record_id) = record.get("id").and_then(|v| v.as_str()) {
-                        if record_id != id {
-                            return Ok(Response::builder()
+                    if let Some(record_id) = record.get("id").and_then(|v| v.as_str())
+                        && record_id != id
+                    {
+                        return Ok(Response::builder()
                                 .status(StatusCode::CONFLICT)
                                 .header("Content-Type", "application/json")
                                 .body(Full::new(Bytes::from(
@@ -128,7 +135,6 @@ pub async fn handle_datasources_request(
                                     })
                                     .to_string(),
                                 )))?);
-                        }
                     }
                 }
 
@@ -168,11 +174,17 @@ pub async fn handle_datasources_request(
                 // Delete specific datasource by ID
                 let mut where_clause = HashMap::new();
                 where_clause.insert("id".to_string(), Value::String(id.clone()));
-                
+
                 let existing = db
-                    .select("_meta_datasources", None, Some(where_clause.clone()), None, None)
+                    .select(
+                        "_meta_datasources",
+                        None,
+                        Some(where_clause.clone()),
+                        None,
+                        None,
+                    )
                     .await?;
-                
+
                 if existing.is_empty() {
                     return Ok(Response::builder()
                         .status(StatusCode::NOT_FOUND)
