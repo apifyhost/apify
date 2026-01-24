@@ -1,4 +1,3 @@
-package e2e
 package e2e_test
 
 import (
@@ -26,402 +25,169 @@ var _ = Describe("Listeners CRUD Operations", func() {
 		if env != nil {
 			env.Stop()
 		}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-})	})		})			Expect(listener["port"]).To(BeNumerically("==", 8091))			Expect(err).NotTo(HaveOccurred())			err = json.NewDecoder(resp.Body).Decode(&listener)			var listener map[string]interface{}			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err = client.Get(env.CPBaseURL + "/apify/admin/listeners/" + listenerID)			// Verify the port was updated			Expect(resp.StatusCode).To(Equal(http.StatusOK))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err = client.Do(req)			req.Header.Set("Content-Type", "application/json")			Expect(err).NotTo(HaveOccurred())			req, err := http.NewRequest(http.MethodPut, env.CPBaseURL+"/apify/admin/listeners/"+listenerID, bytes.NewBuffer(body))			body, _ = json.Marshal(listenerConfig)			listenerConfig["port"] = 8091			// Update to a different port			listenerID := createResult["id"].(string)			Expect(err).NotTo(HaveOccurred())			err = json.NewDecoder(resp.Body).Decode(&createResult)			var createResult map[string]interface{}			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err := client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))			body, _ := json.Marshal(listenerConfig)			}				"protocol": "HTTP",				"ip":       "127.0.0.1",				"port":     8090,				"name":     "port-change-listener",			listenerConfig := map[string]interface{}{			// Create a listener		It("should allow updating a listener to use a different port", func() {		})			Expect(resp.StatusCode).To(Equal(http.StatusConflict))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err = client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))			body, _ = json.Marshal(listenerConfig2)			}				"protocol": "HTTP",				"ip":       "127.0.0.1",				"port":     8089,				"name":     "specific-ip-listener",			listenerConfig2 := map[string]interface{}{			// Try to create another listener on a specific IP with the same port (should fail)			Expect(configObj["ip"]).To(Equal("0.0.0.0"))			Expect(err).NotTo(HaveOccurred())			err = json.Unmarshal([]byte(configStr), &configObj)			var configObj map[string]interface{}			Expect(ok).To(BeTrue())			configStr, ok := listener["config"].(string)			Expect(err).NotTo(HaveOccurred())			err = json.NewDecoder(resp.Body).Decode(&listener)			var listener map[string]interface{}			Expect(resp.StatusCode).To(Equal(http.StatusOK))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err = client.Get(env.CPBaseURL + "/apify/admin/listeners/" + listenerID)			// Verify we can get it			listenerID := createResult["id"].(string)			Expect(err).NotTo(HaveOccurred())			err = json.NewDecoder(resp.Body).Decode(&createResult)			var createResult map[string]interface{}			Expect(resp.StatusCode).To(Equal(http.StatusCreated))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err := client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))			body, _ := json.Marshal(listenerConfig)			}				"protocol": "HTTP",				"ip":       "0.0.0.0",				"port":     8089,				"name":     "all-interfaces-listener",			listenerConfig := map[string]interface{}{			// Create a listener on 0.0.0.0		It("should handle listeners with 0.0.0.0 IP correctly", func() {	Describe("Edge Cases", func() {	})		})			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err := client.Do(req)			Expect(err).NotTo(HaveOccurred())			req, err := http.NewRequest(http.MethodDelete, env.CPBaseURL+"/apify/admin/listeners/non-existent-id", nil)		It("should return 404 when deleting non-existent listener", func() {		})			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err = client.Get(env.CPBaseURL + "/apify/admin/listeners/" + listenerID)			// Verify the listener is deleted			Expect(resp.StatusCode).To(Equal(http.StatusNoContent))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err = client.Do(req)			Expect(err).NotTo(HaveOccurred())			req, err := http.NewRequest(http.MethodDelete, env.CPBaseURL+"/apify/admin/listeners/"+listenerID, nil)			// Delete the listener			listenerID := createResult["id"].(string)			Expect(err).NotTo(HaveOccurred())			err = json.NewDecoder(resp.Body).Decode(&createResult)			var createResult map[string]interface{}			Expect(resp.StatusCode).To(Equal(http.StatusCreated))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err := client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))			body, _ := json.Marshal(listenerConfig)			}				"protocol": "HTTP",				"ip":       "127.0.0.1",				"port":     8088,				"name":     "test-listener-delete",			listenerConfig := map[string]interface{}{			// Create a test listener		It("should delete an existing listener", func() {	Describe("DELETE /apify/admin/listeners/:id", func() {	})		})			Expect(resp.StatusCode).To(Equal(http.StatusConflict))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err = client.Do(req)			req.Header.Set("Content-Type", "application/json")			Expect(err).NotTo(HaveOccurred())			req, err := http.NewRequest(http.MethodPut, env.CPBaseURL+"/apify/admin/listeners/"+listenerID, bytes.NewBuffer(body))			body, _ = json.Marshal(listenerConfig2)			listenerConfig2["port"] = 8086			// Try to update second listener to use the same port as the first			listenerID := createResult["id"].(string)			Expect(err).NotTo(HaveOccurred())			err = json.NewDecoder(resp.Body).Decode(&createResult)			var createResult map[string]interface{}			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err = client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))			body, _ = json.Marshal(listenerConfig2)			}				"protocol": "HTTP",				"ip":       "127.0.0.1",				"port":     8087,				"name":     "test-listener-conflict-2",			listenerConfig2 := map[string]interface{}{			// Create second listener			resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err := client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))			body, _ := json.Marshal(listenerConfig1)			}				"protocol": "HTTP",				"ip":       "127.0.0.1",				"port":     8086,				"name":     "test-listener-conflict-1",			listenerConfig1 := map[string]interface{}{			// Create first listener		It("should reject update with conflicting IP and port", func() {		})			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err := client.Do(req)			req.Header.Set("Content-Type", "application/json")			Expect(err).NotTo(HaveOccurred())			req, err := http.NewRequest(http.MethodPut, env.CPBaseURL+"/apify/admin/listeners/non-existent-id", bytes.NewBuffer(body))			body, _ := json.Marshal(listenerConfig)			}				"protocol": "HTTP",				"ip":       "127.0.0.1",				"port":     8085,				"name":     "test-listener-update-404",			listenerConfig := map[string]interface{}{		It("should return 404 when updating non-existent listener", func() {		})			Expect(configObj["name"]).To(Equal("test-listener-updated"))			Expect(err).NotTo(HaveOccurred())			err = json.Unmarshal([]byte(configStr), &configObj)			var configObj map[string]interface{}			Expect(ok).To(BeTrue())			configStr, ok := listener["config"].(string)			Expect(err).NotTo(HaveOccurred())			err = json.NewDecoder(resp.Body).Decode(&listener)			var listener map[string]interface{}			Expect(resp.StatusCode).To(Equal(http.StatusOK))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err = client.Get(env.CPBaseURL + "/apify/admin/listeners/" + listenerID)			// Verify the update			Expect(resp.StatusCode).To(Equal(http.StatusOK))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err = client.Do(req)			req.Header.Set("Content-Type", "application/json")			Expect(err).NotTo(HaveOccurred())			req, err := http.NewRequest(http.MethodPut, env.CPBaseURL+"/apify/admin/listeners/"+listenerID, bytes.NewBuffer(body))			body, _ = json.Marshal(updatedConfig)			}				"protocol": "HTTP",				"ip":       "127.0.0.1",				"port":     8084,				"name":     "test-listener-updated",			updatedConfig := map[string]interface{}{			// Update the listener			listenerID := createResult["id"].(string)			Expect(err).NotTo(HaveOccurred())			err = json.NewDecoder(resp.Body).Decode(&createResult)			var createResult map[string]interface{}			Expect(resp.StatusCode).To(Equal(http.StatusCreated))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err := client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))			body, _ := json.Marshal(listenerConfig)			}				"protocol": "HTTP",				"ip":       "127.0.0.1",				"port":     8084,				"name":     "test-listener-update",			listenerConfig := map[string]interface{}{			// Create a test listener		It("should update an existing listener", func() {	Describe("PUT /apify/admin/listeners/:id", func() {	})		})			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err := client.Get(env.CPBaseURL + "/apify/admin/listeners/non-existent-id")		It("should return 404 for non-existent listener", func() {		})			Expect(configObj["port"]).To(BeNumerically("==", 8083))			Expect(configObj["name"]).To(Equal("test-listener-get"))			Expect(err).NotTo(HaveOccurred())			err = json.Unmarshal([]byte(configStr), &configObj)			var configObj map[string]interface{}			Expect(ok).To(BeTrue())			configStr, ok := listener["config"].(string)			// Verify config			Expect(listener["id"]).To(Equal(listenerID))			Expect(err).NotTo(HaveOccurred())			err = json.NewDecoder(resp.Body).Decode(&listener)			var listener map[string]interface{}			Expect(resp.StatusCode).To(Equal(http.StatusOK))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err = client.Get(env.CPBaseURL + "/apify/admin/listeners/" + listenerID)			// Get the listener by ID			Expect(listenerID).NotTo(BeEmpty())			listenerID := createResult["id"].(string)			Expect(err).NotTo(HaveOccurred())			err = json.NewDecoder(resp.Body).Decode(&createResult)			var createResult map[string]interface{}			Expect(resp.StatusCode).To(Equal(http.StatusCreated))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err := client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))			body, _ := json.Marshal(listenerConfig)			}				"protocol": "HTTP",				"ip":       "127.0.0.1",				"port":     8083,				"name":     "test-listener-get",			listenerConfig := map[string]interface{}{			// Create a test listener		It("should get a specific listener by ID", func() {	Describe("GET /apify/admin/listeners/:id", func() {	})		})			Expect(found).To(BeTrue(), "Created listener not found in list")			}				}					}						break						found = true					if configObj["name"] == "test-listener-list" {					json.Unmarshal([]byte(configStr), &configObj)					var configObj map[string]interface{}				if configStr, ok := l["config"].(string); ok {			for _, l := range listeners {			found := false			Expect(len(listeners)).To(BeNumerically(">", 0))			Expect(err).NotTo(HaveOccurred())			err = json.NewDecoder(resp.Body).Decode(&listeners)			var listeners []map[string]interface{}			Expect(resp.StatusCode).To(Equal(http.StatusOK))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err = client.Get(env.CPBaseURL + "/apify/admin/listeners")			// List all listeners			resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err := client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))			body, _ := json.Marshal(listenerConfig)			}				"protocol": "HTTP",				"ip":       "0.0.0.0",				"port":     8082,				"name":     "test-listener-list",			listenerConfig := map[string]interface{}{			// Create a test listener first		It("should list all listeners", func() {	Describe("GET /apify/admin/listeners", func() {	})		})			Expect(resp.StatusCode).To(Or(Equal(http.StatusBadRequest), Equal(http.StatusInternalServerError)))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err := client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))			body, _ := json.Marshal(listenerConfig)			}				// Missing required fields like port, ip, protocol				"name": "invalid-listener",			listenerConfig := map[string]interface{}{		It("should reject invalid listener configuration", func() {		})			Expect(resp.StatusCode).To(Equal(http.StatusConflict))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err = client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))			body, _ = json.Marshal(listenerConfig)			listenerConfig["name"] = "conflict-listener-2"			// Try to create another listener with the same IP and port			Expect(resp.StatusCode).To(Equal(http.StatusCreated))			resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err := client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))			body, _ := json.Marshal(listenerConfig)			}				"protocol": "HTTP",				"ip":       "127.0.0.1",				"port":     8081,				"name":     "conflict-listener-1",			listenerConfig := map[string]interface{}{		It("should reject listener with conflicting IP and port", func() {		})			Expect(result["id"]).NotTo(BeEmpty())			Expect(err).NotTo(HaveOccurred())			err = json.NewDecoder(resp.Body).Decode(&result)			var result map[string]interface{}			Expect(resp.StatusCode).To(Equal(http.StatusCreated))			defer resp.Body.Close()			Expect(err).NotTo(HaveOccurred())			resp, err := client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))			body, _ := json.Marshal(listenerConfig)			}				"protocol": "HTTP",				"ip":       "0.0.0.0",				"port":     8080,				"name":     "test-listener-create",			listenerConfig := map[string]interface{}{		It("should create a new listener", func() {	Describe("POST /apify/admin/listeners", func() {	})
+	})
+
+	Describe("POST /apify/admin/listeners", func() {
+		It("should create a new listener", func() {
+			listenerConfig := map[string]interface{}{
+				"name":     "test-listener-create",
+				"port":     8080,
+				"ip":       "0.0.0.0",
+				"protocol": "HTTP",
+			}
+			body, _ := json.Marshal(listenerConfig)
+			resp, err := client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))
+			Expect(err).NotTo(HaveOccurred())
+			defer resp.Body.Close()
+			Expect(resp.StatusCode).To(Equal(http.StatusCreated))
+
+			var result map[string]interface{}
+			err = json.NewDecoder(resp.Body).Decode(&result)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result["id"]).NotTo(BeEmpty())
+		})
+	})
+
+	Describe("GET /apify/admin/listeners", func() {
+		It("should list all listeners", func() {
+			// Create a listener first
+			listenerConfig := map[string]interface{}{
+				"name":     "test-listener-list",
+				"port":     8081,
+				"ip":       "0.0.0.0",
+				"protocol": "HTTP",
+			}
+			body, _ := json.Marshal(listenerConfig)
+			resp, err := client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))
+			Expect(err).NotTo(HaveOccurred())
+			resp.Body.Close()
+
+			// List listeners
+			resp, err = client.Get(env.CPBaseURL + "/apify/admin/listeners")
+			Expect(err).NotTo(HaveOccurred())
+			defer resp.Body.Close()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+			var results []map[string]interface{}
+			err = json.NewDecoder(resp.Body).Decode(&results)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(results)).To(BeGreaterThan(0))
+		})
+	})
+
+	Describe("GET /apify/admin/listeners/{id}", func() {
+		It("should get a listener by ID", func() {
+			// Create a listener first
+			listenerConfig := map[string]interface{}{
+				"name":     "test-listener-get",
+				"port":     8082,
+				"ip":       "0.0.0.0",
+				"protocol": "HTTP",
+			}
+			body, _ := json.Marshal(listenerConfig)
+			resp, err := client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))
+			Expect(err).NotTo(HaveOccurred())
+
+			var created map[string]interface{}
+			err = json.NewDecoder(resp.Body).Decode(&created)
+			resp.Body.Close()
+			Expect(err).NotTo(HaveOccurred())
+			id := created["id"].(string)
+
+			// Get listener by ID
+			resp, err = client.Get(env.CPBaseURL + "/apify/admin/listeners/" + id)
+			Expect(err).NotTo(HaveOccurred())
+			defer resp.Body.Close()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+			var result map[string]interface{}
+			err = json.NewDecoder(resp.Body).Decode(&result)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result["id"]).To(Equal(id))
+		})
+
+		It("should return 404 for non-existent listener", func() {
+			resp, err := client.Get(env.CPBaseURL + "/apify/admin/listeners/non-existent-id")
+			Expect(err).NotTo(HaveOccurred())
+			defer resp.Body.Close()
+			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+		})
+	})
+
+	Describe("PUT /apify/admin/listeners/{id}", func() {
+		It("should update a listener", func() {
+			// Create a listener first
+			listenerConfig := map[string]interface{}{
+				"name":     "test-listener-update",
+				"port":     8083,
+				"ip":       "0.0.0.0",
+				"protocol": "HTTP",
+			}
+			body, _ := json.Marshal(listenerConfig)
+			resp, err := client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))
+			Expect(err).NotTo(HaveOccurred())
+
+			var created map[string]interface{}
+			err = json.NewDecoder(resp.Body).Decode(&created)
+			resp.Body.Close()
+			Expect(err).NotTo(HaveOccurred())
+			id := created["id"].(string)
+
+			// Update listener
+			updatedConfig := map[string]interface{}{
+				"name":     "test-listener-updated",
+				"port":     8084,
+				"ip":       "0.0.0.0",
+				"protocol": "HTTP",
+			}
+			updateBody, _ := json.Marshal(updatedConfig)
+			resp, err = putJSON(client, env.CPBaseURL+"/apify/admin/listeners/"+id, updateBody)
+			Expect(err).NotTo(HaveOccurred())
+			defer resp.Body.Close()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+			// Verify update
+			resp, err = client.Get(env.CPBaseURL + "/apify/admin/listeners/" + id)
+			Expect(err).NotTo(HaveOccurred())
+			defer resp.Body.Close()
+
+			var updated map[string]interface{}
+			err = json.NewDecoder(resp.Body).Decode(&updated)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(updated["name"]).To(Equal("test-listener-updated"))
+		})
+	})
+
+	Describe("DELETE /apify/admin/listeners/{id}", func() {
+		It("should delete a listener", func() {
+			// Create a listener first
+			listenerConfig := map[string]interface{}{
+				"name":     "test-listener-delete",
+				"port":     8085,
+				"ip":       "0.0.0.0",
+				"protocol": "HTTP",
+			}
+			body, _ := json.Marshal(listenerConfig)
+			resp, err := client.Post(env.CPBaseURL+"/apify/admin/listeners", "application/json", bytes.NewBuffer(body))
+			Expect(err).NotTo(HaveOccurred())
+
+			var created map[string]interface{}
+			err = json.NewDecoder(resp.Body).Decode(&created)
+			resp.Body.Close()
+			Expect(err).NotTo(HaveOccurred())
+			id := created["id"].(string)
+
+			// Delete listener
+			resp, err = deleteRequest(client, env.CPBaseURL+"/apify/admin/listeners/"+id)
+			Expect(err).NotTo(HaveOccurred())
+			defer resp.Body.Close()
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+
+			// Verify deletion
+			resp, err = client.Get(env.CPBaseURL + "/apify/admin/listeners/" + id)
+			Expect(err).NotTo(HaveOccurred())
+			defer resp.Body.Close()
+			Expect(resp.StatusCode).To(Equal(http.StatusNotFound))
+		})
+	})
+})
