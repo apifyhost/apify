@@ -159,7 +159,7 @@ pub async fn handle_listeners_request(
                     Value::Number(serde_json::Number::from(updated_at)),
                 );
 
-                db.update("_meta_listeners", where_clause, data).await?;
+                db.update("_meta_listeners", data, where_clause).await?;
 
                 Ok(Response::builder()
                     .status(StatusCode::OK)

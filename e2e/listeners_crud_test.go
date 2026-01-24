@@ -181,7 +181,7 @@ var _ = Describe("Listeners CRUD Operations", func() {
 			resp, err = deleteRequest(client, env.CPBaseURL+"/apify/admin/listeners/"+id)
 			Expect(err).NotTo(HaveOccurred())
 			defer resp.Body.Close()
-			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			Expect(resp.StatusCode).To(Equal(http.StatusNoContent))
 
 			// Verify deletion
 			resp, err = client.Get(env.CPBaseURL + "/apify/admin/listeners/" + id)

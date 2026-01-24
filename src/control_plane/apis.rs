@@ -240,7 +240,7 @@ pub async fn handle_apis_request(
                     Value::Number(serde_json::Number::from(updated_at)),
                 );
 
-                db.update("_meta_api_configs", where_clause, data).await?;
+                db.update("_meta_api_configs", data, where_clause).await?;
 
                 Ok(Response::builder()
                     .status(StatusCode::OK)

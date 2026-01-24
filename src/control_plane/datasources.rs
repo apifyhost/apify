@@ -155,7 +155,7 @@ pub async fn handle_datasources_request(
                     Value::Number(serde_json::Number::from(updated_at)),
                 );
 
-                db.update("_meta_datasources", where_clause, data).await?;
+                db.update("_meta_datasources", data, where_clause).await?;
 
                 Ok(Response::builder()
                     .status(StatusCode::OK)
