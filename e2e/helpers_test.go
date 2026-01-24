@@ -14,26 +14,36 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-// TestEnv holds the test environment configuration
-type TestEnv struct {
-	TmpDir      string
-	ConfigFile  string
-	DBFile      string
-	CPBaseURL   string
-	CPPort      string
-	MetricsPort string
-	CPCmd       *exec.Cmd
+// decodeJSON decodes a JSON response
+func decodeJSON(resp *http.Response, target interface{}) error {
+	defer resp.Body.Close()
+	return json.NewDecoder(resp.Body).Decode(target)
 }
 
-// Stop stops the control plane process
-func (e *TestEnv) Stop() {
-	if e.CPCmd != nil && e.CPCmd.Process != nil {
-		e.CPCmd.Process.Kill()
-		e.CPCmd.Wait()
+// putJSON makes a PUT request with JSON body
+func putJSON(client *http.Client, url string, body interface{}) (*http.Response, error) {
+	jsonBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
 	}
-	if e.TmpDir != "" {
-		os.RemoveAll(e.TmpDir)
+
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		return nil, err
 	}
+	req.Header.Set("Content-Type", "application/json")
+
+	return client.Do(req)
+}
+
+// deleteRequest makes a DELETE request
+func deleteRequest(client *http.Client, url string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return client.Do(req)
 }
 
 // SetupControlPlaneEnv creates a minimal test environment with only Control Plane
@@ -128,36 +138,4 @@ log_level: "info"
 		return nil
 	}, 60*time.Second, 1*time.Second).Should(Succeed())
 	return env, client, nil
-}
-
-// Helper function to decode JSON response
-func decodeJSON(resp *http.Response, target interface{}) error {
-	defer resp.Body.Close()
-	return json.NewDecoder(resp.Body).Decode(target)
-}
-
-// Helper function to make PUT request
-func putJSON(client *http.Client, url string, body interface{}) (*http.Response, error) {
-	jsonBytes, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(jsonBytes))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	return client.Do(req)
-}
-
-// Helper function to make DELETE request
-func deleteRequest(client *http.Client, url string) (*http.Response, error) {
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return client.Do(req)
 }

@@ -71,7 +71,7 @@ var _ = Describe("Listeners CRUD Operations", func() {
 			var results []map[string]interface{}
 			err = json.NewDecoder(resp.Body).Decode(&results)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(len(results)).To(BeGreaterThan(0))
+			Expect(len(results)).To(BeNumerically(">", 0))
 		})
 	})
 
