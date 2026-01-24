@@ -33,15 +33,172 @@ pub async fn handle_listeners_request(
 ) -> Result<Response<Full<Bytes>>, Box<dyn std::error::Error + Send + Sync>> {
     let (parts, body) = req.into_parts();
     let method = parts.method;
+    let path = parts.uri.path();
+
+    // Parse ID from path if present (e.g., /apify/admin/listeners/{id})
+    let id = if path.starts_with("/apify/admin/listeners/") {
+        let segments: Vec<&str> = path.split('/').collect();
+        if segments.len() > 4 {
+            Some(segments[4].to_string())
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
     match method {
         hyper::Method::GET => {
-            let records = db.select("_meta_listeners", None, None, None, None).await?;
-            let json = serde_json::to_string(&records)?;
-            Ok(Response::builder()
-                .status(StatusCode::OK)
-                .header("Content-Type", "application/json")
-                .body(Full::new(Bytes::from(json)))?)
+            if let Some(id) = id {
+                // Get specific listener by ID
+                let mut where_clause = HashMap::new();
+                where_clause.insert("id".to_string(), Value::String(id.clone()));
+                
+                let records = db
+                    .select("_meta_listeners", None, Some(where_clause), None, None)
+                    .await?;
+                
+                if records.is_empty() {
+                    Ok(Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .body(Full::new(Bytes::from("Not Found")))?)
+                } else {
+                    let json = serde_json::to_string(&records[0])?;
+                    Ok(Response::builder()
+                        .status(StatusCode::OK)
+                        .header("Content-Type", "application/json")
+                        .body(Full::new(Bytes::from(json)))?)
+                }
+            } else {
+                // List all listeners
+                let records = db.select("_meta_listeners", None, None, None, None).await?;
+                let json = serde_json::to_string(&records)?;
+                Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", "application/json")
+                    .body(Full::new(Bytes::from(json)))?)
+            }
+        }
+        hyper::Method::PUT => {
+            if let Some(id) = id {
+                // Update specific listener by ID
+                let body_bytes = http_body_util::BodyExt::collect(body).await?.to_bytes();
+                let config: crate::config::ListenerConfig = serde_json::from_slice(&body_bytes)?;
+
+                // Check if listener exists
+                let mut where_clause = HashMap::new();
+                where_clause.insert("id".to_string(), Value::String(id.clone()));
+                
+                let existing = db
+                    .select("_meta_listeners", None, Some(where_clause.clone()), None, None)
+                    .await?;
+                
+                if existing.is_empty() {
+                    return Ok(Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .body(Full::new(Bytes::from("Not Found")))?);
+                }
+
+                // Check for port conflicts with other listeners
+                let mut port_where = HashMap::new();
+                port_where.insert(
+                    "port".to_string(),
+                    Value::Number(serde_json::Number::from(config.port)),
+                );
+
+                let port_records = db
+                    .select("_meta_listeners", None, Some(port_where), None, None)
+                    .await?;
+
+                for record in port_records {
+                    if let Some(record_id) = record.get("id").and_then(|v| v.as_str()) {
+                        if record_id != id {
+                            if let Some(config_str) = record.get("config").and_then(|v| v.as_str())
+                                && let Ok(existing_config) =
+                                    serde_json::from_str::<crate::config::ListenerConfig>(config_str)
+                            {
+                                let conflict = if config.ip == "0.0.0.0" {
+                                    true
+                                } else if existing_config.ip == "0.0.0.0" {
+                                    true
+                                } else {
+                                    existing_config.ip == config.ip
+                                };
+
+                                if conflict {
+                                    return Ok(Response::builder()
+                                        .status(StatusCode::CONFLICT)
+                                        .header("Content-Type", "application/json")
+                                        .body(Full::new(Bytes::from(
+                                            serde_json::json!({
+                                                "error": format!(
+                                                    "Listener port {} conflicts with existing listener {}:{}",
+                                                    config.port, existing_config.ip, existing_config.port
+                                                )
+                                            }).to_string(),
+                                        )))?);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                let config_str = serde_json::to_string(&config)?;
+                let updated_at = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs() as i64;
+
+                let mut data = HashMap::new();
+                data.insert("config".to_string(), Value::String(config_str));
+                data.insert(
+                    "port".to_string(),
+                    Value::Number(serde_json::Number::from(config.port)),
+                );
+                data.insert(
+                    "updated_at".to_string(),
+                    Value::Number(serde_json::Number::from(updated_at)),
+                );
+
+                db.update("_meta_listeners", where_clause, data).await?;
+
+                Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", "application/json")
+                    .body(Full::new(Bytes::from(
+                        serde_json::json!({"id": id}).to_string(),
+                    )))?)
+            } else {
+                Ok(Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body(Full::new(Bytes::from("Missing listener ID")))?)
+            }
+        }
+        hyper::Method::DELETE => {
+            if let Some(id) = id {
+                // Delete specific listener by ID
+                let mut where_clause = HashMap::new();
+                where_clause.insert("id".to_string(), Value::String(id.clone()));
+                
+                let existing = db
+                    .select("_meta_listeners", None, Some(where_clause.clone()), None, None)
+                    .await?;
+                
+                if existing.is_empty() {
+                    return Ok(Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .body(Full::new(Bytes::from("Not Found")))?);
+                }
+
+                db.delete("_meta_listeners", where_clause).await?;
+
+                Ok(Response::builder()
+                    .status(StatusCode::NO_CONTENT)
+                    .body(Full::new(Bytes::from("")))?)
+            } else {
+                Ok(Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body(Full::new(Bytes::from("Missing listener ID")))?)
+            }
         }
         hyper::Method::POST => {
             let body_bytes = http_body_util::BodyExt::collect(body).await?.to_bytes();
