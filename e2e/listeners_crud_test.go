@@ -149,7 +149,8 @@ var _ = Describe("Listeners CRUD Operations", func() {
 			if resp.StatusCode != http.StatusOK {
 				bodyBytes, _ := io.ReadAll(resp.Body)
 				Fail(fmt.Sprintf("Update failed with status %d: %s", resp.StatusCode, string(bodyBytes)))
-			}			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			}
+			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 			// Verify update
 			resp, err = client.Get(env.CPBaseURL + "/apify/admin/listeners/" + id)
