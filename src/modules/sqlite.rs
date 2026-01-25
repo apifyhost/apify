@@ -209,7 +209,10 @@ impl SqliteBackend {
             .build()
             .execute(&self.pool)
             .await
-            .map_err(DatabaseError::QueryError)?;
+            .map_err(|e| {
+                tracing::error!("Insert query failed: {:?}", e);
+                DatabaseError::QueryError(e)
+            })?;
 
         let last_id = res.last_insert_rowid();
         Ok(json!({
@@ -304,7 +307,10 @@ impl SqliteBackend {
             .build()
             .execute(&self.pool)
             .await
-            .map_err(DatabaseError::QueryError)?;
+            .map_err(|e| {
+                tracing::error!("Update query failed: {:?}", e);
+                DatabaseError::QueryError(e)
+            })?;
         Ok(json!({"message": "Record updated", "affected_rows": res.rows_affected()}))
     }
 
