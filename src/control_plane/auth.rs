@@ -259,7 +259,10 @@ pub async fn handle_auth_request(
                 Value::Number(serde_json::Number::from(updated_at)),
             );
 
-            db.insert("_meta_auth_configs", data).await?;
+            db.insert("_meta_auth_configs", data).await.map_err(|e| {
+                tracing::error!("Failed to insert auth config: {:?}", e);
+                e
+            })?;
 
             Ok(Response::builder()
                 .status(StatusCode::CREATED)

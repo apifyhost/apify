@@ -844,13 +844,12 @@ impl SchemaGenerator {
 
                         if curr_type_norm != desired_type_norm {
                             // Check compatibility before allowing recreation
-                            // For SQLite, we are more lenient and allow type changes via recreation
-                            // if !Self::is_type_compatible(&curr_type_norm, &desired_type_norm) {
-                            //     return Err(format!(
-                            //         "Incompatible type change for column '{}': {} -> {}",
-                            //         col.name, curr_type_norm, desired_type_norm
-                            //     ));
-                            // }
+                            if !Self::is_type_compatible(&curr_type_norm, &desired_type_norm) {
+                                return Err(format!(
+                                    "Incompatible type change for column '{}': {} -> {}",
+                                    col.name, curr_type_norm, desired_type_norm
+                                ));
+                            }
                             needs_recreation = true;
                             // Continue checking other columns for incompatible changes
                         }

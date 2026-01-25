@@ -159,7 +159,12 @@ pub async fn handle_listeners_request(
                     Value::Number(serde_json::Number::from(updated_at)),
                 );
 
-                db.update("_meta_listeners", data, where_clause).await?;
+                db.update("_meta_listeners", data, where_clause)
+                    .await
+                    .map_err(|e| {
+                        tracing::error!("Failed to update listener: {:?}", e);
+                        e
+                    })?;
 
                 Ok(Response::builder()
                     .status(StatusCode::OK)
