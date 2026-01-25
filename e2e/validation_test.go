@@ -168,7 +168,7 @@ var _ = Describe("OpenAPI Validation", func() {
 		req, _ := http.NewRequest("POST", baseURL+"/users?dry_run=true&limit=10", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("x-request-id", "12345")
-		
+
 		resp, err := client.Do(req)
 		Expect(err).NotTo(HaveOccurred())
 		defer resp.Body.Close()
@@ -180,7 +180,7 @@ var _ = Describe("OpenAPI Validation", func() {
 		req, _ := http.NewRequest("POST", baseURL+"/users", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		// Missing x-request-id
-		
+
 		resp, err := client.Do(req)
 		Expect(err).NotTo(HaveOccurred())
 		defer resp.Body.Close()
@@ -192,7 +192,7 @@ var _ = Describe("OpenAPI Validation", func() {
 		req, _ := http.NewRequest("POST", baseURL+"/users", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("x-request-id", "123") // Too short (min 5)
-		
+
 		resp, err := client.Do(req)
 		Expect(err).NotTo(HaveOccurred())
 		defer resp.Body.Close()
@@ -204,19 +204,19 @@ var _ = Describe("OpenAPI Validation", func() {
 		req, _ := http.NewRequest("POST", baseURL+"/users?limit=notanumber", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("x-request-id", "12345")
-		
+
 		resp, err := client.Do(req)
 		Expect(err).NotTo(HaveOccurred())
 		defer resp.Body.Close()
 		Expect(resp.StatusCode).To(Equal(http.StatusBadRequest))
 	})
-	
+
 	It("should reject requests with invalid query param constraint", func() {
 		body := []byte(`{"name": "Alice", "email": "alice@example.com"}`)
 		req, _ := http.NewRequest("POST", baseURL+"/users?limit=0", bytes.NewBuffer(body)) // min 1
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("x-request-id", "12345")
-		
+
 		resp, err := client.Do(req)
 		Expect(err).NotTo(HaveOccurred())
 		defer resp.Body.Close()

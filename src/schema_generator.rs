@@ -842,6 +842,13 @@ impl SchemaGenerator {
                         let curr_type_norm = curr_col.column_type.to_uppercase();
                         let desired_type_norm = desired_type.to_uppercase();
 
+                        tracing::info!(
+                            "Checking column '{}' compatibility: {} -> {}",
+                            col.name,
+                            curr_type_norm,
+                            desired_type_norm
+                        );
+
                         if curr_type_norm != desired_type_norm {
                             // Check compatibility before allowing recreation
                             if !Self::is_type_compatible(&curr_type_norm, &desired_type_norm) {

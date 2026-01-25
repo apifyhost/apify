@@ -114,20 +114,20 @@ pub async fn handle_control_plane_request(
         }
     }
 
-    if path == "/apify/admin/apis" {
+    if path.starts_with("/apify/admin/apis") {
         let res = handle_apis_request(req, db).await;
         if let Ok(ref r) = res {
             tracing::info!("API Request handled, status: {}", r.status());
         }
         res
-    } else if path == "/apify/admin/listeners" {
+    } else if path.starts_with("/apify/admin/listeners") {
         handle_listeners_request(req, db).await
     } else if path.starts_with("/admin") {
         // Fallback for admin routes (SPA routing)
         serve_static_file(&path).await
-    } else if path == "/apify/admin/datasources" {
+    } else if path.starts_with("/apify/admin/datasources") {
         handle_datasources_request(req, db).await
-    } else if path == "/apify/admin/auth" {
+    } else if path.starts_with("/apify/admin/auth") {
         handle_auth_request(req, db).await
     } else if path == "/apify/admin/import" {
         handle_import_request(req, db).await

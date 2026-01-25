@@ -166,8 +166,11 @@ pub struct ListenerConfig {
     pub port: u16,
     pub ip: String,
     pub protocol: String,
+    #[serde(default)]
     pub routes: Option<Vec<RouteConfig>>, // Legacy routes support
-    pub modules: Option<ModulesConfig>,   // Listener-level fallback modules (internal, not OpenAPI)
+    #[serde(default)]
+    pub modules: Option<ModulesConfig>, // Listener-level fallback modules (internal, not OpenAPI)
+    #[serde(default)]
     pub consumers: Option<Vec<ConsumerConfig>>, // Authentication consumers
 }
 

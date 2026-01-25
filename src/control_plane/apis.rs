@@ -72,19 +72,220 @@ pub async fn handle_apis_request(
 ) -> Result<Response<Full<Bytes>>, Box<dyn std::error::Error + Send + Sync>> {
     let (parts, body) = req.into_parts();
     let method = parts.method;
+    let path = parts.uri.path();
 
-    tracing::info!("Received {} request to /apify/admin/apis", method);
+    tracing::info!("Received {} request to {}", method, path);
+
+    // Parse ID from path if present (e.g., /apify/admin/apis/{id})
+    let id = if path.starts_with("/apify/admin/apis/") {
+        let segments: Vec<&str> = path.split('/').collect();
+        if segments.len() > 4 {
+            Some(segments[4].to_string())
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
     match method {
         hyper::Method::GET => {
-            let records = db
-                .select("_meta_api_configs", None, None, None, None)
-                .await?;
-            let json = serde_json::to_string(&records)?;
-            Ok(Response::builder()
-                .status(StatusCode::OK)
-                .header("Content-Type", "application/json")
-                .body(Full::new(Bytes::from(json)))?)
+            if let Some(id) = id {
+                // Get specific API by ID
+                let mut where_clause = HashMap::new();
+                where_clause.insert("id".to_string(), Value::String(id.clone()));
+
+                let records = db
+                    .select("_meta_api_configs", None, Some(where_clause), None, None)
+                    .await?;
+
+                if records.is_empty() {
+                    Ok(Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .body(Full::new(Bytes::from("Not Found")))?)
+                } else {
+                    let json = serde_json::to_string(&records[0])?;
+                    Ok(Response::builder()
+                        .status(StatusCode::OK)
+                        .header("Content-Type", "application/json")
+                        .body(Full::new(Bytes::from(json)))?)
+                }
+            } else {
+                // List all APIs
+                let records = db
+                    .select("_meta_api_configs", None, None, None, None)
+                    .await?;
+                let json = serde_json::to_string(&records)?;
+                Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", "application/json")
+                    .body(Full::new(Bytes::from(json)))?)
+            }
+        }
+        hyper::Method::PUT => {
+            if let Some(id) = id {
+                // Update specific API by ID
+                tracing::info!("Processing API update request for ID: {}", id);
+
+                // Check if API exists
+                let mut where_clause = HashMap::new();
+                where_clause.insert("id".to_string(), Value::String(id.clone()));
+
+                let existing = db
+                    .select(
+                        "_meta_api_configs",
+                        None,
+                        Some(where_clause.clone()),
+                        None,
+                        None,
+                    )
+                    .await?;
+
+                if existing.is_empty() {
+                    return Ok(Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .body(Full::new(Bytes::from("Not Found")))?);
+                }
+
+                let body_bytes = http_body_util::BodyExt::collect(body).await?.to_bytes();
+                let payload: Value = serde_json::from_slice(&body_bytes)?;
+
+                let name = payload
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .ok_or("Missing name")?;
+                let version = payload
+                    .get("version")
+                    .and_then(|v| v.as_str())
+                    .ok_or("Missing version")?;
+
+                let spec_content = if let Some(s) = payload.get("spec") {
+                    if s.is_string() {
+                        s.as_str().unwrap().to_string()
+                    } else {
+                        s.to_string()
+                    }
+                } else if let Some(p) = payload.get("path").and_then(|v| v.as_str()) {
+                    tokio::fs::read_to_string(p)
+                        .await
+                        .map_err(|e| format!("Failed to read spec file: {}", e))?
+                } else {
+                    return Err("Missing spec or path".into());
+                };
+
+                let datasource_name = payload.get("datasource_name").and_then(|v| v.as_str());
+                let modules_config = payload.get("modules_config");
+
+                // Parse spec to check for embedded listeners configuration
+                let spec_value: Value = serde_yaml::from_str(&spec_content)
+                    .or_else(|_| serde_json::from_str(&spec_content))
+                    .unwrap_or(Value::Null);
+
+                // Handle listeners association
+                let listeners_from_payload = payload.get("listeners").and_then(|v| v.as_array());
+                let listeners_from_spec = spec_value.get("listeners").and_then(|v| v.as_array());
+
+                let mut target_listeners = Vec::new();
+                if let Some(list) = listeners_from_payload {
+                    for l in list {
+                        if let Some(s) = l.as_str() {
+                            target_listeners.push(s.to_string());
+                        }
+                    }
+                }
+                if let Some(list) = listeners_from_spec {
+                    for l in list {
+                        if let Some(s) = l.as_str() {
+                            target_listeners.push(s.to_string());
+                        }
+                    }
+                }
+                // Deduplicate
+                target_listeners.sort();
+                target_listeners.dedup();
+
+                let updated_at = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs() as i64;
+
+                let spec_value: serde_json::Value =
+                    if let Ok(v) = serde_json::from_str(&spec_content) {
+                        v
+                    } else {
+                        serde_yaml::from_str(&spec_content)
+                            .map_err(|e| format!("Failed to parse spec as JSON or YAML: {}", e))?
+                    };
+
+                let mut data = HashMap::new();
+                data.insert("name".to_string(), Value::String(name.to_string()));
+                data.insert("version".to_string(), Value::String(version.to_string()));
+                data.insert(
+                    "spec".to_string(),
+                    Value::String(serde_json::to_string(&spec_value)?),
+                );
+                if let Some(ds) = datasource_name {
+                    data.insert("datasource_name".to_string(), Value::String(ds.to_string()));
+                }
+                if let Some(mc) = modules_config {
+                    data.insert("modules_config".to_string(), Value::String(mc.to_string()));
+                }
+                if !target_listeners.is_empty() {
+                    data.insert(
+                        "listeners".to_string(),
+                        Value::String(serde_json::to_string(&target_listeners)?),
+                    );
+                }
+                data.insert(
+                    "updated_at".to_string(),
+                    Value::Number(serde_json::Number::from(updated_at)),
+                );
+
+                db.update("_meta_api_configs", data, where_clause).await?;
+
+                Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", "application/json")
+                    .body(Full::new(Bytes::from(
+                        serde_json::json!({"id": id}).to_string(),
+                    )))?)
+            } else {
+                Ok(Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body(Full::new(Bytes::from("Missing API ID")))?)
+            }
+        }
+        hyper::Method::DELETE => {
+            if let Some(id) = id {
+                // Delete specific API by ID
+                let mut where_clause = HashMap::new();
+                where_clause.insert("id".to_string(), Value::String(id.clone()));
+
+                let existing = db
+                    .select(
+                        "_meta_api_configs",
+                        None,
+                        Some(where_clause.clone()),
+                        None,
+                        None,
+                    )
+                    .await?;
+
+                if existing.is_empty() {
+                    return Ok(Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .body(Full::new(Bytes::from("Not Found")))?);
+                }
+
+                db.delete("_meta_api_configs", where_clause).await?;
+
+                Ok(Response::builder()
+                    .status(StatusCode::NO_CONTENT)
+                    .body(Full::new(Bytes::from("")))?)
+            } else {
+                Ok(Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body(Full::new(Bytes::from("Missing API ID")))?)
+            }
         }
         hyper::Method::POST => {
             tracing::info!("Processing API creation/update request");

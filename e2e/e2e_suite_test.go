@@ -45,6 +45,7 @@ type TestEnv struct {
 	TmpDir      string
 	BaseURL     string
 	CPBaseURL   string
+	CPPort      string
 	APIKey      string
 	ConfigFile  string
 	DBFile      string

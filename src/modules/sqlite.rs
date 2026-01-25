@@ -205,11 +205,10 @@ impl SqliteBackend {
             push_bind_sqlite(&mut sep, v);
         }
         qb.push(")");
-        let res = qb
-            .build()
-            .execute(&self.pool)
-            .await
-            .map_err(DatabaseError::QueryError)?;
+        let res = qb.build().execute(&self.pool).await.map_err(|e| {
+            tracing::error!("Insert query failed: {:?}", e);
+            DatabaseError::QueryError(e)
+        })?;
 
         let last_id = res.last_insert_rowid();
         Ok(json!({
@@ -300,11 +299,10 @@ impl SqliteBackend {
                 }
             }
         }
-        let res = qb
-            .build()
-            .execute(&self.pool)
-            .await
-            .map_err(DatabaseError::QueryError)?;
+        let res = qb.build().execute(&self.pool).await.map_err(|e| {
+            tracing::error!("Update query failed: {:?}", e);
+            DatabaseError::QueryError(e)
+        })?;
         Ok(json!({"message": "Record updated", "affected_rows": res.rows_affected()}))
     }
 

@@ -85,6 +85,16 @@ pub fn get_metadata_schemas() -> Vec<TableSchema> {
                     default_value: None,
                     auto_field: false,
                 },
+                ColumnDefinition {
+                    name: "updated_at".to_string(),
+                    column_type: "INTEGER".to_string(), // Timestamp
+                    nullable: true,
+                    primary_key: false,
+                    unique: false,
+                    auto_increment: false,
+                    default_value: None,
+                    auto_field: false,
+                },
             ],
             indexes: vec![IndexDefinition {
                 name: "idx_api_name_version".to_string(),
