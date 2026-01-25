@@ -38,7 +38,20 @@ export const ApisPage = () => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      await createApi(values).unwrap();
+      const payload = {
+        ...values,
+        // Default minimal OpenAPI spec if not provided
+        spec: JSON.stringify({
+          openapi: '3.0.0',
+          info: {
+            title: values.name,
+            version: values.version,
+          },
+          paths: {},
+        }),
+      };
+      // @ts-ignore
+      await createApi(payload).unwrap();
       message.success('API 配置创建成功');
       setIsModalOpen(false);
       form.resetFields();

@@ -36,7 +36,19 @@ export const DataSourcesPage = () => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      await createDataSource(values).unwrap();
+      const payload = {
+        name: values.name,
+        config: {
+          driver: values.db_type === 'postgresql' ? 'postgres' : values.db_type,
+          host: values.host,
+          port: Number(values.port),
+          user: values.username,
+          password: values.password,
+          database: values.database,
+        },
+      };
+      // @ts-ignore
+      await createDataSource(payload).unwrap();
       message.success('数据源创建成功');
       setIsModalOpen(false);
       form.resetFields();

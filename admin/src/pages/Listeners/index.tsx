@@ -38,7 +38,16 @@ export const ListenersPage = () => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      await createListener(values).unwrap();
+      const payload = {
+        ...values,
+        ip: values.host,
+        port: Number(values.port), // Ensure port is a number
+      };
+      // Remove host as it is replaced by ip
+      delete payload.host;
+
+      // @ts-ignore
+      await createListener(payload).unwrap();
       message.success('监听器创建成功');
       setIsModalOpen(false);
       form.resetFields();
