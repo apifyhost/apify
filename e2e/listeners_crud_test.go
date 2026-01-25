@@ -3,6 +3,8 @@ package e2e_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -144,7 +146,10 @@ var _ = Describe("Listeners CRUD Operations", func() {
 			resp, err = putJSON(client, env.CPBaseURL+"/apify/admin/listeners/"+id, updateBody)
 			Expect(err).NotTo(HaveOccurred())
 			defer resp.Body.Close()
-			Expect(resp.StatusCode).To(Equal(http.StatusOK))
+			if resp.StatusCode != http.StatusOK {
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				Fail(fmt.Sprintf("Update failed with status %d: %s", resp.StatusCode, string(bodyBytes)))
+			}			Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 			// Verify update
 			resp, err = client.Get(env.CPBaseURL + "/apify/admin/listeners/" + id)
