@@ -142,8 +142,8 @@ var _ = Describe("Listeners CRUD Operations", func() {
 				"ip":       "0.0.0.0",
 				"protocol": "HTTP",
 			}
-			updateBody, _ := json.Marshal(updatedConfig)
-			resp, err = putJSON(client, env.CPBaseURL+"/apify/admin/listeners/"+id, updateBody)
+			// updateBody is NOT needed here because putJSON marshals the interface
+			resp, err = putJSON(client, env.CPBaseURL+"/apify/admin/listeners/"+id, updatedConfig)
 			Expect(err).NotTo(HaveOccurred())
 			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusOK {
