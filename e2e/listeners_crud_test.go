@@ -160,7 +160,15 @@ var _ = Describe("Listeners CRUD Operations", func() {
 			var updated map[string]interface{}
 			err = json.NewDecoder(resp.Body).Decode(&updated)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(updated["name"]).To(Equal("test-listener-updated"))
+
+			// Parse config string to check name
+			configStr, ok := updated["config"].(string)
+			Expect(ok).To(BeTrue(), "config should be a string")
+
+			var config map[string]interface{}
+			err = json.Unmarshal([]byte(configStr), &config)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(config["name"]).To(Equal("test-listener-updated"))
 		})
 	})
 
