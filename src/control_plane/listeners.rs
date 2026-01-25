@@ -83,7 +83,16 @@ pub async fn handle_listeners_request(
             if let Some(id) = id {
                 // Update specific listener by ID
                 let body_bytes = http_body_util::BodyExt::collect(body).await?.to_bytes();
-                let config: crate::config::ListenerConfig = serde_json::from_slice(&body_bytes)?;
+                let config: crate::config::ListenerConfig =
+                    match serde_json::from_slice(&body_bytes) {
+                        Ok(c) => c,
+                        Err(e) => {
+                            tracing::error!("Failed to deserialize ListenerConfig: {}", e);
+                            return Ok(Response::builder()
+                                .status(StatusCode::BAD_REQUEST)
+                                .body(Full::new(Bytes::from(format!("Invalid config: {}", e))))?);
+                        }
+                    };
 
                 // Check if listener exists
                 let mut where_clause = HashMap::new();

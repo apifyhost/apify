@@ -200,9 +200,8 @@ var _ = Describe("Auth Configs CRUD Operations", func() {
 				"name":    "oidc-auth",
 				"enabled": true,
 				"config": map[string]interface{}{
-					"issuer_url":   "https://example.com/auth",
-					"client_id":    "test-client",
-					"redirect_uri": "http://localhost:3000/callback",
+					"issuer":    "https://example.com/auth",
+					"client_id": "test-client",
 				},
 			}
 			body, _ := json.Marshal(authConfig)
