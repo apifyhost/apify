@@ -49,6 +49,23 @@ pub async fn handle_listeners_request(
 
     match method {
         hyper::Method::GET => {
+            let transform_record = |mut record: Value| -> Value {
+                if let Some(obj) = record.as_object_mut() {
+                    if let Some(config_str) = obj.remove("config").and_then(|v| v.as_str().map(|s| s.to_string())) {
+                        if let Ok(config_json) = serde_json::from_str::<Value>(&config_str) {
+                            if let Some(config_obj) = config_json.as_object() {
+                                for (k, v) in config_obj {
+                                    if !obj.contains_key(k) {
+                                        obj.insert(k.clone(), v.clone());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                record
+            };
+
             if let Some(id) = id {
                 // Get specific listener by ID
                 let mut where_clause = HashMap::new();
@@ -63,7 +80,8 @@ pub async fn handle_listeners_request(
                         .status(StatusCode::NOT_FOUND)
                         .body(Full::new(Bytes::from("Not Found")))?)
                 } else {
-                    let json = serde_json::to_string(&records[0])?;
+                    let record = transform_record(records[0].clone());
+                    let json = serde_json::to_string(&record)?;
                     Ok(Response::builder()
                         .status(StatusCode::OK)
                         .header("Content-Type", "application/json")
@@ -72,7 +90,8 @@ pub async fn handle_listeners_request(
             } else {
                 // List all listeners
                 let records = db.select("_meta_listeners", None, None, None, None).await?;
-                let json = serde_json::to_string(&records)?;
+                let transformed_records: Vec<Value> = records.into_iter().map(transform_record).collect();
+                let json = serde_json::to_string(&transformed_records)?;
                 Ok(Response::builder()
                     .status(StatusCode::OK)
                     .header("Content-Type", "application/json")

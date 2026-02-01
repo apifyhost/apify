@@ -165,6 +165,7 @@ pub struct ListenerConfig {
     pub name: Option<String>, // Listener name for reference
     pub port: u16,
     pub ip: String,
+    #[serde(default = "default_protocol")]
     pub protocol: String,
     #[serde(default)]
     pub routes: Option<Vec<RouteConfig>>, // Legacy routes support
@@ -172,6 +173,10 @@ pub struct ListenerConfig {
     pub modules: Option<ModulesConfig>, // Listener-level fallback modules (internal, not OpenAPI)
     #[serde(default)]
     pub consumers: Option<Vec<ConsumerConfig>>, // Authentication consumers
+}
+
+fn default_protocol() -> String {
+    "http".to_string()
 }
 
 /// Route configuration (name and matching rules)

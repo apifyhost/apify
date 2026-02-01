@@ -18,6 +18,7 @@ import {
   useCreateApiMutation,
   useDeleteApiMutation,
   useGetDataSourcesQuery,
+  useGetListenersQuery,
   ApiConfig,
 } from '@/services/api';
 import dayjs from 'dayjs';
@@ -27,6 +28,7 @@ export const ApisPage = () => {
   const [form] = Form.useForm();
   const { data: apis = [], isLoading } = useGetApisQuery();
   const { data: dataSources = [] } = useGetDataSourcesQuery();
+  const { data: listeners = [] } = useGetListenersQuery();
   const [createApi, { isLoading: isCreating }] = useCreateApiMutation();
   const [deleteApi] = useDeleteApiMutation();
 
@@ -87,7 +89,7 @@ export const ApisPage = () => {
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
-      render: (date) => dayjs(date).format('YYYY-MM-DD HH:mm:ss'),
+      render: (date) => dayjs(date * 1000).format('YYYY-MM-DD HH:mm:ss'),
     },
     {
       title: '操作',
@@ -176,6 +178,29 @@ export const ApisPage = () => {
                 </Select.Option>
               ))}
             </Select>
+          </Form.Item>
+          <Form.Item
+            name="listeners"
+            label="监听器"
+            rules={[{ required: true, message: '请选择至少一个监听器' }]}
+          >
+            <Select placeholder="选择监听器" mode="multiple">
+              {listeners.map((l) => (
+                <Select.Option key={l.name} value={l.name}>
+                  {l.name} ({l.port})
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item
+            name="spec"
+            label="OpenAPI 规范 (YAML/JSON)"
+            rules={[{ required: true, message: '请输入 OpenAPI 规范' }]}
+          >
+            <Input.TextArea
+              rows={10}
+              placeholder="请输入 OpenAPI 规范内容 (YAML 或 JSON 格式)"
+            />
           </Form.Item>
         </Form>
       </Modal>

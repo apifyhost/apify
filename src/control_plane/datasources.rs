@@ -50,6 +50,31 @@ pub async fn handle_datasources_request(
 
     match method {
         hyper::Method::GET => {
+            let transform_record = |mut record: Value| -> Value {
+                if let Some(obj) = record.as_object_mut() {
+                    if let Some(config_str) = obj.remove("config").and_then(|v| v.as_str().map(|s| s.to_string())) {
+                        if let Ok(config_json) = serde_json::from_str::<Value>(&config_str) {
+                            if let Some(config_obj) = config_json.as_object() {
+                                for (k, v) in config_obj {
+                                    if !obj.contains_key(k) {
+                                        obj.insert(k.clone(), v.clone());
+                                    }
+                                    if k == "user" {
+                                        obj.insert("username".to_string(), v.clone());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if !obj.contains_key("db_type") {
+                        let val = obj.get("type").or_else(|| obj.get("driver")).cloned().unwrap_or(Value::Null);
+                        obj.insert("db_type".to_string(), val);
+                    }
+                }
+                record
+            };
+
             if let Some(id) = id {
                 // Get specific datasource by ID
                 let mut where_clause = HashMap::new();
@@ -64,7 +89,8 @@ pub async fn handle_datasources_request(
                         .status(StatusCode::NOT_FOUND)
                         .body(Full::new(Bytes::from("Not Found")))?)
                 } else {
-                    let json = serde_json::to_string(&records[0])?;
+                    let record = transform_record(records[0].clone());
+                    let json = serde_json::to_string(&record)?;
                     Ok(Response::builder()
                         .status(StatusCode::OK)
                         .header("Content-Type", "application/json")
@@ -75,7 +101,10 @@ pub async fn handle_datasources_request(
                 let records = db
                     .select("_meta_datasources", None, None, None, None)
                     .await?;
-                let json = serde_json::to_string(&records)?;
+                
+                let transformed_records: Vec<Value> = records.into_iter().map(transform_record).collect();
+                let json = serde_json::to_string(&transformed_records)?;
+                
                 Ok(Response::builder()
                     .status(StatusCode::OK)
                     .header("Content-Type", "application/json")
@@ -92,7 +121,40 @@ pub async fn handle_datasources_request(
                     .get("name")
                     .and_then(|v| v.as_str())
                     .ok_or("Missing name")?;
-                let config = payload.get("config").ok_or("Missing config")?;
+                
+                // Handle flat structure from frontend
+                let config = if let Some(c) = payload.get("config") {
+                    c.clone()
+                } else {
+                    let driver = payload.get("db_type").or(payload.get("driver"));
+                    let driver = driver.and_then(|v| v.as_str()).ok_or("Missing db_type")?;
+                    let database = payload.get("database").and_then(|v| v.as_str()).ok_or("Missing database")?;
+                    
+                    let mut obj = serde_json::Map::new();
+                    obj.insert("driver".to_string(), Value::String(driver.to_string()));
+                    obj.insert("database".to_string(), Value::String(database.to_string()));
+                    
+                    if let Some(host) = payload.get("host") {
+                        obj.insert("host".to_string(), host.clone());
+                    }
+                    if let Some(port) = payload.get("port") {
+                        obj.insert("port".to_string(), port.clone());
+                    }
+                    if let Some(user) = payload.get("username").or(payload.get("user")) {
+                        obj.insert("user".to_string(), user.clone());
+                    }
+                    if let Some(password) = payload.get("password") {
+                        obj.insert("password".to_string(), password.clone());
+                    }
+                    if let Some(ssl_mode) = payload.get("ssl_mode") {
+                        obj.insert("ssl_mode".to_string(), ssl_mode.clone());
+                    }
+                    if let Some(max_pool_size) = payload.get("max_pool_size") {
+                        obj.insert("max_pool_size".to_string(), max_pool_size.clone());
+                    }
+                    
+                    Value::Object(obj)
+                };
 
                 // Check if datasource exists
                 let mut where_clause = HashMap::new();
@@ -140,7 +202,7 @@ pub async fn handle_datasources_request(
 
                 // Validate config
                 let ds_config: DatabaseSettings = serde_json::from_value(config.clone())?;
-                let config_str = serde_json::to_string(config)?;
+                let config_str = serde_json::to_string(&config)?;
 
                 let updated_at = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)?
@@ -210,7 +272,40 @@ pub async fn handle_datasources_request(
                 .get("name")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing name")?;
-            let config = payload.get("config").ok_or("Missing config")?;
+            
+            // Handle flat structure from frontend
+            let config = if let Some(c) = payload.get("config") {
+                c.clone()
+            } else {
+                let driver = payload.get("db_type").or(payload.get("driver"));
+                let driver = driver.and_then(|v| v.as_str()).ok_or("Missing db_type")?;
+                let database = payload.get("database").and_then(|v| v.as_str()).ok_or("Missing database")?;
+                
+                let mut obj = serde_json::Map::new();
+                obj.insert("driver".to_string(), Value::String(driver.to_string()));
+                obj.insert("database".to_string(), Value::String(database.to_string()));
+                
+                if let Some(host) = payload.get("host") {
+                    obj.insert("host".to_string(), host.clone());
+                }
+                if let Some(port) = payload.get("port") {
+                    obj.insert("port".to_string(), port.clone());
+                }
+                if let Some(user) = payload.get("username").or(payload.get("user")) {
+                    obj.insert("user".to_string(), user.clone());
+                }
+                if let Some(password) = payload.get("password") {
+                    obj.insert("password".to_string(), password.clone());
+                }
+                if let Some(ssl_mode) = payload.get("ssl_mode") {
+                    obj.insert("ssl_mode".to_string(), ssl_mode.clone());
+                }
+                if let Some(max_pool_size) = payload.get("max_pool_size") {
+                    obj.insert("max_pool_size".to_string(), max_pool_size.clone());
+                }
+                
+                Value::Object(obj)
+            };
 
             // Check if datasource with same name already exists
             let mut where_clause = HashMap::new();
@@ -234,7 +329,7 @@ pub async fn handle_datasources_request(
 
             // Validate config
             let ds_config: DatabaseSettings = serde_json::from_value(config.clone())?;
-            let config_str = serde_json::to_string(config)?;
+            let config_str = serde_json::to_string(&config)?;
 
             let id = uuid::Uuid::new_v4().to_string();
             let updated_at = std::time::SystemTime::now()

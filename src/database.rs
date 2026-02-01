@@ -130,7 +130,7 @@ impl std::fmt::Debug for DatabaseManager {
 impl DatabaseManager {
     pub async fn new(config: DatabaseRuntimeConfig) -> Result<Self, DatabaseError> {
         let backend: Arc<dyn DatabaseBackend> = match config.driver.as_str() {
-            "postgres" => {
+            "postgres" | "postgresql" => {
                 let b = crate::modules::postgres::PostgresBackend::connect(config).await?;
                 Arc::new(b)
             }

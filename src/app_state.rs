@@ -116,7 +116,7 @@ impl AppState {
 
                 // Build database URL
                 let url = match ds.driver.as_str() {
-                    "postgres" => {
+                    "postgres" | "postgresql" => {
                         format!(
                             "postgres://{}:{}@{}:{}/{}",
                             ds.user.as_deref().unwrap_or("postgres"),
