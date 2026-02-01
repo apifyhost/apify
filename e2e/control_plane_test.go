@@ -136,13 +136,9 @@ var _ = Describe("Control Plane API Operations", func() {
 
 		found := false
 		for _, l := range listeners {
-			if configStr, ok := l["config"].(string); ok {
-				var configObj map[string]interface{}
-				json.Unmarshal([]byte(configStr), &configObj)
-				if configObj["name"] == "test-listener" {
-					found = true
-					break
-				}
+			if name, ok := l["name"].(string); ok && name == "test-listener" {
+				found = true
+				break
 			}
 		}
 		Expect(found).To(BeTrue(), "Created listener not found")

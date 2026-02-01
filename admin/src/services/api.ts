@@ -5,7 +5,9 @@ export interface ApiConfig {
   name: string;
   version: string;
   datasource_name: string;
+  spec: string;
   schemas?: any[];
+  listeners?: string[];
   created_at: string;
 }
 
@@ -22,8 +24,9 @@ export interface DataSource {
 export interface Listener {
   id: string;
   name: string;
-  host: string;
+  ip: string;
   port: number;
+  protocol: string;
   api_configs: string[];
 }
 

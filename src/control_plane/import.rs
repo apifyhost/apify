@@ -120,7 +120,7 @@ pub async fn handle_import_request(
     if let Some(apis) = config.apis {
         for api_config in apis {
             let path = api_config.path;
-            let modules = api_config.modules;
+            // modules removed from ApiConfig
             let datasource = api_config.datasource;
             let listeners = api_config.listeners;
 
@@ -155,12 +155,7 @@ pub async fn handle_import_request(
                     if let Some(ds) = datasource {
                         data.insert("datasource_name".to_string(), Value::String(ds));
                     }
-                    if let Some(m) = modules {
-                        data.insert(
-                            "modules_config".to_string(),
-                            Value::String(serde_json::to_string(&m)?),
-                        );
-                    }
+                    // modules removed
                     if let Some(l) = listeners {
                         data.insert(
                             "listeners".to_string(),

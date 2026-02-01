@@ -161,14 +161,13 @@ var _ = Describe("Listeners CRUD Operations", func() {
 			err = json.NewDecoder(resp.Body).Decode(&updated)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Parse config string to check name
-			configStr, ok := updated["config"].(string)
-			Expect(ok).To(BeTrue(), "config should be a string")
-
-			var config map[string]interface{}
-			err = json.Unmarshal([]byte(configStr), &config)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(config["name"]).To(Equal("test-listener-updated"))
+			// Check direct fields since response is flattened
+			Expect(updated["name"]).To(Equal("test-listener-updated"))
+			Expect(updated["ip"]).To(Equal("0.0.0.0"))
+			// Port will be a number, not string
+			portVal, ok := updated["port"].(float64)
+			Expect(ok).To(BeTrue(), "port should be a number")
+			Expect(portVal).To(Equal(8084.0))
 		})
 	})
 

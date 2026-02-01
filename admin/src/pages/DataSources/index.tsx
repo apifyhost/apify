@@ -173,7 +173,6 @@ export const DataSourcesPage = () => {
           >
             <Select>
               <Select.Option value="postgresql">PostgreSQL</Select.Option>
-              <Select.Option value="mysql">MySQL</Select.Option>
               <Select.Option value="sqlite">SQLite</Select.Option>
             </Select>
           </Form.Item>

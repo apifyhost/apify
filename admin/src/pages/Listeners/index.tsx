@@ -7,7 +7,6 @@ import {
   Form,
   Input,
   InputNumber,
-  Select,
   message,
   Tag,
   Popconfirm,
@@ -18,7 +17,6 @@ import {
   useGetListenersQuery,
   useCreateListenerMutation,
   useDeleteListenerMutation,
-  useGetApisQuery,
   Listener,
 } from '@/services/api';
 
@@ -26,7 +24,6 @@ export const ListenersPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
   const { data: listeners = [], isLoading } = useGetListenersQuery();
-  const { data: apis = [] } = useGetApisQuery();
   const [createListener, { isLoading: isCreating }] = useCreateListenerMutation();
   const [deleteListener] = useDeleteListenerMutation();
 
@@ -38,7 +35,8 @@ export const ListenersPage = () => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      await createListener(values).unwrap();
+      // Add default protocol
+      await createListener({ ...values, protocol: 'http' }).unwrap();
       message.success('监听器创建成功');
       setIsModalOpen(false);
       form.resetFields();
@@ -65,8 +63,8 @@ export const ListenersPage = () => {
     },
     {
       title: '主机',
-      dataIndex: 'host',
-      key: 'host',
+      dataIndex: 'ip',
+      key: 'ip',
       width: 150,
     },
     {
@@ -152,7 +150,7 @@ export const ListenersPage = () => {
             <Input placeholder="例如: main-listener" />
           </Form.Item>
           <Form.Item
-            name="host"
+            name="ip"
             label="主机"
             rules={[{ required: true, message: '请输入主机地址' }]}
             initialValue="127.0.0.1"
@@ -166,19 +164,6 @@ export const ListenersPage = () => {
             initialValue={8080}
           >
             <InputNumber min={1} max={65535} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item
-            name="api_configs"
-            label="关联 API"
-            rules={[{ required: true, message: '请选择要关联的 API' }]}
-          >
-            <Select mode="multiple" placeholder="选择要关联的 API">
-              {apis.map((api) => (
-                <Select.Option key={api.id} value={api.id}>
-                  {api.name} ({api.version})
-                </Select.Option>
-              ))}
-            </Select>
           </Form.Item>
         </Form>
       </Modal>
