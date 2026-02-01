@@ -9,6 +9,7 @@ control-plane:
     user: apify
     password: apify_password
     database: apify_db
+    max_pool_size: 50
   admin_key: UZY65Nakvsd3
 
 log_level: "info"

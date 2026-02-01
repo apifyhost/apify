@@ -45,7 +45,7 @@ datasource:
   sqlite1:
     driver: sqlite
     database: ./apify.sqlite
-    max_pool_size: 5
+    max_pool_size: 20
 
   postgres1:
     driver: postgres
@@ -55,4 +55,4 @@ datasource:
     password: apify_test_password
     database: apify_e2e
     ssl_mode: disable
-    max_pool_size: 10
+    max_pool_size: 20

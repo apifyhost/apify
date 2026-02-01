@@ -48,7 +48,7 @@ impl DatabaseRuntimeConfig {
             return Self {
                 driver,
                 url,
-                max_size: 10,
+                max_size: 20,
             };
         }
         // Default: file-based sqlite under current directory
@@ -60,7 +60,7 @@ impl DatabaseRuntimeConfig {
         Self {
             driver: "sqlite".into(),
             url,
-            max_size: 10,
+            max_size: 20,
         }
     }
 }

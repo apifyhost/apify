@@ -443,7 +443,7 @@ pub async fn handle_apis_request(
                         let config = DatabaseRuntimeConfig {
                             driver: ds_settings.driver,
                             url,
-                            max_size: ds_settings.max_pool_size.unwrap_or(10) as u32,
+                            max_size: ds_settings.max_pool_size.unwrap_or(20) as u32,
                         };
 
                         let target_db = DatabaseManager::new(config).await?;

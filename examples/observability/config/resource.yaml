@@ -30,4 +30,4 @@ datasource:
     password: apify_password
     database: apify
     ssl_mode: disable
-    max_pool_size: 10
+    max_pool_size: 20
