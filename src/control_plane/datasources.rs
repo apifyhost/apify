@@ -52,23 +52,28 @@ pub async fn handle_datasources_request(
         hyper::Method::GET => {
             let transform_record = |mut record: Value| -> Value {
                 if let Some(obj) = record.as_object_mut() {
-                    if let Some(config_str) = obj.remove("config").and_then(|v| v.as_str().map(|s| s.to_string())) {
-                        if let Ok(config_json) = serde_json::from_str::<Value>(&config_str) {
-                            if let Some(config_obj) = config_json.as_object() {
-                                for (k, v) in config_obj {
-                                    if !obj.contains_key(k) {
-                                        obj.insert(k.clone(), v.clone());
-                                    }
-                                    if k == "user" {
-                                        obj.insert("username".to_string(), v.clone());
-                                    }
-                                }
+                    if let Some(config_str) = obj
+                        .remove("config")
+                        .and_then(|v| v.as_str().map(|s| s.to_string()))
+                        && let Ok(config_json) = serde_json::from_str::<Value>(&config_str)
+                        && let Some(config_obj) = config_json.as_object()
+                    {
+                        for (k, v) in config_obj {
+                            if !obj.contains_key(k) {
+                                obj.insert(k.clone(), v.clone());
+                            }
+                            if k == "user" {
+                                obj.insert("username".to_string(), v.clone());
                             }
                         }
                     }
-                    
+
                     if !obj.contains_key("db_type") {
-                        let val = obj.get("type").or_else(|| obj.get("driver")).cloned().unwrap_or(Value::Null);
+                        let val = obj
+                            .get("type")
+                            .or_else(|| obj.get("driver"))
+                            .cloned()
+                            .unwrap_or(Value::Null);
                         obj.insert("db_type".to_string(), val);
                     }
                 }
@@ -101,10 +106,11 @@ pub async fn handle_datasources_request(
                 let records = db
                     .select("_meta_datasources", None, None, None, None)
                     .await?;
-                
-                let transformed_records: Vec<Value> = records.into_iter().map(transform_record).collect();
+
+                let transformed_records: Vec<Value> =
+                    records.into_iter().map(transform_record).collect();
                 let json = serde_json::to_string(&transformed_records)?;
-                
+
                 Ok(Response::builder()
                     .status(StatusCode::OK)
                     .header("Content-Type", "application/json")
@@ -121,19 +127,22 @@ pub async fn handle_datasources_request(
                     .get("name")
                     .and_then(|v| v.as_str())
                     .ok_or("Missing name")?;
-                
+
                 // Handle flat structure from frontend
                 let config = if let Some(c) = payload.get("config") {
                     c.clone()
                 } else {
                     let driver = payload.get("db_type").or(payload.get("driver"));
                     let driver = driver.and_then(|v| v.as_str()).ok_or("Missing db_type")?;
-                    let database = payload.get("database").and_then(|v| v.as_str()).ok_or("Missing database")?;
-                    
+                    let database = payload
+                        .get("database")
+                        .and_then(|v| v.as_str())
+                        .ok_or("Missing database")?;
+
                     let mut obj = serde_json::Map::new();
                     obj.insert("driver".to_string(), Value::String(driver.to_string()));
                     obj.insert("database".to_string(), Value::String(database.to_string()));
-                    
+
                     if let Some(host) = payload.get("host") {
                         obj.insert("host".to_string(), host.clone());
                     }
@@ -152,7 +161,7 @@ pub async fn handle_datasources_request(
                     if let Some(max_pool_size) = payload.get("max_pool_size") {
                         obj.insert("max_pool_size".to_string(), max_pool_size.clone());
                     }
-                    
+
                     Value::Object(obj)
                 };
 
@@ -272,19 +281,22 @@ pub async fn handle_datasources_request(
                 .get("name")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing name")?;
-            
+
             // Handle flat structure from frontend
             let config = if let Some(c) = payload.get("config") {
                 c.clone()
             } else {
                 let driver = payload.get("db_type").or(payload.get("driver"));
                 let driver = driver.and_then(|v| v.as_str()).ok_or("Missing db_type")?;
-                let database = payload.get("database").and_then(|v| v.as_str()).ok_or("Missing database")?;
-                
+                let database = payload
+                    .get("database")
+                    .and_then(|v| v.as_str())
+                    .ok_or("Missing database")?;
+
                 let mut obj = serde_json::Map::new();
                 obj.insert("driver".to_string(), Value::String(driver.to_string()));
                 obj.insert("database".to_string(), Value::String(database.to_string()));
-                
+
                 if let Some(host) = payload.get("host") {
                     obj.insert("host".to_string(), host.clone());
                 }
@@ -303,7 +315,7 @@ pub async fn handle_datasources_request(
                 if let Some(max_pool_size) = payload.get("max_pool_size") {
                     obj.insert("max_pool_size".to_string(), max_pool_size.clone());
                 }
-                
+
                 Value::Object(obj)
             };
 
