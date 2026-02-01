@@ -16,7 +16,11 @@ pub struct PostgresBackend {
 
 impl PostgresBackend {
     pub async fn connect(config: DatabaseRuntimeConfig) -> Result<Self, DatabaseError> {
-        tracing::info!(">>> CONNECTING TO POSTGRES. CONFIG URL: {} MAX SIZE: {} <<<", config.url, config.max_size);
+        tracing::info!(
+            ">>> CONNECTING TO POSTGRES. CONFIG URL: {} MAX SIZE: {} <<<",
+            config.url,
+            config.max_size
+        );
         let pool = PgPoolOptions::new()
             .max_connections(config.max_size)
             .acquire_timeout(std::time::Duration::from_secs(5))
@@ -33,8 +37,6 @@ impl PostgresBackend {
 
         Ok(Self { pool })
     }
-
-
 
     async fn do_select(
         &self,
@@ -64,26 +66,39 @@ impl PostgresBackend {
         if let Some(o) = offset {
             qb.push(" OFFSET ").push_bind(o as i64);
         }
-        
+
         let pool_size = self.pool.size();
         let pool_idle = self.pool.num_idle();
         if pool_idle == 0 {
-            tracing::warn!("Postgres pool exhaustion risk? Size: {}, Idle: {} [Presuming select on table: {}]", pool_size, pool_idle, table);
+            tracing::warn!(
+                "Postgres pool exhaustion risk? Size: {}, Idle: {} [Presuming select on table: {}]",
+                pool_size,
+                pool_idle,
+                table
+            );
         }
         let start = std::time::Instant::now();
 
-        let rows: Vec<PgRow> = qb
-            .build()
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| {
-                tracing::error!("Postgres select error on table {}: {:?}. Pool Size: {}, Idle: {}", table, e, self.pool.size(), self.pool.num_idle());
-                DatabaseError::QueryError(e)
-            })?;
-        
+        let rows: Vec<PgRow> = qb.build().fetch_all(&self.pool).await.map_err(|e| {
+            tracing::error!(
+                "Postgres select error on table {}: {:?}. Pool Size: {}, Idle: {}",
+                table,
+                e,
+                self.pool.size(),
+                self.pool.num_idle()
+            );
+            DatabaseError::QueryError(e)
+        })?;
+
         let elapsed = start.elapsed();
         if elapsed > std::time::Duration::from_millis(500) {
-             tracing::warn!("Slow Postgres select on table {} took {:?}. Pool Size: {}, Idle: {}", table, elapsed, self.pool.size(), self.pool.num_idle());
+            tracing::warn!(
+                "Slow Postgres select on table {} took {:?}. Pool Size: {}, Idle: {}",
+                table,
+                elapsed,
+                self.pool.size(),
+                self.pool.num_idle()
+            );
         }
 
         Ok(rows.into_iter().map(|r| row_to_json_postgres(&r)).collect())
@@ -153,22 +168,35 @@ impl PostgresBackend {
         let pool_size = self.pool.size();
         let pool_idle = self.pool.num_idle();
         if pool_idle == 0 {
-            tracing::warn!("Postgres pool exhaustion risk? Size: {}, Idle: {} [Presuming insert on table: {}]", pool_size, pool_idle, table);
+            tracing::warn!(
+                "Postgres pool exhaustion risk? Size: {}, Idle: {} [Presuming insert on table: {}]",
+                pool_size,
+                pool_idle,
+                table
+            );
         }
         let start = std::time::Instant::now();
 
-        let row = qb
-            .build()
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| {
-                tracing::error!("Insert query failed on table {}: {:?}. Pool Size: {}, Idle: {}", table, e, self.pool.size(), self.pool.num_idle());
-                DatabaseError::QueryError(e)
-            })?;
-        
+        let row = qb.build().fetch_one(&self.pool).await.map_err(|e| {
+            tracing::error!(
+                "Insert query failed on table {}: {:?}. Pool Size: {}, Idle: {}",
+                table,
+                e,
+                self.pool.size(),
+                self.pool.num_idle()
+            );
+            DatabaseError::QueryError(e)
+        })?;
+
         let elapsed = start.elapsed();
         if elapsed > std::time::Duration::from_millis(500) {
-             tracing::warn!("Slow Postgres insert on table {} took {:?}. Pool Size: {}, Idle: {}", table, elapsed, self.pool.size(), self.pool.num_idle());
+            tracing::warn!(
+                "Slow Postgres insert on table {} took {:?}. Pool Size: {}, Idle: {}",
+                table,
+                elapsed,
+                self.pool.size(),
+                self.pool.num_idle()
+            );
         }
 
         let inserted = row_to_json_postgres(&row);
@@ -275,22 +303,35 @@ impl PostgresBackend {
         let pool_size = self.pool.size();
         let pool_idle = self.pool.num_idle();
         if pool_idle == 0 {
-            tracing::warn!("Postgres pool exhaustion risk? Size: {}, Idle: {} [Presuming update on table: {}]", pool_size, pool_idle, table);
+            tracing::warn!(
+                "Postgres pool exhaustion risk? Size: {}, Idle: {} [Presuming update on table: {}]",
+                pool_size,
+                pool_idle,
+                table
+            );
         }
         let start = std::time::Instant::now();
 
-        let res = qb
-            .build()
-            .execute(&self.pool)
-            .await
-            .map_err(|e| {
-                tracing::error!("Update query failed on table {}: {:?}. Pool Size: {}, Idle: {}", table, e, self.pool.size(), self.pool.num_idle());
-                DatabaseError::QueryError(e)
-            })?;
-        
+        let res = qb.build().execute(&self.pool).await.map_err(|e| {
+            tracing::error!(
+                "Update query failed on table {}: {:?}. Pool Size: {}, Idle: {}",
+                table,
+                e,
+                self.pool.size(),
+                self.pool.num_idle()
+            );
+            DatabaseError::QueryError(e)
+        })?;
+
         let elapsed = start.elapsed();
         if elapsed > std::time::Duration::from_millis(500) {
-             tracing::warn!("Slow Postgres update on table {} took {:?}. Pool Size: {}, Idle: {}", table, elapsed, self.pool.size(), self.pool.num_idle());
+            tracing::warn!(
+                "Slow Postgres update on table {} took {:?}. Pool Size: {}, Idle: {}",
+                table,
+                elapsed,
+                self.pool.size(),
+                self.pool.num_idle()
+            );
         }
 
         Ok(json!({"message": "Record updated", "affected_rows": res.rows_affected()}))
@@ -346,70 +387,6 @@ impl PostgresBackend {
             .map_err(DatabaseError::QueryError)?;
         Ok(res.rows_affected())
     }
-
-    async fn do_get_table_schema(
-        &self,
-        conn: &mut sqlx::PgConnection,
-        table: &str,
-    ) -> Result<Option<TableSchema>, DatabaseError> {
-        let query = r#"
-            SELECT 
-                c.column_name, 
-                c.data_type, 
-                c.is_nullable, 
-                c.column_default,
-                CASE WHEN tc.constraint_type = 'PRIMARY KEY' THEN true ELSE false END as is_primary_key
-            FROM information_schema.columns c
-            LEFT JOIN information_schema.key_column_usage kcu 
-                ON c.table_name = kcu.table_name 
-                AND c.column_name = kcu.column_name
-            LEFT JOIN information_schema.table_constraints tc 
-                ON kcu.constraint_name = tc.constraint_name 
-                AND kcu.table_name = tc.table_name 
-                AND tc.constraint_type = 'PRIMARY KEY'
-            WHERE c.table_name = $1 AND c.table_schema = current_schema()
-        "#;
-
-        let rows = sqlx::query(query)
-            .bind(table)
-            .fetch_all(conn)
-            .await
-            .map_err(DatabaseError::QueryError)?;
-
-        if rows.is_empty() {
-            return Ok(None);
-        }
-
-        let mut columns = Vec::new();
-        for row in rows {
-            let name: String = row.get("column_name");
-            let data_type: String = row.get("data_type");
-            let is_nullable: String = row.get("is_nullable");
-            let column_default: Option<String> = row.get("column_default");
-            let is_primary_key: Option<bool> = row.get("is_primary_key");
-
-            columns.push(ColumnDefinition {
-                name,
-                column_type: data_type,
-                nullable: is_nullable == "YES",
-                primary_key: is_primary_key.unwrap_or(false),
-                unique: false, // TODO: Check unique constraints
-                auto_increment: column_default
-                    .as_ref()
-                    .map(|d| d.contains("nextval"))
-                    .unwrap_or(false),
-                default_value: column_default,
-                auto_field: false,
-            });
-        }
-
-        Ok(Some(TableSchema {
-            table_name: table.to_string(),
-            columns,
-            indexes: vec![],
-            relations: vec![],
-        }))
-    }
 }
 
 impl DatabaseBackend for PostgresBackend {
@@ -449,7 +426,7 @@ impl DatabaseBackend for PostgresBackend {
                         AND tc.constraint_type = 'PRIMARY KEY'
                     WHERE c.table_name = $1 AND c.table_schema = current_schema()
                 "#;
-                
+
                 let rows = sqlx::query(query)
                     .bind(&schema.table_name)
                     .fetch_all(&pool)
@@ -457,10 +434,10 @@ impl DatabaseBackend for PostgresBackend {
                     .map_err(DatabaseError::QueryError)?;
 
                 let current_schema = if rows.is_empty() {
-                        None
+                    None
                 } else {
-                        let mut columns = Vec::new();
-                        for row in rows {
+                    let mut columns = Vec::new();
+                    for row in rows {
                         let name: String = row.get("column_name");
                         let data_type: String = row.get("data_type");
                         let is_nullable: String = row.get("is_nullable");
@@ -491,9 +468,10 @@ impl DatabaseBackend for PostgresBackend {
 
                 if let Some(current) = current_schema {
                     // Table exists, migrate
-                    let migration_sqls = SchemaGenerator::generate_migration_sql(&current, &schema, "postgres")
+                    let migration_sqls =
+                        SchemaGenerator::generate_migration_sql(&current, &schema, "postgres")
                             .map_err(DatabaseError::ValidationError)?;
-                    
+
                     for sql in migration_sqls {
                         tracing::info!(sql = %sql, "Executing migration SQL");
                         sqlx::raw_sql(&sql)
@@ -518,7 +496,7 @@ impl DatabaseBackend for PostgresBackend {
                     }
                 }
             }
-            
+
             // Release lock
             lock_tx.commit().await.map_err(DatabaseError::QueryError)?;
             Ok(())

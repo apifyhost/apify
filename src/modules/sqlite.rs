@@ -187,26 +187,39 @@ impl SqliteBackend {
         if let Some(o) = offset {
             qb.push(" OFFSET ").push_bind(o as i64);
         }
-        
+
         let pool_size = self.pool.size();
         let pool_idle = self.pool.num_idle();
         if pool_idle == 0 {
-            tracing::warn!("SQLite pool exhaustion risk? Size: {}, Idle: {} [Presuming select on table: {}]", pool_size, pool_idle, table);
+            tracing::warn!(
+                "SQLite pool exhaustion risk? Size: {}, Idle: {} [Presuming select on table: {}]",
+                pool_size,
+                pool_idle,
+                table
+            );
         }
 
         let start = std::time::Instant::now();
-        let rows = qb
-            .build()
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|e| {
-                tracing::error!("SQLite select error on table {}: {:?}. Pool Size: {}, Idle: {}", table, e, self.pool.size(), self.pool.num_idle());
-                DatabaseError::QueryError(e)
-            })?;
-        
+        let rows = qb.build().fetch_all(&self.pool).await.map_err(|e| {
+            tracing::error!(
+                "SQLite select error on table {}: {:?}. Pool Size: {}, Idle: {}",
+                table,
+                e,
+                self.pool.size(),
+                self.pool.num_idle()
+            );
+            DatabaseError::QueryError(e)
+        })?;
+
         let elapsed = start.elapsed();
         if elapsed > std::time::Duration::from_millis(500) {
-             tracing::warn!("Slow SQLite select on table {} took {:?}. Pool Size: {}, Idle: {}", table, elapsed, self.pool.size(), self.pool.num_idle());
+            tracing::warn!(
+                "Slow SQLite select on table {} took {:?}. Pool Size: {}, Idle: {}",
+                table,
+                elapsed,
+                self.pool.size(),
+                self.pool.num_idle()
+            );
         }
 
         Ok(rows.into_iter().map(|r| row_to_json_sqlite(&r)).collect())
@@ -235,18 +248,35 @@ impl SqliteBackend {
         let pool_size = self.pool.size();
         let pool_idle = self.pool.num_idle();
         if pool_idle == 0 {
-            tracing::warn!("SQLite pool exhaustion risk? Size: {}, Idle: {} [Presuming insert on table: {}]", pool_size, pool_idle, table);
+            tracing::warn!(
+                "SQLite pool exhaustion risk? Size: {}, Idle: {} [Presuming insert on table: {}]",
+                pool_size,
+                pool_idle,
+                table
+            );
         }
         let start = std::time::Instant::now();
 
         let res = qb.build().execute(&self.pool).await.map_err(|e| {
-            tracing::error!("Insert query failed on table {}: {:?}. Pool Size: {}, Idle: {}", table, e, self.pool.size(), self.pool.num_idle());
+            tracing::error!(
+                "Insert query failed on table {}: {:?}. Pool Size: {}, Idle: {}",
+                table,
+                e,
+                self.pool.size(),
+                self.pool.num_idle()
+            );
             DatabaseError::QueryError(e)
         })?;
 
         let elapsed = start.elapsed();
         if elapsed > std::time::Duration::from_millis(500) {
-             tracing::warn!("Slow SQLite insert on table {} took {:?}. Pool Size: {}, Idle: {}", table, elapsed, self.pool.size(), self.pool.num_idle());
+            tracing::warn!(
+                "Slow SQLite insert on table {} took {:?}. Pool Size: {}, Idle: {}",
+                table,
+                elapsed,
+                self.pool.size(),
+                self.pool.num_idle()
+            );
         }
 
         let last_id = res.last_insert_rowid();
@@ -342,18 +372,35 @@ impl SqliteBackend {
         let pool_size = self.pool.size();
         let pool_idle = self.pool.num_idle();
         if pool_idle == 0 {
-            tracing::warn!("SQLite pool exhaustion risk? Size: {}, Idle: {} [Presuming update on table: {}]", pool_size, pool_idle, table);
+            tracing::warn!(
+                "SQLite pool exhaustion risk? Size: {}, Idle: {} [Presuming update on table: {}]",
+                pool_size,
+                pool_idle,
+                table
+            );
         }
         let start = std::time::Instant::now();
 
         let res = qb.build().execute(&self.pool).await.map_err(|e| {
-            tracing::error!("Update query failed on table {}: {:?}. Pool Size: {}, Idle: {}", table, e, self.pool.size(), self.pool.num_idle());
+            tracing::error!(
+                "Update query failed on table {}: {:?}. Pool Size: {}, Idle: {}",
+                table,
+                e,
+                self.pool.size(),
+                self.pool.num_idle()
+            );
             DatabaseError::QueryError(e)
         })?;
 
         let elapsed = start.elapsed();
         if elapsed > std::time::Duration::from_millis(500) {
-             tracing::warn!("Slow SQLite update on table {} took {:?}. Pool Size: {}, Idle: {}", table, elapsed, self.pool.size(), self.pool.num_idle());
+            tracing::warn!(
+                "Slow SQLite update on table {} took {:?}. Pool Size: {}, Idle: {}",
+                table,
+                elapsed,
+                self.pool.size(),
+                self.pool.num_idle()
+            );
         }
 
         Ok(json!({"message": "Record updated", "affected_rows": res.rows_affected()}))
@@ -402,26 +449,39 @@ impl SqliteBackend {
                 }
             }
         }
-        
+
         let pool_size = self.pool.size();
         let pool_idle = self.pool.num_idle();
         if pool_idle == 0 {
-            tracing::warn!("SQLite pool exhaustion risk? Size: {}, Idle: {} [Presuming delete on table: {}]", pool_size, pool_idle, table);
+            tracing::warn!(
+                "SQLite pool exhaustion risk? Size: {}, Idle: {} [Presuming delete on table: {}]",
+                pool_size,
+                pool_idle,
+                table
+            );
         }
         let start = std::time::Instant::now();
 
-        let res = qb
-            .build()
-            .execute(&self.pool)
-            .await
-            .map_err(|e| {
-                tracing::error!("Delete query failed on table {}: {:?}. Pool Size: {}, Idle: {}", table, e, self.pool.size(), self.pool.num_idle());
-                DatabaseError::QueryError(e)
-            })?;
-        
+        let res = qb.build().execute(&self.pool).await.map_err(|e| {
+            tracing::error!(
+                "Delete query failed on table {}: {:?}. Pool Size: {}, Idle: {}",
+                table,
+                e,
+                self.pool.size(),
+                self.pool.num_idle()
+            );
+            DatabaseError::QueryError(e)
+        })?;
+
         let elapsed = start.elapsed();
         if elapsed > std::time::Duration::from_millis(500) {
-             tracing::warn!("Slow SQLite delete on table {} took {:?}. Pool Size: {}, Idle: {}", table, elapsed, self.pool.size(), self.pool.num_idle());
+            tracing::warn!(
+                "Slow SQLite delete on table {} took {:?}. Pool Size: {}, Idle: {}",
+                table,
+                elapsed,
+                self.pool.size(),
+                self.pool.num_idle()
+            );
         }
 
         Ok(res.rows_affected())
