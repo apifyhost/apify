@@ -213,6 +213,7 @@ pub struct ApiConfig {
     pub path: String,
     pub datasource: Option<String>,
     pub listeners: Option<Vec<String>>, // List of listener names
+    pub access_log: Option<AccessLogConfig>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

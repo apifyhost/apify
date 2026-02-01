@@ -112,7 +112,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                         config: openapi_config,
                                         modules: None,
                                         datasource: api_config.datasource.clone(),
-                                        access_log: None,
+                                        access_log: api_config.access_log.clone(),
                                         listeners: Some(target_listeners.clone()),
                                     });
                                 }
