@@ -50,18 +50,17 @@ pub async fn handle_listeners_request(
     match method {
         hyper::Method::GET => {
             let transform_record = |mut record: Value| -> Value {
-                if let Some(obj) = record.as_object_mut() {
-                    if let Some(config_str) =
-                        obj.get("config").and_then(|v| v.as_str()).map(|s| s.to_string())
-                    {
-                        if let Ok(config_json) = serde_json::from_str::<Value>(&config_str) {
-                            if let Some(config_obj) = config_json.as_object() {
-                                for (k, v) in config_obj {
-                                    if !obj.contains_key(k) {
-                                        obj.insert(k.clone(), v.clone());
-                                    }
-                                }
-                            }
+                if let Some(obj) = record.as_object_mut()
+                    && let Some(config_str) = obj
+                        .get("config")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                    && let Ok(config_json) = serde_json::from_str::<Value>(&config_str)
+                    && let Some(config_obj) = config_json.as_object()
+                {
+                    for (k, v) in config_obj {
+                        if !obj.contains_key(k) {
+                            obj.insert(k.clone(), v.clone());
                         }
                     }
                 }
