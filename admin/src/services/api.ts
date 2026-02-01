@@ -43,7 +43,7 @@ export const apiSlice = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Apis', 'DataSources', 'Listeners', 'Schemas'],
+  tagTypes: ['Apis', 'DataSources', 'Listeners', 'Schemas', 'Tables', 'TableData'],
   endpoints: (builder) => ({
     // API Configs
     getApis: builder.query<ApiConfig[], void>({
