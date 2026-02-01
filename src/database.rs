@@ -112,6 +112,11 @@ pub trait DatabaseBackend: Send + Sync {
                 + 'a,
         >,
     >;
+    fn list_tables<'a>(
+        &'a self,
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<Vec<String>, DatabaseError>> + Send + 'a>,
+    >;
 }
 
 #[derive(Clone)]
@@ -225,5 +230,9 @@ impl DatabaseManager {
         table: &str,
     ) -> Result<Option<TableSchema>, DatabaseError> {
         self.backend.get_table_schema(table).await
+    }
+
+    pub async fn list_tables(&self) -> Result<Vec<String>, DatabaseError> {
+        self.backend.list_tables().await
     }
 }

@@ -11,6 +11,7 @@ use tokio::net::TcpListener;
 
 use super::apis::handle_apis_request;
 use super::auth::handle_auth_request;
+use super::data_manager::{DbCache, create_db_cache, handle_data_manager_request};
 use super::datasources::handle_datasources_request;
 use super::import::handle_import_request;
 use super::listeners::handle_listeners_request;
@@ -75,6 +76,7 @@ pub async fn handle_control_plane_request(
     req: hyper::Request<hyper::body::Incoming>,
     db: &DatabaseManager,
     config: &crate::config::ControlPlaneConfig,
+    cache: &DbCache, // Added cache parameter
 ) -> Result<hyper::Response<Full<Bytes>>, Box<dyn std::error::Error + Send + Sync>> {
     let path = req.uri().path().to_string();
     tracing::info!("Control Plane Request: {} {}", req.method(), path);
@@ -127,6 +129,8 @@ pub async fn handle_control_plane_request(
         serve_static_file(&path).await
     } else if path.starts_with("/apify/admin/datasources") {
         handle_datasources_request(req, db).await
+    } else if path.starts_with("/apify/admin/data/") {
+        handle_data_manager_request(req, db, cache).await
     } else if path.starts_with("/apify/admin/auth") {
         handle_auth_request(req, db).await
     } else if path == "/apify/admin/import" {
@@ -148,12 +152,14 @@ pub async fn start_control_plane_server(
 
     let db = Arc::new(db);
     let config = Arc::new(config);
+    let cache = create_db_cache(); // Create cache
 
     loop {
         let (stream, _) = listener.accept().await?;
         let io = TokioIo::new(stream);
         let db_clone = db.clone();
         let config_clone = config.clone();
+        let cache_clone = cache.clone(); // Clone cache for each request
 
         tokio::task::spawn(async move {
             if let Err(err) = http1::Builder::new()
@@ -162,8 +168,9 @@ pub async fn start_control_plane_server(
                     service_fn(move |req| {
                         let db = db_clone.clone();
                         let config = config_clone.clone();
+                        let cache = cache_clone.clone();
                         async move {
-                            match handle_control_plane_request(req, &db, &config).await {
+                            match handle_control_plane_request(req, &db, &config, &cache).await {
                                 Ok(res) => Ok::<_, hyper::Error>(res),
                                 Err(e) => {
                                     tracing::error!("Internal server error: {}", e);

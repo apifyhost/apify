@@ -617,6 +617,23 @@ impl DatabaseBackend for PostgresBackend {
             }))
         })
     }
+
+    fn list_tables<'a>(
+        &'a self,
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<Vec<String>, DatabaseError>> + Send + 'a>,
+    > {
+        Box::pin(async move {
+            let query = "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE'";
+            let rows = sqlx::query(query)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(DatabaseError::QueryError)?;
+
+            let tables: Vec<String> = rows.iter().map(|r| r.get("table_name")).collect();
+            Ok(tables)
+        })
+    }
 }
 
 fn row_to_json_postgres(row: &PgRow) -> Value {
