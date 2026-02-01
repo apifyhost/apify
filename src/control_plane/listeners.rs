@@ -54,15 +54,14 @@ pub async fn handle_listeners_request(
                     // Explicitly remove "config" field first so it never appears in output
                     if let Some(config_val) = obj.remove("config") {
                         // If it existed and is a string, try to parse and merge its fields
-                        if let Some(config_str) = config_val.as_str() {
-                            if let Ok(config_json) = serde_json::from_str::<Value>(config_str) {
-                                if let Some(config_obj) = config_json.as_object() {
-                                    for (k, v) in config_obj {
-                                        // Only insert if key doesn't exist (record has precedence)
-                                        if !obj.contains_key(k) {
-                                            obj.insert(k.clone(), v.clone());
-                                        }
-                                    }
+                        if let Some(config_str) = config_val.as_str()
+                            && let Ok(config_json) = serde_json::from_str::<Value>(config_str)
+                            && let Some(config_obj) = config_json.as_object()
+                        {
+                            for (k, v) in config_obj {
+                                // Only insert if key doesn't exist (record has precedence)
+                                if !obj.contains_key(k) {
+                                    obj.insert(k.clone(), v.clone());
                                 }
                             }
                         }
