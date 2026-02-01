@@ -16,13 +16,25 @@ pub struct PostgresBackend {
 
 impl PostgresBackend {
     pub async fn connect(config: DatabaseRuntimeConfig) -> Result<Self, DatabaseError> {
+        tracing::info!(">>> CONNECTING TO POSTGRES. CONFIG URL: {} MAX SIZE: {} <<<", config.url, config.max_size);
         let pool = PgPoolOptions::new()
             .max_connections(config.max_size)
+            .acquire_timeout(std::time::Duration::from_secs(5))
             .connect(&config.url)
             .await
             .map_err(DatabaseError::PoolError)?;
+
+        tracing::info!(
+            "Connected to Postgres. Max pool size: {}, Current Size: {}, Idle: {}",
+            config.max_size,
+            pool.size(),
+            pool.num_idle()
+        );
+
         Ok(Self { pool })
     }
+
+
 
     async fn do_select(
         &self,
@@ -52,11 +64,28 @@ impl PostgresBackend {
         if let Some(o) = offset {
             qb.push(" OFFSET ").push_bind(o as i64);
         }
+        
+        let pool_size = self.pool.size();
+        let pool_idle = self.pool.num_idle();
+        if pool_idle == 0 {
+            tracing::warn!("Postgres pool exhaustion risk? Size: {}, Idle: {} [Presuming select on table: {}]", pool_size, pool_idle, table);
+        }
+        let start = std::time::Instant::now();
+
         let rows: Vec<PgRow> = qb
             .build()
             .fetch_all(&self.pool)
             .await
-            .map_err(DatabaseError::QueryError)?;
+            .map_err(|e| {
+                tracing::error!("Postgres select error on table {}: {:?}. Pool Size: {}, Idle: {}", table, e, self.pool.size(), self.pool.num_idle());
+                DatabaseError::QueryError(e)
+            })?;
+        
+        let elapsed = start.elapsed();
+        if elapsed > std::time::Duration::from_millis(500) {
+             tracing::warn!("Slow Postgres select on table {} took {:?}. Pool Size: {}, Idle: {}", table, elapsed, self.pool.size(), self.pool.num_idle());
+        }
+
         Ok(rows.into_iter().map(|r| row_to_json_postgres(&r)).collect())
     }
 
@@ -120,11 +149,28 @@ impl PostgresBackend {
             }
         }
         qb.push(") RETURNING *");
+
+        let pool_size = self.pool.size();
+        let pool_idle = self.pool.num_idle();
+        if pool_idle == 0 {
+            tracing::warn!("Postgres pool exhaustion risk? Size: {}, Idle: {} [Presuming insert on table: {}]", pool_size, pool_idle, table);
+        }
+        let start = std::time::Instant::now();
+
         let row = qb
             .build()
             .fetch_one(&self.pool)
             .await
-            .map_err(DatabaseError::QueryError)?;
+            .map_err(|e| {
+                tracing::error!("Insert query failed on table {}: {:?}. Pool Size: {}, Idle: {}", table, e, self.pool.size(), self.pool.num_idle());
+                DatabaseError::QueryError(e)
+            })?;
+        
+        let elapsed = start.elapsed();
+        if elapsed > std::time::Duration::from_millis(500) {
+             tracing::warn!("Slow Postgres insert on table {} took {:?}. Pool Size: {}, Idle: {}", table, elapsed, self.pool.size(), self.pool.num_idle());
+        }
+
         let inserted = row_to_json_postgres(&row);
 
         // Extract the id field from the inserted record
@@ -225,11 +271,28 @@ impl PostgresBackend {
                 }
             }
         }
+
+        let pool_size = self.pool.size();
+        let pool_idle = self.pool.num_idle();
+        if pool_idle == 0 {
+            tracing::warn!("Postgres pool exhaustion risk? Size: {}, Idle: {} [Presuming update on table: {}]", pool_size, pool_idle, table);
+        }
+        let start = std::time::Instant::now();
+
         let res = qb
             .build()
             .execute(&self.pool)
             .await
-            .map_err(DatabaseError::QueryError)?;
+            .map_err(|e| {
+                tracing::error!("Update query failed on table {}: {:?}. Pool Size: {}, Idle: {}", table, e, self.pool.size(), self.pool.num_idle());
+                DatabaseError::QueryError(e)
+            })?;
+        
+        let elapsed = start.elapsed();
+        if elapsed > std::time::Duration::from_millis(500) {
+             tracing::warn!("Slow Postgres update on table {} took {:?}. Pool Size: {}, Idle: {}", table, elapsed, self.pool.size(), self.pool.num_idle());
+        }
+
         Ok(json!({"message": "Record updated", "affected_rows": res.rows_affected()}))
     }
 
@@ -283,6 +346,70 @@ impl PostgresBackend {
             .map_err(DatabaseError::QueryError)?;
         Ok(res.rows_affected())
     }
+
+    async fn do_get_table_schema(
+        &self,
+        conn: &mut sqlx::PgConnection,
+        table: &str,
+    ) -> Result<Option<TableSchema>, DatabaseError> {
+        let query = r#"
+            SELECT 
+                c.column_name, 
+                c.data_type, 
+                c.is_nullable, 
+                c.column_default,
+                CASE WHEN tc.constraint_type = 'PRIMARY KEY' THEN true ELSE false END as is_primary_key
+            FROM information_schema.columns c
+            LEFT JOIN information_schema.key_column_usage kcu 
+                ON c.table_name = kcu.table_name 
+                AND c.column_name = kcu.column_name
+            LEFT JOIN information_schema.table_constraints tc 
+                ON kcu.constraint_name = tc.constraint_name 
+                AND kcu.table_name = tc.table_name 
+                AND tc.constraint_type = 'PRIMARY KEY'
+            WHERE c.table_name = $1 AND c.table_schema = current_schema()
+        "#;
+
+        let rows = sqlx::query(query)
+            .bind(table)
+            .fetch_all(conn)
+            .await
+            .map_err(DatabaseError::QueryError)?;
+
+        if rows.is_empty() {
+            return Ok(None);
+        }
+
+        let mut columns = Vec::new();
+        for row in rows {
+            let name: String = row.get("column_name");
+            let data_type: String = row.get("data_type");
+            let is_nullable: String = row.get("is_nullable");
+            let column_default: Option<String> = row.get("column_default");
+            let is_primary_key: Option<bool> = row.get("is_primary_key");
+
+            columns.push(ColumnDefinition {
+                name,
+                column_type: data_type,
+                nullable: is_nullable == "YES",
+                primary_key: is_primary_key.unwrap_or(false),
+                unique: false, // TODO: Check unique constraints
+                auto_increment: column_default
+                    .as_ref()
+                    .map(|d| d.contains("nextval"))
+                    .unwrap_or(false),
+                default_value: column_default,
+                auto_field: false,
+            });
+        }
+
+        Ok(Some(TableSchema {
+            table_name: table.to_string(),
+            columns,
+            indexes: vec![],
+            relations: vec![],
+        }))
+    }
 }
 
 impl DatabaseBackend for PostgresBackend {
@@ -291,83 +418,113 @@ impl DatabaseBackend for PostgresBackend {
         table_schemas: Vec<TableSchema>,
     ) -> core::pin::Pin<Box<dyn core::future::Future<Output = Result<(), DatabaseError>> + Send + 'a>>
     {
+        let pool = self.pool.clone();
         Box::pin(async move {
-            let mut conn = self
-                .pool
-                .acquire()
-                .await
-                .map_err(DatabaseError::PoolError)?;
-
-            // Use advisory lock to prevent concurrent schema creation across threads
-            // Lock ID: 123456789 (arbitrary number for schema creation)
-            let lock_acquired =
-                sqlx::query_scalar::<_, bool>("SELECT pg_try_advisory_lock(123456789)")
-                    .fetch_one(&mut *conn)
-                    .await
-                    .map_err(DatabaseError::QueryError)?;
-
-            if !lock_acquired {
-                // Another thread is creating the schema, wait for the lock to be released
-                sqlx::query("SELECT pg_advisory_lock(123456789)")
-                    .execute(&mut *conn)
-                    .await
-                    .map_err(DatabaseError::QueryError)?;
-                // Lock acquired after waiting, but schema should be ready now, so just unlock and return
-                sqlx::query("SELECT pg_advisory_unlock(123456789)")
-                    .execute(&mut *conn)
-                    .await
-                    .map_err(DatabaseError::QueryError)?;
-                return Ok(());
-            }
-
-            // We have the lock, proceed with schema creation
-            let result = async {
-                for schema in table_schemas {
-                    // Check if table exists
-                    let current_schema = self.get_table_schema(&schema.table_name).await?;
-
-                    if let Some(current) = current_schema {
-                        // Table exists, migrate
-                        let migration_sqls =
-                            SchemaGenerator::generate_migration_sql(&current, &schema, "postgres")
-                                .map_err(DatabaseError::ValidationError)?;
-                        for sql in migration_sqls {
-                            tracing::info!(sql = %sql, "Executing migration SQL");
-                            sqlx::raw_sql(&sql)
-                                .execute(&self.pool)
-                                .await
-                                .map_err(DatabaseError::QueryError)?;
-                        }
-                    } else {
-                        // Table does not exist, create
-                        let full_sql = SchemaGenerator::generate_create_table_sql_postgres(&schema);
-                        tracing::info!(sql = %full_sql, "Executing schema creation SQL");
-                        for stmt in full_sql.split(';') {
-                            let s = stmt.trim();
-                            if s.is_empty() {
-                                continue;
-                            }
-                            tracing::info!(statement = %s, "Executing SQL statement");
-                            sqlx::raw_sql(s)
-                                .execute(&self.pool)
-                                .await
-                                .map_err(DatabaseError::QueryError)?;
-                        }
-                    }
-                }
-                Ok::<(), DatabaseError>(())
-            }
-            .await;
-
-            // Always unlock, even if there was an error
-            sqlx::query("SELECT pg_advisory_unlock(123456789)")
-                .execute(&mut *conn)
+            // Acquire a transaction-scoped advisory lock to ensure only one instance runs migrations.
+            // We hold this transaction open until the end.
+            let mut lock_tx = pool.begin().await.map_err(DatabaseError::PoolError)?;
+            sqlx::query("SELECT pg_advisory_xact_lock(123456789)")
+                .execute(&mut *lock_tx)
                 .await
                 .map_err(DatabaseError::QueryError)?;
 
-            result
+            for schema in table_schemas {
+                // Check if table exists
+                // We use the pool (fetch a new connection) for queries inside the locked section.
+                // ample pool size is required to avoid deadlock (lock_tx holds 1, we need 1 more).
+                let query = r#"
+                    SELECT 
+                        c.column_name, 
+                        c.data_type, 
+                        c.is_nullable, 
+                        c.column_default,
+                        CASE WHEN tc.constraint_type = 'PRIMARY KEY' THEN true ELSE false END as is_primary_key
+                    FROM information_schema.columns c
+                    LEFT JOIN information_schema.key_column_usage kcu 
+                        ON c.table_name = kcu.table_name 
+                        AND c.column_name = kcu.column_name
+                    LEFT JOIN information_schema.table_constraints tc 
+                        ON kcu.constraint_name = tc.constraint_name 
+                        AND kcu.table_name = tc.table_name 
+                        AND tc.constraint_type = 'PRIMARY KEY'
+                    WHERE c.table_name = $1 AND c.table_schema = current_schema()
+                "#;
+                
+                let rows = sqlx::query(query)
+                    .bind(&schema.table_name)
+                    .fetch_all(&pool)
+                    .await
+                    .map_err(DatabaseError::QueryError)?;
+
+                let current_schema = if rows.is_empty() {
+                        None
+                } else {
+                        let mut columns = Vec::new();
+                        for row in rows {
+                        let name: String = row.get("column_name");
+                        let data_type: String = row.get("data_type");
+                        let is_nullable: String = row.get("is_nullable");
+                        let column_default: Option<String> = row.get("column_default");
+                        let is_primary_key: Option<bool> = row.get("is_primary_key");
+
+                        columns.push(ColumnDefinition {
+                            name,
+                            column_type: data_type,
+                            nullable: is_nullable == "YES",
+                            primary_key: is_primary_key.unwrap_or(false),
+                            unique: false,
+                            auto_increment: column_default
+                                .as_ref()
+                                .map(|d| d.contains("nextval"))
+                                .unwrap_or(false),
+                            default_value: column_default,
+                            auto_field: false,
+                        });
+                    }
+                    Some(TableSchema {
+                        table_name: schema.table_name.clone(),
+                        columns,
+                        indexes: vec![],
+                        relations: vec![],
+                    })
+                };
+
+                if let Some(current) = current_schema {
+                    // Table exists, migrate
+                    let migration_sqls = SchemaGenerator::generate_migration_sql(&current, &schema, "postgres")
+                            .map_err(DatabaseError::ValidationError)?;
+                    
+                    for sql in migration_sqls {
+                        tracing::info!(sql = %sql, "Executing migration SQL");
+                        sqlx::raw_sql(&sql)
+                            .execute(&pool)
+                            .await
+                            .map_err(DatabaseError::QueryError)?;
+                    }
+                } else {
+                    // Table does not exist, create
+                    let full_sql = SchemaGenerator::generate_create_table_sql_postgres(&schema);
+                    tracing::info!(sql = %full_sql, "Executing schema creation SQL");
+                    for stmt in full_sql.split(';') {
+                        let s = stmt.trim();
+                        if s.is_empty() {
+                            continue;
+                        }
+                        tracing::info!(statement = %s, "Executing SQL statement");
+                        sqlx::raw_sql(s)
+                            .execute(&pool)
+                            .await
+                            .map_err(DatabaseError::QueryError)?;
+                    }
+                }
+            }
+            
+            // Release lock
+            lock_tx.commit().await.map_err(DatabaseError::QueryError)?;
+            Ok(())
         })
     }
+
     fn select<'a>(
         &'a self,
         table: &'a str,

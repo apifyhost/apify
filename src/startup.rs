@@ -71,7 +71,7 @@ pub async fn init_database(
         crate::database::DatabaseRuntimeConfig {
             driver: s.driver.clone(),
             url,
-            max_size: s.max_pool_size.unwrap_or(5) as u32,
+            max_size: s.max_pool_size.unwrap_or(20) as u32,
         }
     } else {
         crate::database::DatabaseRuntimeConfig::sqlite_default()

@@ -13,4 +13,4 @@ datasource:
   sqlite1:
     driver: sqlite
     database: /app/data/orders.db
-    max_pool_size: 5
+    max_pool_size: 20

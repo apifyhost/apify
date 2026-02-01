@@ -67,7 +67,7 @@ export const DataSourcesPage = () => {
       key: 'db_type',
       width: 120,
       render: (type) => {
-        const color = type === 'postgresql' ? 'blue' : type === 'mysql' ? 'orange' : 'default';
+        const color = type === 'postgres' ? 'blue' : 'green';
         return <Tag color={color}>{type.toUpperCase()}</Tag>;
       },
     },
@@ -169,10 +169,10 @@ export const DataSourcesPage = () => {
             name="db_type"
             label="数据库类型"
             rules={[{ required: true, message: '请选择数据库类型' }]}
-            initialValue="postgresql"
+            initialValue="postgres"
           >
             <Select>
-              <Select.Option value="postgresql">PostgreSQL</Select.Option>
+              <Select.Option value="postgres">PostgreSQL</Select.Option>
               <Select.Option value="sqlite">SQLite</Select.Option>
             </Select>
           </Form.Item>
