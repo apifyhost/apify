@@ -236,32 +236,32 @@ pub async fn handle_listeners_request(
                 // Extract listener name if available
                 let existing_record = &existing[0];
                 let mut listener_name = None;
-                if let Some(config_str) = existing_record.get("config").and_then(|v| v.as_str()) {
-                    if let Ok(conf) =
+                if let Some(config_str) = existing_record.get("config").and_then(|v| v.as_str())
+                    && let Ok(conf) =
                         serde_json::from_str::<crate::config::ListenerConfig>(config_str)
-                    {
-                        listener_name = conf.name;
-                    }
+                {
+                    listener_name = conf.name;
                 }
 
                 // Check if listener is used by any API
-                let api_records = db.select("_meta_api_configs", None, None, None, None).await?;
+                let api_records = db
+                    .select("_meta_api_configs", None, None, None, None)
+                    .await?;
                 for api in api_records {
-                    if let Some(listeners_json) = api.get("listeners").and_then(|v| v.as_str()) {
-                        if let Ok(listeners) = serde_json::from_str::<Vec<String>>(listeners_json) {
-                            let mut used = listeners.contains(&id);
-                            if !used {
-                                if let Some(name) = &listener_name {
-                                    used = listeners.contains(name);
-                                }
-                            }
+                    if let Some(listeners_json) = api.get("listeners").and_then(|v| v.as_str())
+                        && let Ok(listeners) = serde_json::from_str::<Vec<String>>(listeners_json)
+                    {
+                        let mut used = listeners.contains(&id);
+                        if !used && let Some(name) = &listener_name {
+                            used = listeners.contains(name);
+                        }
 
-                            if used {
-                                let api_name = api
-                                    .get("name")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("Unknown");
-                                return Ok(Response::builder()
+                        if used {
+                            let api_name = api
+                                .get("name")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("Unknown");
+                            return Ok(Response::builder()
                                     .status(StatusCode::CONFLICT)
                                     .header("Content-Type", "application/json")
                                     .body(Full::new(Bytes::from(
@@ -270,7 +270,6 @@ pub async fn handle_listeners_request(
                                         })
                                         .to_string(),
                                     )))?);
-                            }
                         }
                     }
                 }

@@ -266,15 +266,18 @@ pub async fn handle_datasources_request(
                 let datasource_name = existing[0].get("name").and_then(|v| v.as_str());
 
                 if let Some(ds_name) = datasource_name {
-                    let api_records = db.select("_meta_api_configs", None, None, None, None).await?;
+                    let api_records = db
+                        .select("_meta_api_configs", None, None, None, None)
+                        .await?;
                     for api in api_records {
-                        if let Some(api_ds) = api.get("datasource_name").and_then(|v| v.as_str()) {
-                            if api_ds == ds_name {
-                                let api_name = api
-                                    .get("name")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("Unknown");
-                                return Ok(Response::builder()
+                        if let Some(api_ds) = api.get("datasource_name").and_then(|v| v.as_str())
+                            && api_ds == ds_name
+                        {
+                            let api_name = api
+                                .get("name")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("Unknown");
+                            return Ok(Response::builder()
                                     .status(StatusCode::CONFLICT)
                                     .header("Content-Type", "application/json")
                                     .body(Full::new(Bytes::from(
@@ -282,7 +285,6 @@ pub async fn handle_datasources_request(
                                             "error": format!("Datasource is used by API '{}'. Please delete the API first.", api_name)
                                         }).to_string(),
                                     )))?);
-                            }
                         }
                     }
                 }
