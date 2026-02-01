@@ -86,10 +86,10 @@ pub fn start_listener(
         // Create application state
         tracing::info!("Thread {} creating AppState...", thread_id);
         let state = match AppState::new_with_crud(crate::app_state::AppStateConfig {
-            routes: listener_config.routes.clone(),
+            routes: None,
             datasources: context.datasources.take(), // Take ownership
             openapi_configs: context.openapi_configs,
-            listener_modules: listener_config.modules.clone(),
+            listener_modules: None,
             auth_config: context.auth_config,
             public_url: None,
             access_log_config: context.access_log_config,
@@ -189,10 +189,10 @@ pub fn start_listener(
 
                     // 6. Create new AppState
                     let new_state = match AppState::new_with_crud(AppStateConfig {
-                        routes: new_listener_config.routes,
+                        routes: None,
                         datasources: Some(final_datasources),
                         openapi_configs: new_openapi_configs,
-                        listener_modules: new_listener_config.modules,
+                        listener_modules: None,
                         auth_config: Some(final_auth),
                         public_url: None,
                         access_log_config: initial_access_log.clone(),
@@ -284,10 +284,10 @@ pub fn start_docs_server(
 
         // Create initial application state
         let state = match AppState::new_with_crud(AppStateConfig {
-            routes: listener_config.routes.clone(),
+            routes: None,
             datasources: context.datasources.take(),
             openapi_configs: context.openapi_configs,
-            listener_modules: listener_config.modules.clone(),
+            listener_modules: None,
             auth_config: context.auth_config,
             public_url: Some(format!("http://localhost:{}", listener_port)),
             access_log_config: context.access_log_config,
@@ -341,9 +341,6 @@ pub fn start_docs_server(
                                 port: 0,
                                 ip: "0.0.0.0".to_string(),
                                 protocol: "http".to_string(),
-                                routes: None,
-                                modules: None,
-                                consumers: None,
                             }
                          }
                     } else {
@@ -360,9 +357,6 @@ pub fn start_docs_server(
                                     port: 0,
                                     ip: "0.0.0.0".to_string(),
                                     protocol: "http".to_string(),
-                                    routes: None,
-                                    modules: None,
-                                    consumers: None,
                                 }
                             }
                         }
@@ -416,10 +410,10 @@ pub fn start_docs_server(
 
                     // 6. Create new AppState
                     let new_state = match AppState::new_with_crud(AppStateConfig {
-                        routes: new_listener_config.routes,
+                        routes: None,
                         datasources: Some(final_datasources),
                         openapi_configs: new_openapi_configs,
-                        listener_modules: new_listener_config.modules,
+                        listener_modules: None,
                         auth_config: Some(final_auth),
                         public_url: Some(format!("http://localhost:{}", listener_port)),
                         access_log_config: initial_access_log.clone(),

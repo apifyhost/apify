@@ -53,9 +53,8 @@ pub async fn handle_datasources_request(
             let transform_record = |mut record: Value| -> Value {
                 if let Some(obj) = record.as_object_mut() {
                     if let Some(config_str) = obj
-                        .get("config")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string())
+                        .remove("config")
+                        .and_then(|v| v.as_str().map(|s| s.to_string()))
                         && let Ok(config_json) = serde_json::from_str::<Value>(&config_str)
                         && let Some(config_obj) = config_json.as_object()
                     {

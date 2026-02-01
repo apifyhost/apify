@@ -167,12 +167,6 @@ pub struct ListenerConfig {
     pub ip: String,
     #[serde(default = "default_protocol")]
     pub protocol: String,
-    #[serde(default)]
-    pub routes: Option<Vec<RouteConfig>>, // Legacy routes support
-    #[serde(default)]
-    pub modules: Option<ModulesConfig>, // Listener-level fallback modules (internal, not OpenAPI)
-    #[serde(default)]
-    pub consumers: Option<Vec<ConsumerConfig>>, // Authentication consumers
 }
 
 fn default_protocol() -> String {
@@ -219,8 +213,6 @@ pub struct ApiConfig {
     pub path: String,
     pub datasource: Option<String>,
     pub listeners: Option<Vec<String>>, // List of listener names
-    pub modules: Option<ModulesConfig>,
-    pub access_log: Option<AccessLogConfig>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

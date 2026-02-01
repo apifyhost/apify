@@ -66,9 +66,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     port: 0, // Not used
                     ip: "0.0.0.0".to_string(),
                     protocol: "http".to_string(),
-                    routes: None,
-                    modules: None,
-                    consumers: None,
                 }
             });
 
@@ -93,9 +90,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         {
                             openapi_configs.push(OpenApiStateConfig {
                                 config: openapi_config,
-                                modules: api_config.modules.clone(),
+                                modules: None,
                                 datasource: api_config.datasource.clone(),
-                                access_log: api_config.access_log.clone(),
+                                access_log: None,
                                 listeners: Some(target_listeners.clone()),
                             });
                         }
