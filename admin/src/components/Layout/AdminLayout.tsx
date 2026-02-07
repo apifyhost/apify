@@ -6,6 +6,7 @@ import {
   DatabaseOutlined,
   CloudServerOutlined,
   TableOutlined,
+  AppstoreOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   UserOutlined,
@@ -34,11 +35,6 @@ export const AdminLayout = () => {
       label: <Link to="/dashboard">仪表板</Link>,
     },
     {
-      key: '/apis',
-      icon: <ApiOutlined />,
-      label: <Link to="/apis">API 配置</Link>,
-    },
-    {
       key: '/datasources',
       icon: <DatabaseOutlined />,
       label: <Link to="/datasources">数据源</Link>,
@@ -47,6 +43,16 @@ export const AdminLayout = () => {
       key: '/listeners',
       icon: <CloudServerOutlined />,
       label: <Link to="/listeners">监听器</Link>,
+    },
+    {
+      key: '/apis',
+      icon: <ApiOutlined />,
+      label: <Link to="/apis">API 配置</Link>,
+    },
+    {
+      key: '/data-manager',
+      icon: <AppstoreOutlined />,
+      label: <Link to="/data-manager">数据管理</Link>,
     },
     {
       key: '/schemas',

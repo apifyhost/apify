@@ -104,12 +104,23 @@ async fn handle_request_inner(
         }
 
         if let Some(config) = &state.control_plane_config {
-            return crate::control_plane::handle_control_plane_request(
-                req_builder.body(body_stream)?,
-                db,
-                config,
-            )
-            .await;
+            if let Some(cache) = &state.data_manager_cache {
+                return crate::control_plane::handle_control_plane_request(
+                    req_builder.body(body_stream)?,
+                    db,
+                    config,
+                    cache,
+                )
+                .await;
+            } else {
+                tracing::error!("Data Manager Cache is missing in AppState");
+                return Ok(Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(Full::new(Bytes::from(
+                        "Internal Server Error: Data Manager Cache Missing",
+                    )))
+                    .unwrap());
+            }
         } else {
             tracing::error!("Control Plane DB is present but Config is missing in AppState");
             return Ok(Response::builder()

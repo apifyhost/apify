@@ -6,6 +6,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { Login } from '@/pages/Login';
 import { Dashboard } from '@/pages/Dashboard';
 import { ApisPage } from '@/pages/Apis';
+import { DataManagerPage } from '@/pages/DataManager';
 import { DataSourcesPage } from '@/pages/DataSources';
 import { ListenersPage } from '@/pages/Listeners';
 import { SchemasPage } from '@/pages/Schemas';
@@ -49,6 +50,7 @@ export const Application = () => {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="apis" element={<ApisPage />} />
+        <Route path="data-manager" element={<DataManagerPage />} />
         <Route path="datasources" element={<DataSourcesPage />} />
         <Route path="listeners" element={<ListenersPage />} />
         <Route path="schemas" element={<SchemasPage />} />

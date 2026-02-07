@@ -552,6 +552,24 @@ impl DatabaseBackend for SqliteBackend {
     > {
         Box::pin(async move { self.do_get_table_schema(table).await })
     }
+
+    fn list_tables<'a>(
+        &'a self,
+    ) -> core::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<Vec<String>, DatabaseError>> + Send + 'a>,
+    > {
+        Box::pin(async move {
+            let query =
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'";
+            let rows = sqlx::query(query)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(DatabaseError::QueryError)?;
+
+            let tables: Vec<String> = rows.iter().map(|r| r.get("name")).collect();
+            Ok(tables)
+        })
+    }
 }
 
 fn row_to_json_sqlite(row: &SqliteRow) -> Value {

@@ -50,6 +50,7 @@ pub struct AppState {
     pub auth_config: Option<Vec<Authenticator>>, // Full auth configuration
     pub control_plane_db: Option<DatabaseManager>, // Database for control plane
     pub control_plane_config: Option<crate::config::ControlPlaneConfig>, // Config for control plane
+    pub data_manager_cache: Option<crate::control_plane::data_manager::DbCache>, // Cache for user datasources
 }
 
 impl AppState {
@@ -73,6 +74,7 @@ impl AppState {
             auth_config: None,
             control_plane_db: None,
             control_plane_config: None,
+            data_manager_cache: None,
         }
     }
 
@@ -431,6 +433,7 @@ impl AppState {
             auth_config,
             control_plane_db: config.control_plane_db,
             control_plane_config: config.control_plane_config,
+            data_manager_cache: Some(crate::control_plane::data_manager::create_db_cache()),
         })
     }
 }
